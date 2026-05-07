@@ -6,12 +6,15 @@ from typing import Final
 
 DOMAIN: Final = "dooya"
 
+# Événement HA tiré par cover.py, écouté par ESPHome (on_homeassistant_event)
+EVENT_DOOYA_TRANSMIT: Final = "dooya.transmit"
+
 # Clés de configuration
-CONF_TRANSMITTER: Final = "transmitter"  # UUID de l'entité transmetteur RF
-CONF_DOOYA_ID: Final = "dooya_id"        # Identifiant 24 bits de la télécommande
-CONF_CHANNEL: Final = "channel"          # Canal du volet (1-16)
-CONF_CHECK: Final = "check"              # Code de contrôle (4 bits)
-CONF_COVER_NAME: Final = "cover_name"    # Nom du volet
+CONF_ESPHOME_DEVICE: Final = "esphome_device"  # Nom du device ESPHome (slug)
+CONF_DOOYA_ID: Final = "dooya_id"              # Identifiant 24 bits de la télécommande
+CONF_CHANNEL: Final = "channel"                # Canal du volet (1-16)
+CONF_CHECK: Final = "check"                    # Code de contrôle (4 bits)
+CONF_COVER_NAME: Final = "cover_name"          # Nom du volet
 
 # Valeurs par défaut
 DEFAULT_CHANNEL: Final = 1

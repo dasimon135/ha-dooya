@@ -1,4 +1,13 @@
-"""Plateforme cover pour les volets Dooya RF433."""
+"""Plateforme cover pour les volets Dooya RF433.
+
+Principe de fonctionnement :
+- HA fire un événement `dooya.transmit` sur le bus interne
+- ESPHome écoute via `on_homeassistant_event: dooya.transmit`
+- ESPHome appelle `remote_transmitter.transmit_dooya` avec les paramètres
+
+Avantage : aucune dépendance à radio_frequency, compatible avec
+tout transmetteur ESPHome exposant le handler d'événement.
+"""
 
 from __future__ import annotations
 
@@ -10,25 +19,18 @@ from homeassistant.components.cover import (
     CoverEntity,
     CoverEntityFeature,
 )
-from homeassistant.components.radio_frequency import (
-    ModulationType,
-    async_send_command,
-)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import DEFAULT_CHECK_DOWN, DEFAULT_CHECK_STOP, DEFAULT_CHECK_UP, DOMAIN
-from .dooya_protocol import (
-    BUTTON_DOWN,
-    BUTTON_STOP,
-    BUTTON_UP,
-    DOOYA_FREQUENCY_HZ,
-    DooyaData,
-    encode_dooya,
+from .const import (
+    DEFAULT_CHECK_DOWN,
+    DEFAULT_CHECK_STOP,
+    DEFAULT_CHECK_UP,
+    EVENT_DOOYA_TRANSMIT,
 )
+from .dooya_protocol import BUTTON_DOWN, BUTTON_STOP, BUTTON_UP
 from .entity import DooyaBaseEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -43,33 +45,13 @@ async def async_setup_entry(
     async_add_entities([DooyaCover(config_entry)])
 
 
-class RadioFrequencyCommand:
-    """Commande RF433 OOK pour le protocole Dooya.
-
-    Encapsule les timings OOK à envoyer via la plateforme radio_frequency de HA.
-    La fréquence est 433.92 MHz, modulation OOK.
-    """
-
-    def __init__(self, data: DooyaData) -> None:
-        """Initialiser la commande depuis des données Dooya."""
-        self._data = data
-        self.frequency: int = DOOYA_FREQUENCY_HZ
-        self.modulation: ModulationType = ModulationType.OOK
-
-    def get_raw_timings(self) -> list[int]:
-        """Retourner la liste de timings OOK en µs (HIGH, LOW alternés)."""
-        return encode_dooya(self._data)
-
-
 class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
-    """Volet Dooya RF433 contrôlé via la plateforme radio_frequency de HA.
+    """Volet Dooya RF433.
 
-    État supposé (assumed_state) — aucun retour d'état du volet.
-    Fonctionnalités : ouvrir, fermer, stopper.
+    Commande le volet via l'événement HA `dooya.transmit` qui est
+    intercepté par ESPHome (on_homeassistant_event).
 
-    Compatibilité transmetteurs :
-    - ESPHome + CC1101 (via radio_frequency platform)
-    - Broadlink RM4 Pro (via radio_frequency platform)
+    État supposé (assumed_state) — aucun retour d'état du volet physique.
     """
 
     _attr_device_class = CoverDeviceClass.SHUTTER
@@ -98,46 +80,49 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     async def async_open_cover(self, **kwargs: Any) -> None:
         """Ouvrir le volet (commande UP, button=1)."""
-        await self._async_send(BUTTON_UP, DEFAULT_CHECK_UP)
+        self._fire_transmit(BUTTON_UP, DEFAULT_CHECK_UP)
         self._is_closed = False
         self.async_write_ha_state()
 
     async def async_close_cover(self, **kwargs: Any) -> None:
         """Fermer le volet (commande DOWN, button=3)."""
-        await self._async_send(BUTTON_DOWN, DEFAULT_CHECK_DOWN)
+        self._fire_transmit(BUTTON_DOWN, DEFAULT_CHECK_DOWN)
         self._is_closed = True
         self.async_write_ha_state()
 
     async def async_stop_cover(self, **kwargs: Any) -> None:
         """Stopper le volet (commande STOP, button=5)."""
-        await self._async_send(BUTTON_STOP, DEFAULT_CHECK_STOP)
-        # L'état n'est pas connu après un stop
+        self._fire_transmit(BUTTON_STOP, DEFAULT_CHECK_STOP)
         self.async_write_ha_state()
 
-    async def _async_send(self, button: int, check: int) -> None:
-        """Encoder et envoyer la commande RF via la plateforme radio_frequency."""
-        registry = er.async_get(self.hass)
-        transmitter_entity_id = self._get_transmitter_entity_id(registry)
+    def _fire_transmit(self, button: int, check: int) -> None:
+        """Tirer l'événement dooya.transmit sur le bus HA.
 
-        if transmitter_entity_id is None:
-            _LOGGER.error(
-                "Transmetteur RF introuvable (UUID=%s) pour le volet %s",
-                self._transmitter_uuid,
-                self.name,
-            )
-            return
+        ESPHome intercepte cet événement via on_homeassistant_event
+        et déclenche remote_transmitter.transmit_dooya.
 
-        data = DooyaData(
-            id=self._dooya_id,
-            channel=self._channel,
-            button=button,
-            check=check,
+        Format de l'événement :
+          id      : identifiant hex 8 caractères, ex "00D1C917"
+          channel : canal (int)
+          button  : bouton (1=up, 3=down, 5=stop)
+          check   : code de contrôle
+          device  : slug du device ESPHome (filtre optionnel)
+        """
+        self.hass.bus.async_fire(
+            EVENT_DOOYA_TRANSMIT,
+            {
+                "id": f"{self._dooya_id:08X}",
+                "channel": self._channel,
+                "button": button,
+                "check": check,
+                "device": self._esphome_device,
+            },
         )
-        command = RadioFrequencyCommand(data)
-
-        try:
-            await async_send_command(self.hass, transmitter_entity_id, command)
-        except Exception:  # noqa: BLE001
-            _LOGGER.exception(
-                "Erreur lors de l'envoi de la commande RF au volet %s", self.name
-            )
+        _LOGGER.debug(
+            "dooya.transmit → id=%08X channel=%d button=%d check=%d device=%s",
+            self._dooya_id,
+            self._channel,
+            button,
+            check,
+            self._esphome_device,
+        )

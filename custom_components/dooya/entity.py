@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import Entity
 
 from .const import (
@@ -11,7 +10,7 @@ from .const import (
     CONF_CHECK,
     CONF_COVER_NAME,
     CONF_DOOYA_ID,
-    CONF_TRANSMITTER,
+    CONF_ESPHOME_DEVICE,
     DOMAIN,
 )
 
@@ -19,8 +18,8 @@ from .const import (
 class DooyaBaseEntity(Entity):
     """Entité de base pour les volets Dooya.
 
-    Fournit les attributs communs et la résolution du transmetteur RF
-    depuis son UUID (résistant aux renommages d'entité).
+    Transmet les commandes via l'événement HA `dooya.transmit`
+    écouté par ESPHome (on_homeassistant_event).
     """
 
     _attr_has_entity_name = True
@@ -35,7 +34,7 @@ class DooyaBaseEntity(Entity):
         self._dooya_id: int = data[CONF_DOOYA_ID]
         self._channel: int = data[CONF_CHANNEL]
         self._check: int = data[CONF_CHECK]
-        self._transmitter_uuid: str = data[CONF_TRANSMITTER]
+        self._esphome_device: str = data.get(CONF_ESPHOME_DEVICE, "")
         cover_name: str = data[CONF_COVER_NAME]
 
         self._attr_name = cover_name
@@ -45,13 +44,3 @@ class DooyaBaseEntity(Entity):
             "manufacturer": "Dooya",
             "model": "RF433 Cover",
         }
-
-    def _get_transmitter_entity_id(self, registry: er.EntityRegistry) -> str | None:
-        """Résoudre l'entity_id du transmetteur depuis son UUID.
-
-        Utilise l'UUID stocké pour être résistant aux renommages.
-        """
-        entry = registry.async_get_entry(self._transmitter_uuid)  # type: ignore[arg-type]
-        if entry is None:
-            return None
-        return entry.entity_id

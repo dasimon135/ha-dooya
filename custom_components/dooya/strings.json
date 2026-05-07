@@ -2,10 +2,10 @@
   "config": {
     "step": {
       "user": {
-        "title": "Dooya RF Cover — Transmitter",
-        "description": "Select the RF433 transmitter that will control this cover.",
+        "title": "Dooya RF Cover — ESPHome Device",
+        "description": "Enter the ESPHome device name that will transmit RF commands (e.g. `volets-dooya-rf433`). Leave blank if you have only one ESPHome device with the Dooya handler.",
         "data": {
-          "transmitter": "RF Transmitter"
+          "esphome_device": "ESPHome device name (optional)"
         }
       },
       "learn": {
