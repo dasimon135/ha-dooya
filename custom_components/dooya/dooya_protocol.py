@@ -116,43 +116,35 @@ def decode_dooya(timings: list[int]) -> DooyaData | None:
     def _match(value: int, reference: int) -> bool:
         return abs(value - reference) <= reference * TOLERANCE
 
-    idx = 0
+    pos = [0]  # liste pour permettre la mutation depuis les closures
 
     def _read() -> int | None:
-        nonlocal idx
-        if idx >= len(timings):
+        if pos[0] >= len(timings):
             return None
-        val = timings[idx]
-        idx += 1
+        val = timings[pos[0]]
+        pos[0] += 1
         return val
 
     def _expect_item(high_ref: int, low_ref: int) -> bool:
         h = _read()
-        l = _read()
-        if h is None or l is None:
+        lo = _read()
+        if h is None or lo is None:
             return False
-        return _match(h, high_ref) and _match(l, low_ref)
-
-    def _expect_mark(high_ref: int) -> bool:
-        h = _read()
-        if h is None:
-            return False
-        return _match(h, high_ref)
+        return _match(h, high_ref) and _match(lo, low_ref)
 
     def _read_bits(nbits: int) -> int | None:
         value = 0
         for _ in range(nbits):
-            h = timings[idx] if idx < len(timings) else None
-            l = timings[idx + 1] if idx + 1 < len(timings) else None
-            if h is None or l is None:
+            h = timings[pos[0]] if pos[0] < len(timings) else None
+            lo = timings[pos[0] + 1] if pos[0] + 1 < len(timings) else None
+            if h is None or lo is None:
                 return None
-            nonlocal idx  # noqa: F824 — nécessaire pour lire dans la closure
-            if _match(h, BIT_ONE_HIGH_US) and _match(l, BIT_ONE_LOW_US):
+            if _match(h, BIT_ONE_HIGH_US) and _match(lo, BIT_ONE_LOW_US):
                 value = (value << 1) | 1
-                idx += 2
-            elif _match(h, BIT_ZERO_HIGH_US) and _match(l, BIT_ZERO_LOW_US):
+                pos[0] += 2
+            elif _match(h, BIT_ZERO_HIGH_US) and _match(lo, BIT_ZERO_LOW_US):
                 value = (value << 1) | 0
-                idx += 2
+                pos[0] += 2
             else:
                 return None
         return value

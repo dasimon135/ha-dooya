@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from custom_components.dooya.dooya_protocol import (
+from dooya_protocol import (
     BUTTON_DOWN,
     BUTTON_STOP,
     BUTTON_UP,
