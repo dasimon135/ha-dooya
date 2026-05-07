@@ -1,0 +1,11 @@
+{
+  "domain": "dooya",
+  "name": "Dooya RF Covers",
+  "config_flow": true,
+  "dependencies": ["radio_frequency"],
+  "documentation": "https://github.com/dasimon135/ha-dooya",
+  "integration_type": "device",
+  "iot_class": "assumed_state",
+  "codeowners": ["@dasimon135"],
+  "version": "0.1.0"
+}

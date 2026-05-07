@@ -1,0 +1,45 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Dooya RF Cover — Transmitter",
+        "description": "Select the RF433 transmitter that will control this cover.",
+        "data": {
+          "transmitter": "RF Transmitter"
+        }
+      },
+      "learn": {
+        "title": "Learning Mode",
+        "description": "Press the **UP** button on the Dooya remote within {timeout} seconds.\nIf the signal is received, the ID will be filled in automatically.\nCheck 'Skip' to enter the ID manually.",
+        "data": {
+          "skip": "Enter manually"
+        }
+      },
+      "confirm": {
+        "title": "Confirm Learned Data",
+        "description": "Signal received!\n- ID: **{dooya_id}**\n- Channel: **{channel}**\n\nEnter a name for this cover.",
+        "data": {
+          "cover_name": "Cover name"
+        }
+      },
+      "manual": {
+        "title": "Manual Entry",
+        "description": "Enter the Dooya remote ID manually. You can find it in your ESPHome logs.",
+        "data": {
+          "cover_name": "Cover name",
+          "dooya_id": "Remote ID (hex, e.g. 00D1C917)",
+          "channel": "Channel (1-16)",
+          "check": "Check code (0-15)"
+        }
+      }
+    },
+    "abort": {
+      "no_transmitters": "No compatible RF433 OOK transmitter found. Please set up a transmitter first (ESPHome CC1101 or Broadlink RM4 Pro)."
+    },
+    "error": {
+      "invalid_transmitter": "Selected entity is not a valid transmitter.",
+      "invalid_dooya_id": "Invalid ID. Expected a hexadecimal value (e.g. 00D1C917).",
+      "learn_timeout": "No signal received within the timeout. Press 'Skip' to enter the ID manually."
+    }
+  }
+}

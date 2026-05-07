@@ -1,0 +1,9 @@
+{
+  "name": "Dooya RF Covers",
+  "description": "Home Assistant integration for Dooya RF433 motorized covers/blinds. Supports all Dooya RF433 models and OEM brands (Cherub, Raex, Zemismart). Uses the HA radio_frequency platform — compatible with ESPHome CC1101 and Broadlink RM4 Pro transmitters.",
+  "render_readme": true,
+  "domains": ["cover"],
+  "country": [],
+  "homeassistant": "2026.5.0",
+  "iot_standards": []
+}

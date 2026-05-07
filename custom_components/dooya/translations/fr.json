@@ -1,0 +1,45 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Dooya RF Cover — Transmetteur",
+        "description": "Sélectionnez le transmetteur RF433 qui pilotera ce volet.",
+        "data": {
+          "transmitter": "Transmetteur RF"
+        }
+      },
+      "learn": {
+        "title": "Mode apprentissage",
+        "description": "Appuyez sur le bouton **MONTER** de la télécommande Dooya dans les {timeout} secondes.\nSi le signal est reçu, l'identifiant sera renseigné automatiquement.\nCochez 'Passer' pour saisir l'identifiant manuellement.",
+        "data": {
+          "skip": "Saisie manuelle"
+        }
+      },
+      "confirm": {
+        "title": "Confirmer les données apprises",
+        "description": "Signal reçu !\n- ID : **{dooya_id}**\n- Canal : **{channel}**\n\nDonnez un nom à ce volet.",
+        "data": {
+          "cover_name": "Nom du volet"
+        }
+      },
+      "manual": {
+        "title": "Saisie manuelle",
+        "description": "Saisissez l'identifiant de la télécommande Dooya. Vous le trouverez dans les logs ESPHome.",
+        "data": {
+          "cover_name": "Nom du volet",
+          "dooya_id": "ID télécommande (hex, ex : 00D1C917)",
+          "channel": "Canal (1-16)",
+          "check": "Code de contrôle (0-15)"
+        }
+      }
+    },
+    "abort": {
+      "no_transmitters": "Aucun transmetteur RF433 OOK compatible trouvé. Configurez d'abord un transmetteur (ESPHome CC1101 ou Broadlink RM4 Pro)."
+    },
+    "error": {
+      "invalid_transmitter": "L'entité sélectionnée n'est pas un transmetteur valide.",
+      "invalid_dooya_id": "Identifiant invalide. Attendu : valeur hexadécimale (ex : 00D1C917).",
+      "learn_timeout": "Aucun signal reçu dans le délai imparti. Cochez 'Saisie manuelle' pour entrer l'ID manuellement."
+    }
+  }
+}
