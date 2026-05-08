@@ -5,12 +5,13 @@ Control Dooya RF433 motorized covers (blinds/shutters/rollers) from Home Assista
 ## Features
 
 - **Open / Close / Stop** via RF433 OOK
-- **Learning mode** — press UP on the physical remote to auto-detect the ID
-- **Manual entry** — enter the hex ID directly (visible in ESPHome logs)
+- **Manual entry** — enter the hex ID directly (visible in ESPHome logs with `dump: dooya`)
 - **Transmitter agnostic** — works with any HA `radio_frequency` transmitter:
   - ESPHome ESP32 + CC1101
   - Broadlink RM4 Pro
-- **OEM brands supported** : Dooya, Cherub, Raex, Zemismart, and all clones using the same protocol
+- **OEM brands supported**: Dooya, Cherub, Raex, Zemismart, and all clones using the same protocol
+
+> 🚧 **Learning mode** (auto-detect ID from physical remote) — planned for a future release.
 
 ## Requirements
 
@@ -24,26 +25,17 @@ Control Dooya RF433 motorized covers (blinds/shutters/rollers) from Home Assista
 3. Restart Home Assistant
 4. **Settings → Integrations → Add → Dooya RF Covers**
 
-## ESPHome Prerequisite (CC1101)
+## Finding your Dooya ID
 
-If using an ESPHome CC1101 transmitter, ensure it is set up as a `radio_frequency` platform entity in HA.
-
-For **learning mode**, add to your ESPHome configuration:
+If using an ESPHome CC1101 receiver, you can retrieve your motor ID from the logs by adding `dump: dooya` to your `remote_receiver` configuration:
 
 ```yaml
 remote_receiver:
   pin: GPIO4
   dump: dooya
-  on_dooya:
-    then:
-      - homeassistant.event:
-          event: esphome.dooya_received
-          data:
-            id: !lambda 'char buf[9]; sprintf(buf, "%08X", x.id); return buf;'
-            channel: !lambda 'return std::to_string(x.channel);'
-            button: !lambda 'return std::to_string(x.button);'
-            check: !lambda 'return std::to_string(x.check);'
 ```
+
+Then press any button on your physical remote — the ID will appear in ESPHome logs.
 
 ## Protocol
 
