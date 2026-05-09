@@ -4,38 +4,123 @@ Control Dooya RF433 motorized covers (blinds/shutters/rollers) from Home Assista
 
 ## Features
 
-- **Open / Close / Stop** via RF433 OOK
-- **Manual entry** — enter the hex ID directly (visible in ESPHome logs with `dump: dooya`)
-- **Transmitter agnostic** — works with any HA `radio_frequency` transmitter:
-  - ESPHome ESP32 + CC1101
-  - Broadlink RM4 Pro
-- **OEM brands supported**: Dooya, Cherub, Raex, Zemismart, and all clones using the same protocol
-
-> 🚧 **Learning mode** (auto-detect ID from physical remote) — planned for a future release.
+- **Open / Close / Stop** via a native ESPHome service
+- **Automatic detection from the remote** — press UP on the physical remote to read the shutter ID automatically
+- **Manual entry** — enter the shutter ID directly if you already know it
+- **User-friendly setup flow** — choose between manual entry and automatic detection
+- **No extra ESPHome buttons required** — one cover entity per shutter in Home Assistant
+- **OEM brands supported** : Dooya, Cherub, Raex, Zemismart, and all clones using the same protocol
 
 ## Requirements
 
 - Home Assistant 2026.5+
-- A configured `radio_frequency` transmitter entity (433.92 MHz OOK)
+- An ESPHome device exposing the `transmit_dooya` service
+- A 433.92 MHz OOK transmitter, typically ESP32 + CC1101
 
 ## Installation (HACS)
 
-1. Add this repository as a custom HACS integration
-2. Install "Dooya RF Covers"
-3. Restart Home Assistant
-4. **Settings → Integrations → Add → Dooya RF Covers**
+1. In HACS, open the menu for custom repositories
+2. Add `https://github.com/dasimon135/ha-dooya` as an `Integration` repository
+3. Install "Dooya RF Covers"
+4. Restart Home Assistant
+5. **Settings → Integrations → Add → Dooya RF Covers**
 
-## Finding your Dooya ID
+Manual installation is also possible by copying `custom_components/dooya` into your Home Assistant configuration directory.
 
-If using an ESPHome CC1101 receiver, you can retrieve your motor ID from the logs by adding `dump: dooya` to your `remote_receiver` configuration:
+## Support
+
+- Bug reports and feature requests: https://github.com/dasimon135/ha-dooya/issues
+- Repository: https://github.com/dasimon135/ha-dooya
+- Step-by-step French tutorial: docs/tuto-hacf.md
+- HACF forum post template: docs/post-hacf.md
+
+## Installation (manual)
+
+1. Copy `custom_components/dooya` into your Home Assistant configuration directory
+2. Restart Home Assistant
+3. **Settings → Integrations → Add → Dooya RF Covers**
+
+## ESPHome Prerequisite (CC1101)
+
+This integration now relies on a native ESPHome service.
+
+Your ESPHome node must:
+
+- expose an action/service named `transmit_dooya`
+- be integrated in Home Assistant through the ESPHome integration
+- have **Allow service calls** enabled in the ESPHome integration options
+- optionally expose a `remote_receiver` with `dump: dooya` if you want automatic detection from the remote
+
+Example ESPHome pieces required for automatic detection:
 
 ```yaml
+api:
+  services:
+    - service: transmit_dooya
+      variables:
+        dooya_id: int
+        channel: int
+        btn: int
+        check: int
+
 remote_receiver:
   pin: GPIO4
   dump: dooya
+  on_dooya:
+    then:
+      - homeassistant.event:
+          event: esphome.dooya_received
+          data_template:
+            id: "{{ dooya_id }}"
+            channel: "{{ dooya_channel }}"
+            button: "{{ dooya_button }}"
+            check: "{{ dooya_check }}"
+          variables:
+            dooya_id: !lambda |-
+              char buf[9];
+              snprintf(buf, sizeof(buf), "%08X", x.id);
+              return std::string(buf);
+            dooya_channel: !lambda |-
+              return std::to_string(x.channel);
+            dooya_button: !lambda |-
+              return std::to_string(x.button);
+            dooya_check: !lambda |-
+              return std::to_string(x.check);
 ```
 
-Then press any button on your physical remote — the ID will appear in ESPHome logs.
+Note: if you use `homeassistant.event`, Home Assistant must allow the ESPHome device to perform Home Assistant actions.
+
+## Home Assistant Setup
+
+1. Add the Dooya RF Covers integration
+2. Select the ESPHome device that will send the commands
+3. Choose one of the two setup methods:
+   Manual entry if you already know the shutter identifier.
+   Automatic detection from the remote if you want Home Assistant to read it for you.
+4. Create one config entry per shutter
+
+### What automatic detection does
+
+Automatic detection does **not** pair the shutter and does **not** change its configuration.
+
+It only listens to the signal sent by the physical remote control, then reads:
+
+- the shutter identifier
+- the channel
+
+Once these values are known, Home Assistant can generate **Open**, **Stop**, and **Close** commands for the same shutter.
+
+## Cleaning Up Old ESPHome Buttons
+
+If you previously exposed one ESPHome button per action and per shutter, they are no longer needed.
+
+Recommended cleanup:
+
+1. Remove the old `button:` section from your ESPHome YAML
+2. Reflash or OTA-update the ESPHome node
+3. Reload the ESPHome integration in Home Assistant
+
+After that, keep only the Dooya cover entities.
 
 ## Protocol
 
@@ -50,6 +135,16 @@ Dooya RF433 OOK — timings (µs):
 Frame: `header + 24-bit ID + 8-bit channel + 4-bit button + 4-bit check`
 
 Buttons: `UP=1`, `DOWN=3`, `STOP=5`
+
+## Release Status
+
+Current version: `0.2.0`
+
+Current architecture:
+
+- Home Assistant custom integration with config flow
+- ESPHome RF433 sender/receiver using a native `transmit_dooya` action/service
+- Automatic learning based on the `esphome.dooya_received` event sent by the ESPHome node
 
 ## License
 

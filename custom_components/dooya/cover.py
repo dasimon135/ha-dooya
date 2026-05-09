@@ -1,12 +1,12 @@
 """Plateforme cover pour les volets Dooya RF433.
 
 Principe de fonctionnement :
-- HA fire un événement `dooya.transmit` sur le bus interne
-- ESPHome écoute via `on_homeassistant_event: dooya.transmit`
-- ESPHome appelle `remote_transmitter.transmit_dooya` avec les paramètres
+- HA appelle le service ESPHome `transmit_dooya` via l'intégration esphome
+- ESPHome exécute la lambda qui appelle remote_transmitter.transmit_dooya
+- Service name : esphome.{device_slug}_transmit_dooya
+  ex : esphome.volets_dooya_rf433_transmit_dooya
 
-Avantage : aucune dépendance à radio_frequency, compatible avec
-tout transmetteur ESPHome exposant le handler d'événement.
+Le device_slug est calculé depuis CONF_ESPHOME_DEVICE (tirets → underscores).
 """
 
 from __future__ import annotations
@@ -25,10 +25,10 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import (
+    CONF_ESPHOME_DEVICE,
     DEFAULT_CHECK_DOWN,
     DEFAULT_CHECK_STOP,
     DEFAULT_CHECK_UP,
-    EVENT_DOOYA_TRANSMIT,
 )
 from .dooya_protocol import BUTTON_DOWN, BUTTON_STOP, BUTTON_UP
 from .entity import DooyaBaseEntity
@@ -48,8 +48,7 @@ async def async_setup_entry(
 class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     """Volet Dooya RF433.
 
-    Commande le volet via l'événement HA `dooya.transmit` qui est
-    intercepté par ESPHome (on_homeassistant_event).
+    Commande le volet via un service natif ESPHome.
 
     État supposé (assumed_state) — aucun retour d'état du volet physique.
     """
@@ -80,49 +79,75 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     async def async_open_cover(self, **kwargs: Any) -> None:
         """Ouvrir le volet (commande UP, button=1)."""
-        self._fire_transmit(BUTTON_UP, DEFAULT_CHECK_UP)
+        await self._async_transmit(BUTTON_UP, DEFAULT_CHECK_UP)
         self._is_closed = False
         self.async_write_ha_state()
 
     async def async_close_cover(self, **kwargs: Any) -> None:
         """Fermer le volet (commande DOWN, button=3)."""
-        self._fire_transmit(BUTTON_DOWN, DEFAULT_CHECK_DOWN)
+        await self._async_transmit(BUTTON_DOWN, DEFAULT_CHECK_DOWN)
         self._is_closed = True
         self.async_write_ha_state()
 
     async def async_stop_cover(self, **kwargs: Any) -> None:
         """Stopper le volet (commande STOP, button=5)."""
-        self._fire_transmit(BUTTON_STOP, DEFAULT_CHECK_STOP)
+        await self._async_transmit(BUTTON_STOP, DEFAULT_CHECK_STOP)
         self.async_write_ha_state()
 
-    def _fire_transmit(self, button: int, check: int) -> None:
-        """Tirer l'événement dooya.transmit sur le bus HA.
+    async def _async_transmit(self, button: int, check: int) -> None:
+        """Appeler le service ESPHome transmit_dooya.
 
-        ESPHome intercepte cet événement via on_homeassistant_event
-        et déclenche remote_transmitter.transmit_dooya.
-
-        Format de l'événement :
-          id      : identifiant hex 8 caractères, ex "00D1C917"
-          channel : canal (int)
-          button  : bouton (1=up, 3=down, 5=stop)
-          check   : code de contrôle
-          device  : slug du device ESPHome (filtre optionnel)
+        Service cible : esphome.{device_slug}_transmit_dooya
+        Variables : dooya_id (int), channel (int), btn (int), check (int)
         """
-        self.hass.bus.async_fire(
-            EVENT_DOOYA_TRANSMIT,
-            {
-                "id": f"{self._dooya_id:08X}",
-                "channel": self._channel,
-                "button": button,
-                "check": check,
-                "device": self._esphome_device,
-            },
-        )
+        service_name = self._resolve_service_name()
+        if service_name is None:
+            return
         _LOGGER.debug(
-            "dooya.transmit → id=%08X channel=%d button=%d check=%d device=%s",
+            "esphome.%s → id=%08X channel=%d button=%d check=%d",
+            service_name,
             self._dooya_id,
             self._channel,
             button,
             check,
-            self._esphome_device,
         )
+        if not self.hass.services.has_service("esphome", service_name):
+            _LOGGER.error(
+                "Service ESPHome introuvable: esphome.%s. "
+                "Redémarrer Home Assistant et vérifier que les appels de services ESPHome sont autorisés.",
+                service_name,
+            )
+            return
+        await self.hass.services.async_call(
+            "esphome",
+            service_name,
+            {
+                "dooya_id": self._dooya_id,
+                "channel": self._channel,
+                "btn": button,
+                "check": check,
+            },
+            blocking=True,
+        )
+
+    def _resolve_service_name(self) -> str | None:
+        """Déterminer le nom du service ESPHome à appeler."""
+        device = self._config_entry.data.get(CONF_ESPHOME_DEVICE, "")
+        if not device:
+            _LOGGER.error(
+                "Aucun device ESPHome configuré pour %s. "
+                "Reconfigurer l'entrée Dooya avec le bon device.",
+                self._attr_name,
+            )
+            return None
+
+        service_name = f"{device.replace('-', '_')}_transmit_dooya"
+        if self.hass.services.has_service("esphome", service_name):
+            return service_name
+
+        _LOGGER.error(
+            "Service ESPHome introuvable: esphome.%s. "
+            "Vérifier le nom du device ESPHome configuré.",
+            service_name,
+        )
+        return None

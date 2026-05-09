@@ -51,7 +51,8 @@ def encode_dooya(data: DooyaData) -> list[int]:
     """Encode une commande Dooya en liste de timings OOK (µs).
 
     Format de la liste retournée : [high, low, high, low, ...]
-    Compatible avec HomeAssistant radio_frequency platform et ESPHome remote_transmitter.
+    Compatible avec ESPHome remote_transmitter et avec une éventuelle
+    réutilisation côté Home Assistant.
 
     Args:
         data: données de la commande Dooya

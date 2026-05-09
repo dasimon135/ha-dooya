@@ -18,8 +18,10 @@ from .const import (
 class DooyaBaseEntity(Entity):
     """Entité de base pour les volets Dooya.
 
-    Transmet les commandes via l'événement HA `dooya.transmit`
-    écouté par ESPHome (on_homeassistant_event).
+    Stocke les paramètres appris/manuels d'un volet Dooya.
+
+    Les commandes sont envoyées par la plateforme cover via le service/action
+    ESPHome `transmit_dooya`.
     """
 
     _attr_has_entity_name = True

@@ -3,35 +3,55 @@
     "step": {
       "user": {
         "title": "Dooya RF Cover — Transmitter",
-        "description": "Select the RF433 transmitter that will control this cover.",
+        "description": "Enter the name of the ESPHome device that will send commands to the shutter. Compatible device(s) found: {detected}.",
         "data": {
-          "transmitter": "RF Transmitter"
+          "esphome_device": "ESPHome device name"
+        }
+      },
+      "method": {
+        "title": "Dooya RF Cover — Setup Method",
+        "description": "Choose how you want to set up this shutter. If you already know its identifier, use manual entry. Otherwise, automatic detection can read it from your remote control.",
+        "data": {
+          "method": "Configuration method"
+        },
+        "data_description": {
+          "method": {
+            "manual": "Manual entry: recommended if you already know the shutter identifier.",
+            "learn": "Automatic detection: press the UP button on the remote control so the identifier can be read automatically."
+          }
         }
       },
       "learn": {
-        "title": "Learning Mode",
-        "description": "Press the **UP** button on the Dooya remote within {timeout} seconds.\nIf the signal is received, the ID will be filled in automatically.\nCheck 'Skip' to enter the ID manually.",
+        "title": "Automatic Detection From Remote",
+        "description": "Listening started. Within the next {timeout} seconds, press the **UP** button on the physical Dooya remote control for this shutter.\n\nHome Assistant will automatically move to the next step as soon as a valid signal is received.\n\nThis step does not change the shutter or pair anything. It only reads the signal sent by the remote control."
+      },
+      "learn_retry": {
+        "title": "Automatic Detection From Remote",
+        "description": "No signal was received within {timeout} seconds. You can try again, or switch to manual entry.",
         "data": {
-          "skip": "Enter manually"
+          "skip": "I want to enter the information manually"
         }
       },
       "confirm": {
         "title": "Confirm Learned Data",
-        "description": "Signal received!\n- ID: **{dooya_id}**\n- Channel: **{channel}**\n\nEnter a name for this cover.",
+        "description": "Signal received.\n- Identifier: **{dooya_id}**\n- Channel: **{channel}**\n\nChoose a name for this shutter.",
         "data": {
           "cover_name": "Cover name"
         }
       },
       "manual": {
         "title": "Manual Entry",
-        "description": "Enter the Dooya remote ID manually. You can find it in your ESPHome logs.",
+        "description": "Enter the shutter information manually. Use this mode if you already know the identifier, or if you do not want to use automatic detection.",
         "data": {
-          "cover_name": "Cover name",
-          "dooya_id": "Remote ID (hex, e.g. 00D1C917)",
+          "cover_name": "Shutter name",
+          "dooya_id": "Shutter identifier (for example: 00D1C917)",
           "channel": "Channel (1-16)",
           "check": "Check code (0-15)"
         }
       }
+    },
+    "progress": {
+      "listen_remote": "Waiting for a signal from the Dooya remote control"
     },
     "abort": {
       "no_transmitters": "No compatible RF433 OOK transmitter found. Please set up a transmitter first (ESPHome CC1101 or Broadlink RM4 Pro)."
@@ -39,7 +59,9 @@
     "error": {
       "invalid_transmitter": "Selected entity is not a valid transmitter.",
       "invalid_dooya_id": "Invalid ID. Expected a hexadecimal value (e.g. 00D1C917).",
-      "learn_timeout": "No signal received within the timeout. Press 'Skip' to enter the ID manually."
+      "learn_timeout": "No signal was received in time. You can try again, or choose manual entry.",
+      "required_esphome_device": "Several compatible ESPHome devices were found. Choose the one that should send the shutter commands.",
+      "unknown_esphome_device": "No compatible ESPHome device was found with this name. Check the name and try again."
     }
   }
 }

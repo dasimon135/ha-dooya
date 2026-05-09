@@ -6,7 +6,7 @@ from typing import Final
 
 DOMAIN: Final = "dooya"
 
-# Événement HA tiré par cover.py, écouté par ESPHome (on_homeassistant_event)
+# Ancien événement historique, conservé pour compatibilité documentaire.
 EVENT_DOOYA_TRANSMIT: Final = "dooya.transmit"
 
 # Clés de configuration

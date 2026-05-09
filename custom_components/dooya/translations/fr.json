@@ -3,35 +3,55 @@
     "step": {
       "user": {
         "title": "Dooya RF Cover — Device ESPHome",
-        "description": "Entrez le nom du device ESPHome qui émettra les commandes RF (ex : `volets-dooya-rf433`). Laissez vide si vous n'avez qu'un seul device ESPHome avec le handler Dooya.",
+        "description": "Entrez le nom du boîtier ESPHome qui enverra les commandes au volet (exemple : `volets-dooya-rf433`). Boîtier(s) compatible(s) détecté(s) : {detected}.",
         "data": {
-          "esphome_device": "Nom du device ESPHome (optionnel)"
+          "esphome_device": "Nom du boîtier ESPHome"
+        }
+      },
+      "method": {
+        "title": "Dooya RF Cover — Mode de configuration",
+        "description": "Choisissez comment vous voulez configurer ce volet. Si vous connaissez déjà son identifiant, utilisez la saisie manuelle. Sinon, la détection automatique peut le lire depuis votre télécommande.",
+        "data": {
+          "method": "Méthode de configuration"
+        },
+        "data_description": {
+          "method": {
+            "manual": "Saisie manuelle : recommandée si vous connaissez déjà l'identifiant du volet.",
+            "learn": "Détection automatique : appuyez sur le bouton MONTER de la télécommande pour lire automatiquement l'identifiant."
+          }
         }
       },
       "learn": {
-        "title": "Mode apprentissage",
-        "description": "Appuyez sur le bouton **MONTER** de la télécommande Dooya dans les {timeout} secondes.\nSi le signal est reçu, l'identifiant sera renseigné automatiquement.\nCochez 'Passer' pour saisir l'identifiant manuellement.",
+        "title": "Détection automatique depuis la télécommande",
+        "description": "L'écoute a démarré. Dans les {timeout} prochaines secondes, appuyez sur le bouton **MONTER** de la télécommande Dooya physique de ce volet.\n\nHome Assistant passera automatiquement à l'étape suivante dès qu'un signal valide sera reçu.\n\nCette étape ne modifie pas le volet et n'effectue aucun appairage. Elle sert uniquement à lire le signal envoyé par la télécommande."
+      },
+      "learn_retry": {
+        "title": "Détection automatique depuis la télécommande",
+        "description": "Aucun signal n'a été reçu dans les {timeout} secondes. Vous pouvez réessayer ou passer en saisie manuelle.",
         "data": {
-          "skip": "Saisie manuelle"
+          "skip": "Je veux saisir les informations manuellement"
         }
       },
       "confirm": {
         "title": "Confirmer les données apprises",
-        "description": "Signal reçu !\n- ID : **{dooya_id}**\n- Canal : **{channel}**\n\nDonnez un nom à ce volet.",
+        "description": "Signal reçu.\n- Identifiant : **{dooya_id}**\n- Canal : **{channel}**\n\nChoisissez un nom pour ce volet.",
         "data": {
           "cover_name": "Nom du volet"
         }
       },
       "manual": {
         "title": "Saisie manuelle",
-        "description": "Saisissez l'identifiant de la télécommande Dooya. Vous le trouverez dans les logs ESPHome.",
+        "description": "Saisissez manuellement les informations du volet. Utilisez ce mode si vous connaissez déjà l'identifiant, ou si vous ne souhaitez pas utiliser la détection automatique.",
         "data": {
           "cover_name": "Nom du volet",
-          "dooya_id": "ID télécommande (hex, ex : 00D1C917)",
+          "dooya_id": "Identifiant du volet (exemple : 00D1C917)",
           "channel": "Canal (1-16)",
           "check": "Code de contrôle (0-15)"
         }
       }
+    },
+    "progress": {
+      "listen_remote": "En attente d'un signal de la télécommande Dooya"
     },
     "abort": {
       "no_transmitters": "Aucun transmetteur RF433 OOK compatible trouvé. Configurez d'abord un transmetteur (ESPHome CC1101 ou Broadlink RM4 Pro)."
@@ -39,7 +59,9 @@
     "error": {
       "invalid_transmitter": "L'entité sélectionnée n'est pas un transmetteur valide.",
       "invalid_dooya_id": "Identifiant invalide. Attendu : valeur hexadécimale (ex : 00D1C917).",
-      "learn_timeout": "Aucun signal reçu dans le délai imparti. Cochez 'Saisie manuelle' pour entrer l'ID manuellement."
+      "learn_timeout": "Aucun signal n'a été reçu dans le délai prévu. Vous pouvez réessayer ou choisir la saisie manuelle.",
+      "required_esphome_device": "Plusieurs boîtiers ESPHome compatibles ont été trouvés. Choisissez celui qui doit envoyer les commandes du volet.",
+      "unknown_esphome_device": "Aucun boîtier ESPHome compatible n'a été trouvé avec ce nom. Vérifiez le nom et réessayez."
     }
   }
 }

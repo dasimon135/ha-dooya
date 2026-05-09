@@ -4,8 +4,9 @@
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/dasimon135/ha-dooya",
+  "issue_tracker": "https://github.com/dasimon135/ha-dooya/issues",
   "integration_type": "device",
   "iot_class": "assumed_state",
   "codeowners": ["@dasimon135"],
-  "version": "0.1.0"
+  "version": "0.2.0"
 }
