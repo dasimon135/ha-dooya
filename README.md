@@ -51,9 +51,15 @@ Your ESPHome node must:
 - have **Allow service calls** enabled in the ESPHome integration options
 - optionally expose a `remote_receiver` with `dump: dooya` if you want automatic detection from the remote
 
-Example ESPHome pieces required for automatic detection:
+Example ESPHome pieces required for automatic detection and transmission:
 
 ```yaml
+esphome:
+  on_boot:
+    priority: -100
+    then:
+      - cc1101.begin_rx: mycc1101
+
 api:
   services:
     - service: transmit_dooya
@@ -62,30 +68,73 @@ api:
         channel: int
         btn: int
         check: int
+      then:
+        - lambda: |-
+            esphome::remote_base::DooyaData d{};
+            d.id      = (uint32_t)dooya_id;
+            d.channel = (uint8_t)channel;
+            d.button  = (uint8_t)btn;
+            d.check   = (uint8_t)check;
+            auto call = id(rf_transmitter).transmit();
+            esphome::remote_base::DooyaProtocol().encode(call.get_data(), d);
+            call.set_send_times(5);
+            call.set_send_wait(1000);
+            call.perform();
+
+cc1101:
+  id: mycc1101
+  cs_pin: GPIO5
+  frequency: 433.92MHz
+  output_power: 10
+  modulation_type: ASK/OOK
+  symbol_rate: 5000
+  filter_bandwidth: 203kHz
+
+remote_transmitter:
+  - id: rf_transmitter
+    pin:
+      number: GPIO4
+    carrier_duty_percent: 100%
+    non_blocking: false
+    on_transmit:
+      then:
+        - cc1101.begin_tx: mycc1101
+    on_complete:
+      then:
+        - cc1101.begin_rx: mycc1101
 
 remote_receiver:
-  pin: GPIO4
+  pin: GPIO16
   dump: dooya
   on_dooya:
     then:
-      - homeassistant.event:
-          event: esphome.dooya_received
-          data_template:
-            id: "{{ dooya_id }}"
-            channel: "{{ dooya_channel }}"
-            button: "{{ dooya_button }}"
-            check: "{{ dooya_check }}"
-          variables:
-            dooya_id: !lambda |-
-              char buf[9];
-              snprintf(buf, sizeof(buf), "%08X", x.id);
-              return std::string(buf);
-            dooya_channel: !lambda |-
-              return std::to_string(x.channel);
-            dooya_button: !lambda |-
-              return std::to_string(x.button);
-            dooya_check: !lambda |-
-              return std::to_string(x.check);
+      - if:
+          condition:
+            api.connected:
+              state_subscription_only: true
+          then:
+            - homeassistant.event:
+                event: esphome.dooya_received
+                data_template:
+                  id: "{{ dooya_id }}"
+                  channel: "{{ dooya_channel }}"
+                  button: "{{ dooya_button }}"
+                  check: "{{ dooya_check }}"
+                variables:
+                  dooya_id: !lambda |-
+                    char buf[9];
+                    snprintf(buf, sizeof(buf), "%08" PRIX32, x.id);
+                    return std::string(buf);
+                  dooya_channel: !lambda |-
+                    return std::to_string(x.channel);
+                  dooya_button: !lambda |-
+                    return std::to_string(x.button);
+                  dooya_check: !lambda |-
+                    return std::to_string(x.check);
+          else:
+            - logger.log:
+                format: "Trame Dooya reçue mais Home Assistant n'est pas connecté via l'API, événement non envoyé"
+                level: WARN
 ```
 
 Note: if you use `homeassistant.event`, Home Assistant must allow the ESPHome device to perform Home Assistant actions.
