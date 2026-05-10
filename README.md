@@ -5,6 +5,9 @@ Control Dooya RF433 motorized covers (blinds/shutters/rollers) from Home Assista
 ## Features
 
 - **Open / Close / Stop** via a native ESPHome service
+- **Estimated position** based on real opening and closing travel times
+- **Set position** support for partial opening/closing directly from Home Assistant
+- **Manual recalibration services** to mark a cover as open, closed, or set a known position
 - **Automatic detection from the remote** — press UP on the physical remote to read the shutter ID automatically
 - **Manual entry** — enter the shutter ID directly if you already know it
 - **User-friendly setup flow** — choose between manual entry and automatic detection
@@ -146,7 +149,8 @@ Note: if you use `homeassistant.event`, Home Assistant must allow the ESPHome de
 3. Choose one of the two setup methods:
    Manual entry if you already know the shutter identifier.
    Automatic detection from the remote if you want Home Assistant to read it for you.
-4. Create one config entry per shutter
+4. Enter the full opening and closing travel times for that cover
+5. Create one config entry per shutter
 
 ### What automatic detection does
 
@@ -171,6 +175,33 @@ Recommended cleanup:
 
 After that, keep only the Dooya cover entities.
 
+## Estimated Position And Calibration
+
+This integration can estimate the current cover position without a physical position sensor.
+
+It works by combining:
+
+- the configured full opening time
+- the configured full closing time
+- the commands sent from Home Assistant
+- the RF frames received from the physical remote
+
+Important: this remains an estimated position, not a true measured position.
+
+If needed, you can recalibrate a cover manually with the entity services exposed by the integration:
+
+- `dooya.mark_open`
+- `dooya.mark_closed`
+- `dooya.set_known_position`
+
+Typical calibration flow:
+
+1. fully close the cover
+2. call `dooya.mark_closed`
+3. measure the real opening time and closing time
+4. update those values in the integration options
+5. test with an intermediate position such as 50%
+
 ## Protocol
 
 Dooya RF433 OOK — timings (µs):
@@ -187,13 +218,14 @@ Buttons: `UP=1`, `DOWN=3`, `STOP=5`
 
 ## Release Status
 
-Current version: `0.2.0`
+Current version: `0.3.0`
 
 Current architecture:
 
 - Home Assistant custom integration with config flow
 - ESPHome RF433 sender/receiver using a native `transmit_dooya` action/service
 - Automatic learning based on the `esphome.dooya_received` event sent by the ESPHome node
+- Estimated position based on configured travel times, with manual recalibration services
 
 ## License
 

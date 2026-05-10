@@ -1,0 +1,34 @@
+mark_open:
+  target:
+    entity:
+      domain: cover
+      integration: dooya
+  name: Marquer comme ouvert
+  description: Recale la position estimée du volet à 100 % sans envoyer de commande RF.
+
+mark_closed:
+  target:
+    entity:
+      domain: cover
+      integration: dooya
+  name: Marquer comme fermé
+  description: Recale la position estimée du volet à 0 % sans envoyer de commande RF.
+
+set_known_position:
+  target:
+    entity:
+      domain: cover
+      integration: dooya
+  name: Définir une position connue
+  description: Force une position estimée connue sans envoyer de commande RF.
+  fields:
+    position:
+      name: Position
+      description: Position connue du volet, entre 0 et 100.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 1
+          mode: slider

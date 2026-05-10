@@ -36,7 +36,9 @@
         "title": "Confirmer les données apprises",
         "description": "Signal reçu.\n- Identifiant : **{dooya_id}**\n- Canal : **{channel}**\n\nChoisissez un nom pour ce volet.",
         "data": {
-          "cover_name": "Nom du volet"
+          "cover_name": "Nom du volet",
+          "travel_time_up": "Temps d'ouverture complet (secondes)",
+          "travel_time_down": "Temps de fermeture complet (secondes)"
         }
       },
       "manual": {
@@ -46,7 +48,9 @@
           "cover_name": "Nom du volet",
           "dooya_id": "Identifiant du volet (exemple : 00D1C917)",
           "channel": "Canal (1-16)",
-          "check": "Code de contrôle (0-15)"
+          "check": "Code de contrôle (0-15)",
+          "travel_time_up": "Temps d'ouverture complet (secondes)",
+          "travel_time_down": "Temps de fermeture complet (secondes)"
         }
       }
     },
@@ -62,6 +66,18 @@
       "learn_timeout": "Aucun signal n'a été reçu dans le délai prévu. Vous pouvez réessayer ou choisir la saisie manuelle.",
       "required_esphome_device": "Plusieurs boîtiers ESPHome compatibles ont été trouvés. Choisissez celui qui doit envoyer les commandes du volet.",
       "unknown_esphome_device": "Aucun boîtier ESPHome compatible n'a été trouvé avec ce nom. Vérifiez le nom et réessayez."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Réglages de position estimée",
+        "description": "Ajustez les temps de trajet complets utilisés pour estimer la position du volet.",
+        "data": {
+          "travel_time_up": "Temps d'ouverture complet (secondes)",
+          "travel_time_down": "Temps de fermeture complet (secondes)"
+        }
+      }
     }
   }
 }

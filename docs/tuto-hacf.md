@@ -7,6 +7,8 @@ Ce tutoriel explique pas a pas comment piloter des volets, stores ou rideaux mot
 L'objectif est simple :
 
 - envoyer les commandes Monter / Stop / Descendre depuis Home Assistant
+- estimer la position du volet sans capteur physique
+- regler un pourcentage d'ouverture directement depuis Home Assistant
 - apprendre automatiquement l'identifiant du volet depuis la telecommande physique
 - eviter de multiplier les boutons ESPHome, un par action et par volet
 
@@ -103,6 +105,13 @@ Deux choix sont alors proposes :
 - saisie manuelle si vous connaissez deja l'identifiant du volet
 - detection automatique si vous voulez le lire depuis la telecommande physique
 
+Dans les deux cas, il faut aussi renseigner :
+
+- le temps d'ouverture complet
+- le temps de fermeture complet
+
+Ces deux valeurs servent a estimer la position du volet dans Home Assistant.
+
 ## 5. Utiliser le mode apprentissage automatique
 
 Le mode apprentissage ne modifie pas le moteur et ne fait aucun appairage RF.
@@ -129,9 +138,29 @@ Une fois le volet ajoute, Home Assistant envoie les commandes RF433 via le servi
 - Stop
 - Descendre
 
+L'integration peut aussi estimer la position actuelle du volet et accepter une consigne intermediaire, par exemple 40 % ou 70 %.
+
+En pratique, plus les temps d'ouverture et de fermeture sont proches de la realite, plus l'estimation sera bonne.
+
 Tu peux ensuite piloter le volet comme n'importe quelle autre entite `cover` dans Home Assistant. Les anciens boutons ESPHome exposes un par un ne sont plus necessaires.
 
-## 7. Depannage rapide
+## 7. Recalage manuel si la position derive
+
+Comme il n'y a pas de capteur physique, l'etat reste une estimation. Si besoin, tu peux le recaler sans faire bouger le volet avec les services d'entite suivants :
+
+- `dooya.mark_open`
+- `dooya.mark_closed`
+- `dooya.set_known_position`
+
+Exemple simple :
+
+1. fermer completement le volet
+2. appeler `dooya.mark_closed`
+3. ouvrir completement en chronometrant
+4. fermer completement en chronometrant
+5. mettre a jour les temps dans les options de l'entree
+
+## 8. Depannage rapide
 
 ### Le boitier ESPHome n'apparait pas dans le flow
 
@@ -158,7 +187,15 @@ Verifier :
 - le canal
 - le cablage et la frequence du module RF433
 
-## 8. Liens utiles
+### La position estimee n'est pas bonne
+
+Verifier :
+
+- que les temps d'ouverture et de fermeture sont realistes
+- qu'un stop manuel ou telecommande n'a pas interrompu un mouvement sans recalage
+- que l'entite a bien ete recalee avec `dooya.mark_open`, `dooya.mark_closed` ou `dooya.set_known_position` si necessaire
+
+## 9. Liens utiles
 
 - Depot GitHub : `https://github.com/dasimon135/ha-dooya`
 - Issues : `https://github.com/dasimon135/ha-dooya/issues`

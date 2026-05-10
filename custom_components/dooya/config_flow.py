@@ -7,7 +7,7 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.core import callback
 
@@ -17,13 +17,16 @@ from .const import (
     CONF_COVER_NAME,
     CONF_DOOYA_ID,
     CONF_ESPHOME_DEVICE,
+    CONF_TRAVEL_TIME_DOWN,
+    CONF_TRAVEL_TIME_UP,
     DEFAULT_CHANNEL,
+    DEFAULT_TRAVEL_TIME_DOWN,
+    DEFAULT_TRAVEL_TIME_UP,
     DOMAIN,
+    EVENT_DOOYA_RECEIVED,
 )
 from .dooya_protocol import DooyaData
 
-# Événement ESPHome publié lors de la réception d'une trame Dooya
-DOOYA_LEARN_EVENT = "esphome.dooya_received"
 # Délai maximum d'attente en mode apprentissage (secondes)
 LEARN_TIMEOUT_SEC = 30
 
@@ -32,6 +35,12 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
     """Config flow pour ajouter un volet Dooya."""
 
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> DooyaOptionsFlow:
+        """Retourner le flow d'options pour une entrée existante."""
+        return DooyaOptionsFlow(config_entry)
 
     def __init__(self) -> None:
         """Initialiser le config flow."""
@@ -180,7 +189,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
             event_received.set()
             self.hass.async_create_task(self.hass.config_entries.flow.async_configure(self.flow_id))
 
-        unsubscribe = self.hass.bus.async_listen(DOOYA_LEARN_EVENT, _handle_event)
+        unsubscribe = self.hass.bus.async_listen(EVENT_DOOYA_RECEIVED, _handle_event)
 
         try:
             await asyncio.wait_for(event_received.wait(), timeout=LEARN_TIMEOUT_SEC)
@@ -203,6 +212,8 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                 dooya_id=self._learned_data.id,
                 channel=self._learned_data.channel,
                 check=self._learned_data.check,
+                travel_time_up=user_input[CONF_TRAVEL_TIME_UP],
+                travel_time_down=user_input[CONF_TRAVEL_TIME_DOWN],
             )
 
         return self.async_show_form(
@@ -210,6 +221,14 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_COVER_NAME): str,
+                    vol.Required(
+                        CONF_TRAVEL_TIME_UP,
+                        default=DEFAULT_TRAVEL_TIME_UP,
+                    ): vol.All(vol.Coerce(float), vol.Range(min=1, max=240)),
+                    vol.Required(
+                        CONF_TRAVEL_TIME_DOWN,
+                        default=DEFAULT_TRAVEL_TIME_DOWN,
+                    ): vol.All(vol.Coerce(float), vol.Range(min=1, max=240)),
                 }
             ),
             description_placeholders={
@@ -235,6 +254,8 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                     dooya_id=dooya_id,
                     channel=user_input[CONF_CHANNEL],
                     check=user_input[CONF_CHECK],
+                    travel_time_up=user_input[CONF_TRAVEL_TIME_UP],
+                    travel_time_down=user_input[CONF_TRAVEL_TIME_DOWN],
                 )
 
         return self.async_show_form(
@@ -249,6 +270,14 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_CHECK, default=1): vol.All(
                         int, vol.Range(min=0, max=15)
                     ),
+                    vol.Required(
+                        CONF_TRAVEL_TIME_UP,
+                        default=DEFAULT_TRAVEL_TIME_UP,
+                    ): vol.All(vol.Coerce(float), vol.Range(min=1, max=240)),
+                    vol.Required(
+                        CONF_TRAVEL_TIME_DOWN,
+                        default=DEFAULT_TRAVEL_TIME_DOWN,
+                    ): vol.All(vol.Coerce(float), vol.Range(min=1, max=240)),
                 }
             ),
             errors=errors,
@@ -261,6 +290,8 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
         dooya_id: int,
         channel: int,
         check: int,
+        travel_time_up: float,
+        travel_time_down: float,
     ) -> FlowResult:
         """Créer l'entrée de configuration."""
         return self.async_create_entry(
@@ -271,5 +302,49 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_CHANNEL: channel,
                 CONF_CHECK: check,
                 CONF_COVER_NAME: name,
+                CONF_TRAVEL_TIME_UP: travel_time_up,
+                CONF_TRAVEL_TIME_DOWN: travel_time_down,
             },
+        )
+
+
+class DooyaOptionsFlow(OptionsFlow):
+    """Options flow pour ajuster les temps de trajet d'un volet Dooya."""
+
+    def __init__(self, config_entry: ConfigEntry) -> None:
+        """Initialiser le flow d'options."""
+        self._config_entry = config_entry
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Modifier les temps de trajet estimés."""
+        current_up = self._config_entry.options.get(
+            CONF_TRAVEL_TIME_UP,
+            self._config_entry.data.get(CONF_TRAVEL_TIME_UP, DEFAULT_TRAVEL_TIME_UP),
+        )
+        current_down = self._config_entry.options.get(
+            CONF_TRAVEL_TIME_DOWN,
+            self._config_entry.data.get(
+                CONF_TRAVEL_TIME_DOWN, DEFAULT_TRAVEL_TIME_DOWN
+            ),
+        )
+
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_TRAVEL_TIME_UP,
+                        default=current_up,
+                    ): vol.All(vol.Coerce(float), vol.Range(min=1, max=240)),
+                    vol.Required(
+                        CONF_TRAVEL_TIME_DOWN,
+                        default=current_down,
+                    ): vol.All(vol.Coerce(float), vol.Range(min=1, max=240)),
+                }
+            ),
         )

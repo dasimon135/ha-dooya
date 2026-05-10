@@ -36,7 +36,9 @@
         "title": "Confirm Learned Data",
         "description": "Signal received.\n- Identifier: **{dooya_id}**\n- Channel: **{channel}**\n\nChoose a name for this shutter.",
         "data": {
-          "cover_name": "Shutter name"
+          "cover_name": "Shutter name",
+          "travel_time_up": "Full opening time (seconds)",
+          "travel_time_down": "Full closing time (seconds)"
         }
       },
       "manual": {
@@ -46,7 +48,9 @@
           "cover_name": "Shutter name",
           "dooya_id": "Shutter identifier (for example: 00D1C917)",
           "channel": "Channel (1-16)",
-          "check": "Check code (0-15)"
+          "check": "Check code (0-15)",
+          "travel_time_up": "Full opening time (seconds)",
+          "travel_time_down": "Full closing time (seconds)"
         }
       }
     },
@@ -62,6 +66,18 @@
       "learn_timeout": "No signal was received in time. You can try again, or choose manual entry.",
       "required_esphome_device": "Several compatible ESPHome devices were found. Choose the one that should send the shutter commands.",
       "unknown_esphome_device": "No compatible ESPHome device was found with this name. Check the name and try again."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Estimated Position Settings",
+        "description": "Adjust the full travel times used to estimate the shutter position.",
+        "data": {
+          "travel_time_up": "Full opening time (seconds)",
+          "travel_time_down": "Full closing time (seconds)"
+        }
+      }
     }
   }
 }
