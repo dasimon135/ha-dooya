@@ -75,7 +75,11 @@
         "description": "Adjust the full travel times used to estimate the shutter position.",
         "data": {
           "travel_time_up": "Full opening time (seconds)",
-          "travel_time_down": "Full closing time (seconds)"
+          "travel_time_down": "Full closing time (seconds)",
+          "repeat_count": "RF transmission repeat count (1–3)"
+        },
+        "data_description": {
+          "repeat_count": "Number of times the RF command is sent for each action. Increase to 2 or 3 if the shutter sometimes misses commands (RF interference). Default: 1."
         }
       }
     }

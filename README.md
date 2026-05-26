@@ -202,6 +202,20 @@ Typical calibration flow:
 4. update those values in the integration options
 5. test with an intermediate position such as 50%
 
+## RF Reliability (Repeat Count)
+
+RF433 OOK is a one-way protocol with no acknowledgement. In environments with RF interference (other 433 MHz devices, Wi-Fi, etc.), a command may occasionally be lost.
+
+The **RF transmission repeat count** option (accessible via **Settings → Integrations → Dooya → Configure**) controls how many times each command is sent:
+
+| Value | Behaviour |
+|-------|-----------|
+| 1 | Single transmission — default, suitable for most environments |
+| 2 | Two transmissions, 100 ms apart — recommended if commands are occasionally missed |
+| 3 | Three transmissions — for very noisy RF environments |
+
+> ⚠️ Do not exceed 3 repetitions. Some Dooya motors may interpret repeated signals as a pairing or limit-setting command.
+
 ## Protocol
 
 Dooya RF433 OOK — timings (µs):
@@ -218,7 +232,7 @@ Buttons: `UP=1`, `DOWN=3`, `STOP=5`
 
 ## Release Status
 
-Current version: `0.3.0`
+Current version: `0.4.0`
 
 Current architecture:
 

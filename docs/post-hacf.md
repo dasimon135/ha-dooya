@@ -23,6 +23,8 @@ Le mode apprentissage fonctionne maintenant en pratique : le noeud ESPHome publi
 
 J'ai aussi ajoute une gestion de position estimee basee sur le temps d'ouverture et de fermeture, avec possibilite de recalage manuel si besoin. Ca ne remplace pas un vrai capteur de position, mais dans la pratique ca permet deja un usage bien plus confortable au quotidien. 🙂
 
+Il y a aussi un reglage **Nombre de repetitions RF** dans les options de chaque volet, utile si le moteur rate parfois une commande a cause d'interferences. La valeur par defaut est 1, mais passer a 2 suffit generalement a regler le probleme.
+
 L'idee derriere tout ca est surtout d'eviter les bricolages avec une pile de boutons ESPHome pour chaque volet, et d'obtenir au final une integration plus propre cote Home Assistant.
 
 Le chemin valide a ce jour est :

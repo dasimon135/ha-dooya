@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 import logging
 from time import monotonic
@@ -22,11 +23,13 @@ import voluptuous as vol
 
 from .const import (
     CONF_ESPHOME_DEVICE,
+    CONF_REPEAT_COUNT,
     CONF_TRAVEL_TIME_DOWN,
     CONF_TRAVEL_TIME_UP,
     DEFAULT_CHECK_DOWN,
     DEFAULT_CHECK_STOP,
     DEFAULT_CHECK_UP,
+    DEFAULT_REPEAT_COUNT,
     DEFAULT_TRAVEL_TIME_DOWN,
     DEFAULT_TRAVEL_TIME_UP,
     EVENT_DOOYA_RECEIVED,
@@ -88,6 +91,12 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
                 config_entry.data.get(
                     CONF_TRAVEL_TIME_DOWN, DEFAULT_TRAVEL_TIME_DOWN
                 ),
+            )
+        )
+        self._repeat_count: int = int(
+            options.get(
+                CONF_REPEAT_COUNT,
+                config_entry.data.get(CONF_REPEAT_COUNT, DEFAULT_REPEAT_COUNT),
             )
         )
         self._current_position: int | None = None
@@ -218,17 +227,21 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
                 service_name,
             )
             return
-        await self.hass.services.async_call(
-            "esphome",
-            service_name,
-            {
-                "dooya_id": self._dooya_id,
-                "channel": self._channel,
-                "btn": button,
-                "check": check,
-            },
-            blocking=True,
-        )
+        payload = {
+            "dooya_id": self._dooya_id,
+            "channel": self._channel,
+            "btn": button,
+            "check": check,
+        }
+        for i in range(self._repeat_count):
+            if i > 0:
+                await asyncio.sleep(0.1)
+            await self.hass.services.async_call(
+                "esphome",
+                service_name,
+                payload,
+                blocking=True,
+            )
 
     def _resolve_service_name(self) -> str | None:
         """Déterminer le nom du service ESPHome à appeler."""

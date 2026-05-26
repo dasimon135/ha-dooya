@@ -17,9 +17,11 @@ from .const import (
     CONF_COVER_NAME,
     CONF_DOOYA_ID,
     CONF_ESPHOME_DEVICE,
+    CONF_REPEAT_COUNT,
     CONF_TRAVEL_TIME_DOWN,
     CONF_TRAVEL_TIME_UP,
     DEFAULT_CHANNEL,
+    DEFAULT_REPEAT_COUNT,
     DEFAULT_TRAVEL_TIME_DOWN,
     DEFAULT_TRAVEL_TIME_UP,
     DOMAIN,
@@ -329,6 +331,12 @@ class DooyaOptionsFlow(OptionsFlow):
                 CONF_TRAVEL_TIME_DOWN, DEFAULT_TRAVEL_TIME_DOWN
             ),
         )
+        current_repeat = int(
+            self._config_entry.options.get(
+                CONF_REPEAT_COUNT,
+                self._config_entry.data.get(CONF_REPEAT_COUNT, DEFAULT_REPEAT_COUNT),
+            )
+        )
 
         if user_input is not None:
             return self.async_create_entry(data=user_input)
@@ -345,6 +353,10 @@ class DooyaOptionsFlow(OptionsFlow):
                         CONF_TRAVEL_TIME_DOWN,
                         default=current_down,
                     ): vol.All(vol.Coerce(float), vol.Range(min=1, max=240)),
+                    vol.Required(
+                        CONF_REPEAT_COUNT,
+                        default=current_repeat,
+                    ): vol.All(int, vol.Range(min=1, max=3)),
                 }
             ),
         )

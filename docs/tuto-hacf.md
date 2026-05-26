@@ -160,6 +160,24 @@ Exemple simple :
 4. fermer completement en chronometrant
 5. mettre a jour les temps dans les options de l'entree
 
+## 8. Ameliorer la fiabilite RF (repetition)
+
+Le protocole RF433 OOK est unidirectionnel : il n'y a pas d'accuse de reception. Dans un environnement avec des interferences (autres appareils 433 MHz, reseaux Wi-Fi proches), une commande peut parfois ne pas etre recue par le moteur.
+
+Pour corriger ce comportement, l'integration propose un reglage **Nombre de repetitions RF** dans les options du volet :
+
+1. Aller dans Parametres puis Appareils et services
+2. Cliquer sur **Configurer** sur l'entree Dooya concernee
+3. Modifier le champ **Nombre de repetitions RF** (1 a 3)
+
+| Valeur | Comportement |
+|--------|--------------|
+| 1 | Emission unique — par defaut, convient a la plupart des installations |
+| 2 | Deux emissions espacees de 100 ms — recommande si des commandes sont parfois ratees |
+| 3 | Trois emissions — pour les environnements RF tres bruyants |
+
+Ne pas depasser 3 repetitions : certains moteurs Dooya peuvent interpreter une serie trop longue comme une commande de configuration.
+
 ## 8. Depannage rapide
 
 ### Le boitier ESPHome n'apparait pas dans le flow
