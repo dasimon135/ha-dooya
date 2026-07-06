@@ -71,14 +71,16 @@
   "options": {
     "step": {
       "init": {
-        "title": "Estimated Position Settings",
-        "description": "Adjust the full travel times used to estimate the shutter position.",
+        "title": "Shutter Settings",
+        "description": "Choose the transmitter node and adjust the full travel times used to estimate the shutter position.",
         "data": {
+          "esphome_device": "ESPHome transmitter device",
           "travel_time_up": "Full opening time (seconds)",
           "travel_time_down": "Full closing time (seconds)",
           "repeat_count": "RF transmission repeat count (1–3)"
         },
         "data_description": {
+          "esphome_device": "ESPHome node used to transmit RF commands for this shutter. With several nodes in the house, pick the one closest to the shutter.",
           "repeat_count": "Number of times the RF command is sent for each action. Increase to 2 or 3 if the shutter sometimes misses commands (RF interference). Default: 1."
         }
       }

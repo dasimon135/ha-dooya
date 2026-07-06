@@ -71,14 +71,16 @@
   "options": {
     "step": {
       "init": {
-        "title": "Réglages de position estimée",
-        "description": "Ajustez les temps de trajet complets utilisés pour estimer la position du volet.",
+        "title": "Réglages du volet",
+        "description": "Choisissez le nœud émetteur et ajustez les temps de trajet complets utilisés pour estimer la position du volet.",
         "data": {
+          "esphome_device": "Appareil ESPHome émetteur",
           "travel_time_up": "Temps d'ouverture complet (secondes)",
           "travel_time_down": "Temps de fermeture complet (secondes)",
           "repeat_count": "Nombre de répétitions de l'émission RF (1–3)"
         },
         "data_description": {
+          "esphome_device": "Nœud ESPHome utilisé pour émettre les commandes RF de ce volet. Avec plusieurs nœuds dans la maison, choisissez le plus proche du volet.",
           "repeat_count": "Nombre de fois où la commande RF est envoyée à chaque action. Augmenter à 2 ou 3 si le volet rate parfois une commande (interférences RF). Défaut : 1."
         }
       }

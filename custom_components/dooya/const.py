@@ -20,6 +20,12 @@ CONF_TRAVEL_TIME_UP: Final = "travel_time_up"  # Temps d'ouverture complet (s)
 CONF_TRAVEL_TIME_DOWN: Final = "travel_time_down"  # Temps de fermeture complet (s)
 CONF_REPEAT_COUNT: Final = "repeat_count"          # Nombre de répétitions de la trame RF (fiabilité)
 
+# Received frames matching one of our own transmissions (same button) less
+# than this many seconds old are echoes picked up by another node, not a
+# physical remote press. Covers repeat_count (max 3) x ~0.4 s per blocking
+# transmit call plus event latency.
+ECHO_SUPPRESS_WINDOW_SEC: Final = 2.0
+
 # Valeurs par défaut
 DEFAULT_CHANNEL: Final = 1
 DEFAULT_CHECK_UP: Final = 1

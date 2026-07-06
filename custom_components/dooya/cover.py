@@ -32,9 +32,11 @@ from .const import (
     DEFAULT_REPEAT_COUNT,
     DEFAULT_TRAVEL_TIME_DOWN,
     DEFAULT_TRAVEL_TIME_UP,
+    ECHO_SUPPRESS_WINDOW_SEC,
     EVENT_DOOYA_RECEIVED,
 )
 from .dooya_protocol import BUTTON_DOWN, BUTTON_STOP, BUTTON_UP
+from .echo_filter import TxEchoFilter
 from .entity import DooyaBaseEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -107,6 +109,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         self._target_reached_unsub: Callable[[], None] | None = None
         self._progress_unsub: Callable[[], None] | None = None
         self._event_unsub: Callable[[], None] | None = None
+        self._echo_filter = TxEchoFilter(ECHO_SUPPRESS_WINDOW_SEC)
 
     @property
     def is_closed(self) -> bool | None:
@@ -233,6 +236,9 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             "btn": button,
             "check": check,
         }
+        # Record before and after each call: echoes from other nodes can
+        # arrive while the blocking transmit loop is still in progress.
+        self._echo_filter.record_tx(button, monotonic())
         for i in range(self._repeat_count):
             if i > 0:
                 await asyncio.sleep(0.1)
@@ -242,10 +248,14 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
                 payload,
                 blocking=True,
             )
+            self._echo_filter.record_tx(button, monotonic())
 
     def _resolve_service_name(self) -> str | None:
         """Déterminer le nom du service ESPHome à appeler."""
-        device = self._config_entry.data.get(CONF_ESPHOME_DEVICE, "")
+        device = self._config_entry.options.get(
+            CONF_ESPHOME_DEVICE,
+            self._config_entry.data.get(CONF_ESPHOME_DEVICE, ""),
+        )
         if not device:
             _LOGGER.error(
                 "Aucun device ESPHome configuré pour %s. "
@@ -277,6 +287,14 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             return
 
         if event_id != self._dooya_id or event_channel != self._channel:
+            return
+
+        if self._echo_filter.is_echo(button, monotonic()):
+            _LOGGER.debug(
+                "%s: ignoring echo of our own transmission (button=%d)",
+                self._attr_name,
+                button,
+            )
             return
 
         if button == BUTTON_UP:
