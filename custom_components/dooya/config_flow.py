@@ -272,7 +272,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_COVER_NAME): str,
                     vol.Required(CONF_DOOYA_ID): str,
                     vol.Required(CONF_CHANNEL, default=DEFAULT_CHANNEL): vol.All(
-                        int, vol.Range(min=1, max=16)
+                        int, vol.Range(min=0, max=16)
                     ),
                     vol.Required(CONF_CHECK, default=1): vol.All(
                         int, vol.Range(min=0, max=15)

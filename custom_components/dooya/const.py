@@ -26,6 +26,11 @@ CONF_REPEAT_COUNT: Final = "repeat_count"          # Nombre de répétitions de 
 # transmit call plus event latency.
 ECHO_SUPPRESS_WINDOW_SEC: Final = 2.0
 
+# Canal broadcast Dooya : les trames canal 0 sont exécutées par tous les
+# volets appairés à la même télécommande (bouton "tous" des télécommandes
+# multi-canaux).
+BROADCAST_CHANNEL: Final = 0
+
 # Valeurs par défaut
 DEFAULT_CHANNEL: Final = 1
 DEFAULT_CHECK_UP: Final = 1

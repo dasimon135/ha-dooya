@@ -22,6 +22,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 import voluptuous as vol
 
 from .const import (
+    BROADCAST_CHANNEL,
     CONF_ESPHOME_DEVICE,
     CONF_REPEAT_COUNT,
     CONF_TRAVEL_TIME_DOWN,
@@ -72,17 +73,24 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     _attr_device_class = CoverDeviceClass.SHUTTER
     _attr_assumed_state = True
-    _attr_supported_features = (
-        CoverEntityFeature.OPEN
-        | CoverEntityFeature.CLOSE
-        | CoverEntityFeature.STOP
-        | CoverEntityFeature.SET_POSITION
-    )
 
     def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialiser le volet Dooya."""
         super().__init__(config_entry)
         self._attr_name = self._cover_name
+
+        # Channel 0 is the Dooya broadcast channel ("all" button): every
+        # paired shutter reacts, so a per-shutter position estimate is
+        # meaningless — expose plain open/close/stop only.
+        self._is_broadcast = self._channel == BROADCAST_CHANNEL
+        self._attr_supported_features = (
+            CoverEntityFeature.OPEN
+            | CoverEntityFeature.CLOSE
+            | CoverEntityFeature.STOP
+        )
+        if not self._is_broadcast:
+            self._attr_supported_features |= CoverEntityFeature.SET_POSITION
+
         options = config_entry.options
         self._travel_time_up = float(
             options.get(
@@ -117,6 +125,8 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     @property
     def is_closed(self) -> bool | None:
         """Retourner l'état fermé estimé."""
+        if self._is_broadcast:
+            return None
         self._refresh_position()
         if self._current_position is None:
             return None
@@ -125,6 +135,8 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     @property
     def current_cover_position(self) -> int | None:
         """Retourner la position estimée du volet."""
+        if self._is_broadcast:
+            return None
         self._refresh_position()
         return self._current_position
 
@@ -189,6 +201,12 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     async def async_set_cover_position(self, **kwargs: Any) -> None:
         """Déplacer le volet vers une position cible estimée."""
+        if self._is_broadcast:
+            _LOGGER.warning(
+                "%s: set_position is not supported on the broadcast channel",
+                self._attr_name,
+            )
+            return
         position = clamp_position(kwargs[ATTR_POSITION])
         self._refresh_position()
 
@@ -298,7 +316,11 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         except (KeyError, TypeError, ValueError):
             return
 
-        if event_id != self._dooya_id or event_channel != self._channel:
+        if event_id != self._dooya_id:
+            return
+        # A broadcast frame (channel 0, remote "all" button or the HA
+        # broadcast entity) moves every shutter paired with this remote.
+        if event_channel != self._channel and event_channel != BROADCAST_CHANNEL:
             return
 
         if self._echo_filter.is_echo(button, monotonic()):
@@ -320,6 +342,9 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     @callback
     def _start_estimated_motion(self, direction: int, target_position: int) -> None:
         """Démarrer ou redémarrer un mouvement estimé."""
+        if self._is_broadcast:
+            self.async_write_ha_state()
+            return
         self._refresh_position()
         self._cancel_motion_callbacks()
 
