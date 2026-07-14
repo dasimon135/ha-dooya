@@ -1,13 +1,13 @@
 {
   "domain": "dooya",
   "name": "Dooya RF Covers",
+  "after_dependencies": ["frontend"],
+  "codeowners": ["@dasimon135"],
   "config_flow": true,
   "dependencies": [],
-  "after_dependencies": ["frontend"],
   "documentation": "https://github.com/dasimon135/ha-dooya",
-  "issue_tracker": "https://github.com/dasimon135/ha-dooya/issues",
   "integration_type": "device",
   "iot_class": "assumed_state",
-  "codeowners": ["@dasimon135"],
+  "issue_tracker": "https://github.com/dasimon135/ha-dooya/issues",
   "version": "0.6.0"
 }
