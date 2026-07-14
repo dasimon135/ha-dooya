@@ -15,10 +15,7 @@
           "method": "Configuration method"
         },
         "data_description": {
-          "method": {
-            "manual": "Manual entry: recommended if you already know the shutter identifier.",
-            "learn": "Automatic detection: press the UP button on the remote control so the identifier can be read automatically."
-          }
+          "method": "Manual entry is recommended if you already know the shutter identifier. Automatic detection reads it when you press the UP button on the remote control."
         }
       },
       "learn": {

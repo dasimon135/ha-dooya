@@ -1,7 +1,7 @@
 {
   "domain": "dooya",
   "name": "Dooya RF Covers",
-  "after_dependencies": ["frontend"],
+  "after_dependencies": ["frontend", "http"],
   "codeowners": ["@dasimon135"],
   "config_flow": true,
   "dependencies": [],

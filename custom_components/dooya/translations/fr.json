@@ -15,10 +15,7 @@
           "method": "Méthode de configuration"
         },
         "data_description": {
-          "method": {
-            "manual": "Saisie manuelle : recommandée si vous connaissez déjà l'identifiant du volet.",
-            "learn": "Détection automatique : appuyez sur le bouton MONTER de la télécommande pour lire automatiquement l'identifiant."
-          }
+          "method": "La saisie manuelle est recommandée si vous connaissez déjà l'identifiant du volet. La détection automatique le lit quand vous appuyez sur le bouton MONTER de la télécommande."
         }
       },
       "learn": {
