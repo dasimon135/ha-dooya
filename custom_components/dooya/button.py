@@ -30,6 +30,8 @@ async def async_setup_entry(
     entities: list[DooyaButtonBase] = [
         DooyaMarkOpenButton(config_entry),
         DooyaMarkClosedButton(config_entry),
+        DooyaCalibrateUpButton(config_entry),
+        DooyaCalibrateDownButton(config_entry),
     ]
     # The favorite button only exists when a favorite position is set in
     # the options (the entry reloads on options change, so it appears and
@@ -89,6 +91,30 @@ class DooyaMarkClosedButton(DooyaButtonBase):
         """Marquer le volet comme fermé."""
         if (cover := self._cover) is not None:
             cover.async_mark_closed()
+
+
+class DooyaCalibrateUpButton(DooyaButtonBase):
+    """Mesure le temps d'ouverture complet (volet fermé requis)."""
+
+    translation_key = "calibrate_up"
+    _attr_icon = "mdi:timer-play-outline"
+
+    async def async_press(self) -> None:
+        """Démarrer la mesure du temps d'ouverture."""
+        if (cover := self._cover) is not None:
+            await cover.async_start_calibration(1)
+
+
+class DooyaCalibrateDownButton(DooyaButtonBase):
+    """Mesure le temps de fermeture complet (volet ouvert requis)."""
+
+    translation_key = "calibrate_down"
+    _attr_icon = "mdi:timer-stop-outline"
+
+    async def async_press(self) -> None:
+        """Démarrer la mesure du temps de fermeture."""
+        if (cover := self._cover) is not None:
+            await cover.async_start_calibration(-1)
 
 
 class DooyaFavoriteButton(DooyaButtonBase):

@@ -27,6 +27,10 @@ CONF_FAVORITE_POSITION: Final = "favorite_position"  # Position favorite (0-100,
 # transmit call plus event latency.
 ECHO_SUPPRESS_WINDOW_SEC: Final = 2.0
 
+# Calibration assistante : délai maximum entre le départ (UP/DOWN) et le
+# STOP de l'utilisateur avant abandon de la mesure.
+CALIBRATION_TIMEOUT_SEC: Final = 240.0
+
 # Canal broadcast Dooya : les trames canal 0 sont exécutées par tous les
 # volets appairés à la même télécommande (bouton "tous" des télécommandes
 # multi-canaux).

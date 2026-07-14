@@ -8,6 +8,7 @@ import logging
 from time import monotonic
 from typing import Any
 
+from homeassistant.components import persistent_notification
 from homeassistant.components.cover import (
     CoverDeviceClass,
     CoverEntity,
@@ -23,6 +24,7 @@ import voluptuous as vol
 
 from .const import (
     BROADCAST_CHANNEL,
+    CALIBRATION_TIMEOUT_SEC,
     CONF_ESPHOME_DEVICE,
     CONF_REPEAT_COUNT,
     CONF_TRAVEL_TIME_DOWN,
@@ -122,6 +124,12 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         self._event_unsub: Callable[[], None] | None = None
         self._echo_filter = TxEchoFilter(ECHO_SUPPRESS_WINDOW_SEC)
 
+        # Calibration assistant state: 0 = idle, +1 measuring up travel,
+        # -1 measuring down travel.
+        self._calibrating = 0
+        self._calibration_start: float | None = None
+        self._calibration_unsub: Callable[[], None] | None = None
+
     @property
     def is_closed(self) -> bool | None:
         """Retourner l'état fermé estimé."""
@@ -176,6 +184,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     async def async_will_remove_from_hass(self) -> None:
         """Nettoyer les callbacks lors de la suppression de l'entité."""
         self._cancel_motion_callbacks()
+        self._cancel_calibration_timeout()
         if self._event_unsub is not None:
             self._event_unsub()
             self._event_unsub = None
@@ -197,6 +206,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         """Stopper le volet (commande STOP, button=5)."""
         self._refresh_position()
         await self._async_transmit(BUTTON_STOP, DEFAULT_CHECK_STOP)
+        self._finish_calibration()
         self._stop_estimated_motion()
 
     async def async_set_cover_position(self, **kwargs: Any) -> None:
@@ -239,6 +249,121 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     def async_set_known_position(self, position: int) -> None:
         """Forcer manuellement une position connue sans envoyer de trame RF."""
         self._finalize_position(clamp_position(position))
+
+    # ---- calibration assistant ------------------------------------------
+
+    async def async_start_calibration(self, direction: int) -> None:
+        """Mesurer un temps de trajet complet.
+
+        Depuis la butée opposée, envoie UP/DOWN et chronomètre jusqu'au
+        prochain STOP (bouton HA, service ou télécommande physique). Le
+        temps mesuré est enregistré dans les options de l'entrée, qui se
+        recharge automatiquement.
+        """
+        if self._is_broadcast:
+            _LOGGER.warning(
+                "%s: calibration is not available on the broadcast channel",
+                self._attr_name,
+            )
+            return
+
+        self._refresh_position()
+        expected_start = 0 if direction > 0 else 100
+        if self._current_position is not None and self._current_position != expected_start:
+            self._notify(
+                f"Calibration not started for '{self._attr_name}': the shutter "
+                f"must be fully {'closed' if direction > 0 else 'open'} first "
+                f"(estimated position: {self._current_position}%)."
+            )
+            return
+
+        self._cancel_calibration_timeout()
+        self._calibrating = direction
+        self._calibration_start = monotonic()
+        self._calibration_unsub = async_call_later(
+            self.hass, CALIBRATION_TIMEOUT_SEC, self._handle_calibration_timeout
+        )
+
+        if direction > 0:
+            await self._async_transmit(BUTTON_UP, DEFAULT_CHECK_UP)
+            self._start_estimated_motion(direction=1, target_position=100)
+        else:
+            await self._async_transmit(BUTTON_DOWN, DEFAULT_CHECK_DOWN)
+            self._start_estimated_motion(direction=-1, target_position=0)
+
+        self._notify(
+            f"Calibration started for '{self._attr_name}'. Press STOP (in Home "
+            "Assistant or on the remote) at the exact moment the shutter "
+            f"reaches the fully {'open' if direction > 0 else 'closed'} position."
+        )
+
+    @callback
+    def _finish_calibration(self) -> None:
+        """Clore une mesure de calibration sur réception d'un STOP."""
+        if self._calibrating == 0 or self._calibration_start is None:
+            return
+
+        direction = self._calibrating
+        elapsed = monotonic() - self._calibration_start
+        self._calibrating = 0
+        self._calibration_start = None
+        self._cancel_calibration_timeout()
+
+        if not 1.0 <= elapsed <= CALIBRATION_TIMEOUT_SEC:
+            self._notify(
+                f"Calibration for '{self._attr_name}' cancelled: measured "
+                f"{elapsed:.1f} s is out of the accepted range."
+            )
+            return
+
+        measured = round(elapsed, 1)
+        key = CONF_TRAVEL_TIME_UP if direction > 0 else CONF_TRAVEL_TIME_DOWN
+        # The shutter is at the end stop the user just confirmed.
+        self._finalize_position(100 if direction > 0 else 0)
+
+        options = dict(self._config_entry.options)
+        options[key] = measured
+        # Triggers the entry update listener, which reloads with the new time.
+        self.hass.config_entries.async_update_entry(
+            self._config_entry, options=options
+        )
+        self._notify(
+            f"Calibration done for '{self._attr_name}': full "
+            f"{'opening' if direction > 0 else 'closing'} time measured at "
+            f"{measured} s and saved."
+        )
+        _LOGGER.info(
+            "%s: calibrated %s to %.1f s",
+            self._attr_name,
+            key,
+            measured,
+        )
+
+    @callback
+    def _handle_calibration_timeout(self, _now: Any) -> None:
+        """Abandonner une calibration restée sans STOP."""
+        self._calibration_unsub = None
+        if self._calibrating == 0:
+            return
+        self._calibrating = 0
+        self._calibration_start = None
+        self._notify(
+            f"Calibration for '{self._attr_name}' cancelled: no STOP received "
+            f"within {int(CALIBRATION_TIMEOUT_SEC)} s."
+        )
+
+    @callback
+    def _cancel_calibration_timeout(self) -> None:
+        """Annuler le timer de timeout de calibration."""
+        if self._calibration_unsub is not None:
+            self._calibration_unsub()
+            self._calibration_unsub = None
+
+    def _notify(self, message: str) -> None:
+        """Publier une notification persistante liée à la calibration."""
+        persistent_notification.async_create(
+            self.hass, message, title="Dooya calibration"
+        )
 
     async def _async_transmit(self, button: int, check: int) -> None:
         """Appeler le service ESPHome transmit_dooya."""
@@ -337,6 +462,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             self._start_estimated_motion(direction=-1, target_position=0)
         elif button == BUTTON_STOP:
             self._refresh_position()
+            self._finish_calibration()
             self._stop_estimated_motion()
 
     @callback
