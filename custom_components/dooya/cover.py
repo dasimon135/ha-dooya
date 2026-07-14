@@ -140,6 +140,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     async def async_added_to_hass(self) -> None:
         """Restaurer l'état précédent depuis le storage HA."""
+        await super().async_added_to_hass()
         if (last_state := await self.async_get_last_state()) is not None:
             restored_position = last_state.attributes.get(ATTR_CURRENT_POSITION)
             if restored_position is not None:
