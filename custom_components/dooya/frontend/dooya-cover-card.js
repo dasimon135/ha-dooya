@@ -10,7 +10,7 @@
  * entities) the manual recalibration actions mark_open / mark_closed.
  */
 
-const VERSION = "1.0.0";
+const VERSION = "1.1.0";
 // eslint-disable-next-line no-console
 console.info(`%c DOOYA-COVER-CARD %c v${VERSION} `, "background:#e8833a;color:#fff;border-radius:3px 0 0 3px", "background:#c95d2e;color:#fff;border-radius:0 3px 3px 0");
 
@@ -29,6 +29,7 @@ const STRINGS = {
     calibrate: "Recalibrate",
     markOpen: "Set as open",
     markClosed: "Set as closed",
+    favorite: "Favorite",
     notFound: (e) => `Entity ${e} not found`,
   },
   fr: {
@@ -45,6 +46,7 @@ const STRINGS = {
     calibrate: "Recaler",
     markOpen: "Marquer ouvert",
     markClosed: "Marquer fermé",
+    favorite: "Favori",
     notFound: (e) => `Entité ${e} introuvable`,
   },
 };
@@ -69,7 +71,7 @@ class DooyaCoverCard extends HTMLElement {
   }
 
   getCardSize() {
-    return 5;
+    return this._config && this._config.view === "compact" ? 2 : 5;
   }
 
   static getStubConfig(hass) {
@@ -96,12 +98,27 @@ class DooyaCoverCard extends HTMLElement {
     return !!(e && e.platform === "dooya");
   }
 
+  _favoriteButton() {
+    // Sibling button entity on the same device whose id mentions the
+    // favorite position (entity ids derive from EN "favorite" or FR
+    // "favori(te)" names, both matched by "favori").
+    const reg = (this._hass && this._hass.entities) || {};
+    const coverReg = reg[this._config.entity];
+    const devId = coverReg && coverReg.device_id;
+    if (!devId) return null;
+    return (
+      Object.keys(reg).find(
+        (e) => e.startsWith("button.") && reg[e].device_id === devId && /favori/i.test(e)
+      ) || null
+    );
+  }
+
   _signature() {
     if (!this._config || !this._hass) return null;
     const s = this._hass.states[this._config.entity];
     if (!s) return this._config.entity + ":none";
     const a = s.attributes;
-    return `${this._config.entity}:${s.state}:${a.current_position}`;
+    return `${this._config.entity}:${s.state}:${a.current_position}:${this._favoriteButton() || ""}`;
   }
 
   _call(domain, service, data) {
@@ -138,6 +155,28 @@ class DooyaCoverCard extends HTMLElement {
     // Curtain covers the (100 - position)% upper part of the window.
     const curtainPct = pos == null ? (closed ? 100 : 0) : 100 - pos;
 
+    const favBtn = this._favoriteButton();
+
+    if (this._config.view === "compact") {
+      const fillPct = pos != null ? pos : closed ? 0 : 100;
+      this._body.innerHTML = `
+        <div class="head chead">
+          <div class="title">${name}</div>
+          <div class="state ${moving ? "moving" : ""}" title="${t.estimated}">${stateLabel}</div>
+        </div>
+        <div class="compact">
+          <div class="cbar" data-bar title="${t.estimated}">
+            <div class="cfill ${moving ? "moving" : ""}" style="width:${fillPct}%"></div>
+          </div>
+          ${favBtn ? `<button class="ctl mini" data-fav="${favBtn}" title="${t.favorite}"><ha-icon icon="mdi:star"></ha-icon></button>` : ""}
+          <button class="ctl mini ${opening ? "active" : ""}" data-act="open" title="${t.up}"><ha-icon icon="mdi:chevron-up"></ha-icon></button>
+          <button class="ctl mini" data-act="stop" title="${t.stop}"><ha-icon icon="mdi:stop"></ha-icon></button>
+          <button class="ctl mini ${closing ? "active" : ""}" data-act="close" title="${t.down}"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
+        </div>
+      `;
+      return;
+    }
+
     const showPresets = this._config.show_presets !== false;
     const showCalib = this._config.show_calibration !== false && this._isDooya();
 
@@ -152,6 +191,9 @@ class DooyaCoverCard extends HTMLElement {
             return `<button class="chip ${active ? "active" : ""}" data-pos="${p}">${label}</button>`;
           })
           .join("") +
+        (favBtn
+          ? `<button class="chip star" data-fav="${favBtn}" title="${t.favorite}"><ha-icon icon="mdi:star"></ha-icon></button>`
+          : "") +
         `</div>`;
     }
 
@@ -235,8 +277,21 @@ class DooyaCoverCard extends HTMLElement {
       this._call("cover", "set_cover_position", { entity_id, position: target });
       return;
     }
-    const tgt = e.target.closest("[data-act],[data-pos]");
+    const bar = e.target.closest("[data-bar]");
+    if (bar) {
+      // Horizontal position bar (compact view): left = closed, right = open.
+      const r = bar.getBoundingClientRect();
+      const frac = (e.clientX - r.left) / r.width;
+      const target = Math.max(0, Math.min(100, Math.round(frac * 100)));
+      this._call("cover", "set_cover_position", { entity_id, position: target });
+      return;
+    }
+    const tgt = e.target.closest("[data-act],[data-pos],[data-fav]");
     if (!tgt) return;
+    if (tgt.dataset.fav) {
+      this._call("button", "press", { entity_id: tgt.dataset.fav });
+      return;
+    }
     const act = tgt.dataset.act;
     if (act === "open") this._call("cover", "open_cover", { entity_id });
     else if (act === "close") this._call("cover", "close_cover", { entity_id });
@@ -295,6 +350,17 @@ class DooyaCoverCard extends HTMLElement {
       .calib-label { display:inline-flex; align-items:center; gap:4px; font-size:.8rem;
                      color: var(--secondary-text-color); }
       .calib-label ha-icon { --mdc-icon-size:16px; }
+      .chip.star ha-icon { color:#f5a623; }
+      .chip.star.active { background:#f5a623; }
+      .chead { margin-bottom:6px; }
+      .compact { display:flex; align-items:center; gap:8px; }
+      .cbar { position:relative; flex:1; height:14px; border-radius:7px; overflow:hidden;
+              background: var(--divider-color); cursor:pointer; }
+      .cfill { position:absolute; top:0; left:0; bottom:0; border-radius:7px;
+               background: var(--primary-color); transition:width .9s linear; }
+      .cfill.moving { opacity:.75; }
+      .ctl.mini { width:38px; height:32px; flex:none; margin:0; border-radius:9px; }
+      .ctl.mini ha-icon { --mdc-icon-size:20px; }
       .ctl, .chip { transition: filter .15s ease, transform .1s ease, background .2s ease; }
       .ctl:hover, .chip:hover { filter: brightness(1.12); }
       .ctl:active, .chip:active { transform: scale(.95); }
@@ -326,6 +392,7 @@ class DooyaCoverCardEditor extends HTMLElement {
         ({
           entity: fr ? "Entité cover (requis)" : "Cover entity (required)",
           name: fr ? "Nom (optionnel)" : "Name (optional)",
+          view: fr ? "Affichage" : "View",
           show_presets: fr ? "Afficher les positions prédéfinies" : "Show preset positions",
           show_calibration: fr ? "Afficher le recalage manuel" : "Show manual recalibration",
         }[s.name] || s.name);
@@ -344,10 +411,22 @@ class DooyaCoverCardEditor extends HTMLElement {
     this._form.schema = [
       { name: "entity", required: true, selector: { entity: { domain: "cover" } } },
       { name: "name", selector: { text: {} } },
+      {
+        name: "view",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "normal", label: fr ? "Normale" : "Normal" },
+              { value: "compact", label: fr ? "Réduite" : "Compact" },
+            ],
+          },
+        },
+      },
       { name: "show_presets", selector: { boolean: {} } },
       { name: "show_calibration", selector: { boolean: {} } },
     ];
-    this._form.data = { show_presets: true, show_calibration: true, ...this._config };
+    this._form.data = { view: "normal", show_presets: true, show_calibration: true, ...this._config };
   }
 }
 

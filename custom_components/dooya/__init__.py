@@ -16,7 +16,7 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.COVER, Platform.BUTTON]
 
-CARD_VERSION = "1.0.0"
+CARD_VERSION = "1.1.0"
 CARD_URL = "/dooya_frontend/dooya-cover-card.js"
 
 
