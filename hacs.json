@@ -1,9 +1,5 @@
 {
   "name": "Dooya RF Covers",
-  "description": "Home Assistant integration for Dooya RF433 motorized covers/blinds using an ESPHome transmit_dooya service. Supports manual setup and automatic detection from the physical remote.",
-  "render_readme": true,
-  "domains": ["cover"],
-  "country": [],
   "homeassistant": "2026.5.0",
-  "iot_standards": []
+  "render_readme": true
 }

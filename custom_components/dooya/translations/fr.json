@@ -15,10 +15,7 @@
           "method": "Méthode de configuration"
         },
         "data_description": {
-          "method": {
-            "manual": "Saisie manuelle : recommandée si vous connaissez déjà l'identifiant du volet.",
-            "learn": "Détection automatique : appuyez sur le bouton MONTER de la télécommande pour lire automatiquement l'identifiant."
-          }
+          "method": "La saisie manuelle est recommandée si vous connaissez déjà l'identifiant du volet. La détection automatique le lit quand vous appuyez sur le bouton MONTER de la télécommande."
         }
       },
       "learn": {
@@ -47,7 +44,7 @@
         "data": {
           "cover_name": "Nom du volet",
           "dooya_id": "Identifiant du volet (exemple : 00D1C917)",
-          "channel": "Canal (1-16)",
+          "channel": "Canal (1-16, ou 0 = tous les volets)",
           "check": "Code de contrôle (0-15)",
           "travel_time_up": "Temps d'ouverture complet (secondes)",
           "travel_time_down": "Temps de fermeture complet (secondes)"
@@ -71,15 +68,48 @@
   "options": {
     "step": {
       "init": {
-        "title": "Réglages de position estimée",
-        "description": "Ajustez les temps de trajet complets utilisés pour estimer la position du volet.",
+        "title": "Réglages du volet",
+        "description": "Choisissez le nœud émetteur et ajustez les temps de trajet complets utilisés pour estimer la position du volet.",
         "data": {
+          "esphome_device": "Appareil ESPHome émetteur",
           "travel_time_up": "Temps d'ouverture complet (secondes)",
           "travel_time_down": "Temps de fermeture complet (secondes)",
-          "repeat_count": "Nombre de répétitions de l'émission RF (1–3)"
+          "repeat_count": "Nombre de répétitions de l'émission RF (1–3)",
+          "favorite_position": "Position favorite (%, optionnelle)"
         },
         "data_description": {
-          "repeat_count": "Nombre de fois où la commande RF est envoyée à chaque action. Augmenter à 2 ou 3 si le volet rate parfois une commande (interférences RF). Défaut : 1."
+          "esphome_device": "Nœud ESPHome utilisé pour émettre les commandes RF de ce volet. Avec plusieurs nœuds dans la maison, choisissez le plus proche du volet.",
+          "repeat_count": "Nombre de fois où la commande RF est envoyée à chaque action. Augmenter à 2 ou 3 si le volet rate parfois une commande (interférences RF). Défaut : 1.",
+          "favorite_position": "Position utilisée par le bouton « Position favorite » sur la page de l'appareil et sur la carte. Laisser vide pour masquer le bouton."
+        }
+      }
+    }
+  },
+  "entity": {
+    "button": {
+      "mark_open": { "name": "Marquer ouvert" },
+      "mark_closed": { "name": "Marquer fermé" },
+      "calibrate_up": { "name": "Calibrer le temps d'ouverture" },
+      "calibrate_down": { "name": "Calibrer le temps de fermeture" },
+      "favorite": { "name": "Position favorite" }
+    }
+  },
+  "services": {
+    "mark_open": {
+      "name": "Marquer comme ouvert",
+      "description": "Recale la position estimée du volet à 100 % sans envoyer de commande RF."
+    },
+    "mark_closed": {
+      "name": "Marquer comme fermé",
+      "description": "Recale la position estimée du volet à 0 % sans envoyer de commande RF."
+    },
+    "set_known_position": {
+      "name": "Définir une position connue",
+      "description": "Force une position estimée connue sans envoyer de commande RF.",
+      "fields": {
+        "position": {
+          "name": "Position",
+          "description": "Position connue du volet, entre 0 et 100."
         }
       }
     }

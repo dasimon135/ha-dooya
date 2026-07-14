@@ -1,0 +1,141 @@
+blueprint:
+  name: Dooya shutters — sun-based open/close
+  description: >-
+    Opens the selected shutters in the morning and closes them in the
+    evening based on sun elevation, with an optional hot-weather rule that
+    closes them during the day when a temperature sensor exceeds a
+    threshold (to keep the house cool).
+
+    Designed for Dooya RF covers but works with any cover entity.
+  domain: automation
+  source_url: https://github.com/dasimon135/ha-dooya/blob/main/blueprints/automation/dooya/shutters_sun.yaml
+  input:
+    covers:
+      name: Shutters
+      description: Cover entities to control.
+      selector:
+        entity:
+          domain: cover
+          multiple: true
+    evening_elevation:
+      name: Evening closing elevation
+      description: Close the shutters when the sun drops below this elevation (°).
+      default: 0
+      selector:
+        number:
+          min: -18
+          max: 20
+          step: 1
+          unit_of_measurement: "°"
+    morning_elevation:
+      name: Morning opening elevation
+      description: Open the shutters when the sun rises above this elevation (°).
+      default: 5
+      selector:
+        number:
+          min: -18
+          max: 30
+          step: 1
+          unit_of_measurement: "°"
+    earliest_open:
+      name: Earliest opening time
+      description: Never open before this time (lazy weekend mornings).
+      default: "07:30:00"
+      selector:
+        time: {}
+    temperature_sensor:
+      name: Outdoor temperature sensor (optional)
+      description: >-
+        When set, the shutters close during the day if this sensor exceeds
+        the hot-weather threshold, and reopen when it cools down.
+      default: ""
+      selector:
+        entity:
+          domain: sensor
+          device_class: temperature
+    hot_threshold:
+      name: Hot-weather threshold
+      description: Temperature above which the shutters close during the day.
+      default: 30
+      selector:
+        number:
+          min: 20
+          max: 45
+          step: 0.5
+          unit_of_measurement: "°C"
+
+mode: queued
+max: 4
+
+variables:
+  temperature_sensor: !input temperature_sensor
+  hot_threshold: !input hot_threshold
+
+triggers:
+  - trigger: numeric_state
+    entity_id: sun.sun
+    attribute: elevation
+    below: !input evening_elevation
+    id: evening
+  - trigger: numeric_state
+    entity_id: sun.sun
+    attribute: elevation
+    above: !input morning_elevation
+    id: morning
+  - trigger: template
+    value_template: >-
+      {{ temperature_sensor != '' and
+         states(temperature_sensor) | float(0) > hot_threshold | float }}
+    id: hot
+  - trigger: template
+    value_template: >-
+      {{ temperature_sensor != '' and
+         states(temperature_sensor) | float(99) < hot_threshold | float - 1 }}
+    id: cooled
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: evening
+        sequence:
+          - action: cover.close_cover
+            target:
+              entity_id: !input covers
+      - conditions:
+          - condition: trigger
+            id: morning
+          - condition: time
+            after: !input earliest_open
+          - condition: or
+            conditions:
+              - "{{ temperature_sensor == '' }}"
+              - "{{ states(temperature_sensor) | float(0) <= hot_threshold | float }}"
+        sequence:
+          - action: cover.open_cover
+            target:
+              entity_id: !input covers
+      - conditions:
+          - condition: trigger
+            id: hot
+          - condition: sun
+            after: sunrise
+            before: sunset
+        sequence:
+          - action: cover.close_cover
+            target:
+              entity_id: !input covers
+      - conditions:
+          - condition: trigger
+            id: cooled
+          - condition: sun
+            after: sunrise
+            before: sunset
+          - condition: numeric_state
+            entity_id: sun.sun
+            attribute: elevation
+            above: !input morning_elevation
+        sequence:
+          - action: cover.open_cover
+            target:
+              entity_id: !input covers

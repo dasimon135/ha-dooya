@@ -1,5 +1,10 @@
 # Dooya RF Covers — Home Assistant Integration
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="custom_components/dooya/brand/dark_logo.png">
+  <img src="custom_components/dooya/brand/logo.png" alt="Dooya RF" height="90">
+</picture>
+
 Control Dooya RF433 motorized covers (blinds/shutters/rollers) from Home Assistant.
 
 ## Features
@@ -8,6 +13,13 @@ Control Dooya RF433 motorized covers (blinds/shutters/rollers) from Home Assista
 - **Estimated position** based on real opening and closing travel times
 - **Set position** support for partial opening/closing directly from Home Assistant
 - **Manual recalibration services** to mark a cover as open, closed, or set a known position
+- **Recalibration & calibration buttons** on the device page — no service call needed
+- **Travel-time calibration assistant** — measures the real opening/closing times with a stopwatch instead of manual entry
+- **Favorite position** — per-shutter option + one-press button, like real Dooya remotes
+- **Broadcast channel 0** — one entity that opens/closes every shutter paired with the remote in a single RF frame
+- **Gateway-linked availability** — entities become `unavailable` when the ESPHome node is offline
+- **Diagnostics download** for easier GitHub issues
+- **Bundled Lovelace card** (`custom:dooya-cover-card`) — animated shutter with position, presets and recalibration, normal & compact views, no HACS frontend install needed
 - **Automatic detection from the remote** — press UP on the physical remote to read the shutter ID automatically
 - **Manual entry** — enter the shutter ID directly if you already know it
 - **User-friendly setup flow** — choose between manual entry and automatic detection
@@ -31,6 +43,8 @@ Control Dooya RF433 motorized covers (blinds/shutters/rollers) from Home Assista
 Manual installation is also possible by copying `custom_components/dooya` into your Home Assistant configuration directory.
 
 ## Support
+
+When opening an issue, please attach the **diagnostics download** (device page → three-dot menu → *Download diagnostics*): it contains the entry configuration (remote id redacted) and the current cover state.
 
 - Bug reports and feature requests: https://github.com/dasimon135/ha-dooya/issues
 - Repository: https://github.com/dasimon135/ha-dooya
@@ -163,6 +177,38 @@ It only listens to the signal sent by the physical remote control, then reads:
 
 Once these values are known, Home Assistant can generate **Open**, **Stop**, and **Close** commands for the same shutter.
 
+## Bundled Lovelace Card
+
+The integration ships its own dashboard card — it is registered automatically, nothing to install or declare in Lovelace resources.
+
+Add it from the dashboard card picker ("Dooya Cover Card", with a visual editor), or via YAML:
+
+```yaml
+type: custom:dooya-cover-card
+entity: cover.living_room_shutter
+```
+
+The card shows:
+
+- an **animated window** that tracks the estimated position in real time — click anywhere in the window to send the shutter to that height
+- **Open / Stop / Close** buttons
+- a **position slider** and **preset chips** (0 / 25 / 50 / 75 / 100 %)
+- **recalibration shortcuts** calling `dooya.mark_open` / `dooya.mark_closed` (shown only for Dooya entities)
+
+Options:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `entity` | — | Cover entity (required) |
+| `name` | entity name | Card title |
+| `view` | `normal` | `normal` (full animated window) or `compact` (one-line bar with up/stop/down) |
+| `show_presets` | `true` | Show the preset position chips |
+| `show_calibration` | `true` | Show the recalibration shortcuts |
+
+The compact view fits dashboards with many shutters: a clickable position bar (left = closed, right = open), the up/stop/down buttons and the favorite button when one is configured. A star chip also appears in the normal view when a favorite position is set in the integration options.
+
+Labels follow the Home Assistant UI language (English / French).
+
 ## Cleaning Up Old ESPHome Buttons
 
 If you previously exposed one ESPHome button per action and per shutter, they are no longer needed.
@@ -194,13 +240,49 @@ If needed, you can recalibrate a cover manually with the entity services exposed
 - `dooya.mark_closed`
 - `dooya.set_known_position`
 
-Typical calibration flow:
+The same actions are also available as **button entities** on the shutter's device page (*Set as open*, *Set as closed*), usable directly from the UI and in automations.
 
-1. fully close the cover
-2. call `dooya.mark_closed`
-3. measure the real opening time and closing time
-4. update those values in the integration options
-5. test with an intermediate position such as 50%
+### Calibration assistant
+
+Instead of measuring travel times with a stopwatch, use the two calibration buttons on the device page:
+
+1. fully close the shutter, then press **Calibrate opening time** — the shutter starts opening
+2. press **STOP** (in Home Assistant or on the physical remote) at the exact moment it is fully open
+3. the measured time is saved to the integration options automatically (a notification confirms the value)
+4. repeat from the open position with **Calibrate closing time**
+
+Persistent notifications guide each step; the measurement is cancelled automatically after 240 s without a STOP.
+
+### Favorite position
+
+Set a **favorite position** (for example 30 %) in the integration options. A *Favorite position* button then appears on the device page (and a star chip on the bundled card) that sends the shutter there in one press — like the favorite button of real Dooya remotes.
+
+## Broadcast Channel (All Shutters)
+
+Dooya multi-channel remotes have an "all" button that transmits on **channel 0**: every shutter paired with the remote executes the command from a single RF frame.
+
+You can create such an entity with manual entry by setting the channel to `0`. It exposes open/close/stop only (no position estimate, since each shutter moves independently), and is ideal for "close everything" automations — one RF frame instead of one per shutter.
+
+Broadcast frames are also understood the other way around: when the remote's "all" button is pressed (or the HA broadcast entity is used), the position estimate of every per-channel cover with the same remote id is updated accordingly.
+
+## Position Confidence
+
+The cover exposes two attributes reflecting how much the estimate may have drifted:
+
+- `moves_since_sync` — number of moves that ended between the end stops since the last full open/close
+- `position_confidence` — `high` (0–4), `medium` (5–9) or `low` (10+)
+
+Every full travel to an end stop (or a manual recalibration) resets the counter. If confidence turns `low`, simply open or close the shutter fully once.
+
+## Automation Blueprint
+
+The repo ships a ready-to-import blueprint ([blueprints/automation/dooya/shutters_sun.yaml](blueprints/automation/dooya/shutters_sun.yaml)) that:
+
+- closes the shutters when the sun drops below a configurable elevation
+- opens them in the morning above a configurable elevation (never before a chosen time)
+- optionally closes them during hot days (outdoor temperature sensor + threshold) and reopens once it cools down
+
+[![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fdasimon135%2Fha-dooya%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fdooya%2Fshutters_sun.yaml)
 
 ## RF Reliability (Repeat Count)
 

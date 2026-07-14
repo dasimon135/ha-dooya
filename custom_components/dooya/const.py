@@ -19,6 +19,22 @@ CONF_COVER_NAME: Final = "cover_name"          # Nom du volet
 CONF_TRAVEL_TIME_UP: Final = "travel_time_up"  # Temps d'ouverture complet (s)
 CONF_TRAVEL_TIME_DOWN: Final = "travel_time_down"  # Temps de fermeture complet (s)
 CONF_REPEAT_COUNT: Final = "repeat_count"          # Nombre de répétitions de la trame RF (fiabilité)
+CONF_FAVORITE_POSITION: Final = "favorite_position"  # Position favorite (0-100, optionnelle)
+
+# Received frames matching one of our own transmissions (same button) less
+# than this many seconds old are echoes picked up by another node, not a
+# physical remote press. Covers repeat_count (max 3) x ~0.4 s per blocking
+# transmit call plus event latency.
+ECHO_SUPPRESS_WINDOW_SEC: Final = 2.0
+
+# Calibration assistante : délai maximum entre le départ (UP/DOWN) et le
+# STOP de l'utilisateur avant abandon de la mesure.
+CALIBRATION_TIMEOUT_SEC: Final = 240.0
+
+# Canal broadcast Dooya : les trames canal 0 sont exécutées par tous les
+# volets appairés à la même télécommande (bouton "tous" des télécommandes
+# multi-canaux).
+BROADCAST_CHANNEL: Final = 0
 
 # Valeurs par défaut
 DEFAULT_CHANNEL: Final = 1

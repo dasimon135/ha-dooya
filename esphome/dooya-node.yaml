@@ -1,0 +1,171 @@
+# Full TX+RX Dooya RF433 node for the ha-dooya integration.
+#
+# Deploy one node per RF zone (reinforced concrete walls typically need one
+# node per zone). Copy this file once per node and change ONLY the
+# substitutions block: each node must have a unique name.
+#
+# Every node:
+#   - exposes its own `transmit_dooya` service; assign each cover to its
+#     nearest node in the integration's config or options flow;
+#   - listens continuously and publishes `esphome.dooya_received` on every
+#     decoded frame, which the integration uses to resync the estimated
+#     position when a physical remote is used.
+#
+# Wiring (ESP32 devkit + CC1101):
+#   CC1101 CS   -> GPIO5     CC1101 SCK  -> GPIO18
+#   CC1101 MOSI -> GPIO23    CC1101 MISO -> GPIO19
+#   CC1101 GDO0 -> GPIO4     CC1101 GDO2 -> GPIO16
+#
+# RF range tip: replace the coil antenna with a straight 17.3 cm wire
+# (433 MHz quarter wave), keep the node high up and away from concrete.
+#
+# After adopting the node in Home Assistant, enable "Allow the device to
+# perform Home Assistant actions" in the ESPHome integration options,
+# otherwise the received events are silently dropped.
+
+substitutions:
+  device_name: dooya-node-1        # UNIQUE per node (e.g. dooya-node-etage)
+  friendly_name: "Dooya RF Node 1"
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  on_boot:
+    # Enter RX as soon as the node boots, otherwise nothing is received
+    # until the first transmission.
+    priority: -100
+    then:
+      - cc1101.begin_rx: mycc1101
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  power_save_mode: none
+  fast_connect: true
+  ap:
+    ssid: "${device_name}-fallback"
+    password: !secret dooya_ap_password
+
+captive_portal:
+
+logger:
+  level: INFO
+  logs:
+    wifi: WARN
+    esp-idf: WARN
+
+api:
+  # Service called by ha-dooya (cover.py) to transmit an RF frame.
+  # HA calls esphome.<device_name>_transmit_dooya with {dooya_id, channel, btn, check}.
+  services:
+    - service: transmit_dooya
+      variables:
+        dooya_id: int   # 24-bit shutter identifier (e.g. 0x00D1C917 = 13749527)
+        channel: int    # channel (1-16)
+        btn: int        # 1=up, 3=down, 5=stop
+        check: int      # check code (1=up, 3=down, 5=stop)
+      then:
+        - lambda: |-
+            esphome::remote_base::DooyaData d{};
+            d.id      = (uint32_t)dooya_id;
+            d.channel = (uint8_t)channel;
+            d.button  = (uint8_t)btn;
+            d.check   = (uint8_t)check;
+            auto call = id(rf_transmitter).transmit();
+            esphome::remote_base::DooyaProtocol().encode(call.get_data(), d);
+            call.set_send_times(5);
+            call.set_send_wait(1000);
+            call.perform();
+
+ota:
+  - platform: esphome
+    password: !secret dooya_ota_password
+
+web_server:
+  port: 80
+
+# SPI bus for the CC1101
+spi:
+  id: spi_bus
+  type: single
+  clk_pin: GPIO18
+  mosi_pin: GPIO23
+  miso_pin: GPIO19
+
+# Native ESPHome CC1101 - async mode, ASK/OOK for the Dooya protocol
+cc1101:
+  id: mycc1101
+  cs_pin: 5
+  frequency: 433.92MHz
+  output_power: 10
+  modulation_type: ASK/OOK
+  symbol_rate: 5000
+  filter_bandwidth: 203kHz
+
+# RF transmitter on GDO0 (GPIO4)
+remote_transmitter:
+  - id: rf_transmitter
+    pin:
+      number: 4
+    carrier_duty_percent: 100%
+    non_blocking: false
+    on_transmit:
+      then:
+        - cc1101.begin_tx: mycc1101
+    on_complete:
+      then:
+        - cc1101.begin_rx: mycc1101
+
+# RF receiver on GDO2 (GPIO16).
+# Publishes `esphome.dooya_received` for every decoded Dooya frame: used by
+# the config flow (automatic learning) and by the covers (position resync
+# when a physical remote is used out of HA).
+remote_receiver:
+  id: rf_receiver
+  pin:
+    number: 16
+  dump:
+    - dooya
+  on_dooya:
+    then:
+      - lambda: |-
+          ESP_LOGI(
+            "dooya_rx",
+            "received id=%08" PRIX32 " ch=%u btn=%u chk=%u",
+            x.id,
+            x.channel,
+            x.button,
+            x.check
+          );
+      - if:
+          condition:
+            api.connected:
+              state_subscription_only: true
+          then:
+            - homeassistant.event:
+                event: esphome.dooya_received
+                data_template:
+                  id: "{{ dooya_id }}"
+                  channel: "{{ dooya_channel }}"
+                  button: "{{ dooya_button }}"
+                  check: "{{ dooya_check }}"
+                variables:
+                  dooya_id: !lambda |-
+                    char buf[9];
+                    snprintf(buf, sizeof(buf), "%08" PRIX32, x.id);
+                    return std::string(buf);
+                  dooya_channel: !lambda |-
+                    return std::to_string(x.channel);
+                  dooya_button: !lambda |-
+                    return std::to_string(x.button);
+                  dooya_check: !lambda |-
+                    return std::to_string(x.check);
+          else:
+            - logger.log:
+                format: "Dooya frame received but Home Assistant is not connected through the API, event not sent"
+                level: WARN

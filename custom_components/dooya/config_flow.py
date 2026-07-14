@@ -17,6 +17,7 @@ from .const import (
     CONF_COVER_NAME,
     CONF_DOOYA_ID,
     CONF_ESPHOME_DEVICE,
+    CONF_FAVORITE_POSITION,
     CONF_REPEAT_COUNT,
     CONF_TRAVEL_TIME_DOWN,
     CONF_TRAVEL_TIME_UP,
@@ -31,6 +32,17 @@ from .dooya_protocol import DooyaData
 
 # Délai maximum d'attente en mode apprentissage (secondes)
 LEARN_TIMEOUT_SEC = 30
+
+
+def _list_transmit_devices(hass) -> list[str]:
+    """List ESPHome devices exposing a transmit_dooya service."""
+    esphome_services = hass.services.async_services().get("esphome", {})
+    devices = []
+    suffix = "_transmit_dooya"
+    for service_name in esphome_services:
+        if service_name.endswith(suffix):
+            devices.append(service_name[: -len(suffix)].replace("_", "-"))
+    return sorted(devices)
 
 
 class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -52,13 +64,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
 
     def _available_esphome_devices(self) -> list[str]:
         """Lister les devices ESPHome exposant un service transmit_dooya."""
-        esphome_services = self.hass.services.async_services().get("esphome", {})
-        devices = []
-        suffix = "_transmit_dooya"
-        for service_name in esphome_services:
-            if service_name.endswith(suffix):
-                devices.append(service_name[: -len(suffix)].replace("_", "-"))
-        return sorted(devices)
+        return _list_transmit_devices(self.hass)
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -267,7 +273,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_COVER_NAME): str,
                     vol.Required(CONF_DOOYA_ID): str,
                     vol.Required(CONF_CHANNEL, default=DEFAULT_CHANNEL): vol.All(
-                        int, vol.Range(min=1, max=16)
+                        int, vol.Range(min=0, max=16)
                     ),
                     vol.Required(CONF_CHECK, default=1): vol.All(
                         int, vol.Range(min=0, max=15)
@@ -321,6 +327,10 @@ class DooyaOptionsFlow(OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Modifier les temps de trajet estimés."""
+        current_device = self._config_entry.options.get(
+            CONF_ESPHOME_DEVICE,
+            self._config_entry.data.get(CONF_ESPHOME_DEVICE, ""),
+        )
         current_up = self._config_entry.options.get(
             CONF_TRAVEL_TIME_UP,
             self._config_entry.data.get(CONF_TRAVEL_TIME_UP, DEFAULT_TRAVEL_TIME_UP),
@@ -341,22 +351,51 @@ class DooyaOptionsFlow(OptionsFlow):
         if user_input is not None:
             return self.async_create_entry(data=user_input)
 
+        # With several TX+RX nodes in the house, a cover can be reassigned to
+        # the nearest node here without re-creating the entry. Keep the
+        # current device selectable even if its node is offline right now.
+        devices = _list_transmit_devices(self.hass)
+        if current_device and current_device not in devices:
+            devices = sorted([*devices, current_device])
+
+        schema: dict[Any, Any] = {}
+        if devices:
+            schema[
+                vol.Required(CONF_ESPHOME_DEVICE, default=current_device)
+            ] = vol.In(devices)
+
+        favorite_field = (
+            vol.Optional(
+                CONF_FAVORITE_POSITION,
+                description={
+                    "suggested_value": self._config_entry.options.get(
+                        CONF_FAVORITE_POSITION
+                    )
+                },
+            )
+            if self._config_entry.options.get(CONF_FAVORITE_POSITION) is not None
+            else vol.Optional(CONF_FAVORITE_POSITION)
+        )
+
+        schema.update(
+            {
+                vol.Required(
+                    CONF_TRAVEL_TIME_UP,
+                    default=current_up,
+                ): vol.All(vol.Coerce(float), vol.Range(min=1, max=240)),
+                vol.Required(
+                    CONF_TRAVEL_TIME_DOWN,
+                    default=current_down,
+                ): vol.All(vol.Coerce(float), vol.Range(min=1, max=240)),
+                vol.Required(
+                    CONF_REPEAT_COUNT,
+                    default=current_repeat,
+                ): vol.All(int, vol.Range(min=1, max=3)),
+                favorite_field: vol.All(vol.Coerce(int), vol.Range(min=0, max=100)),
+            }
+        )
+
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_TRAVEL_TIME_UP,
-                        default=current_up,
-                    ): vol.All(vol.Coerce(float), vol.Range(min=1, max=240)),
-                    vol.Required(
-                        CONF_TRAVEL_TIME_DOWN,
-                        default=current_down,
-                    ): vol.All(vol.Coerce(float), vol.Range(min=1, max=240)),
-                    vol.Required(
-                        CONF_REPEAT_COUNT,
-                        default=current_repeat,
-                    ): vol.All(int, vol.Range(min=1, max=3)),
-                }
-            ),
+            data_schema=vol.Schema(schema),
         )
