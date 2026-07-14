@@ -1,5 +1,10 @@
 # Dooya RF Covers — Home Assistant Integration
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="custom_components/dooya/brand/dark_logo.png">
+  <img src="custom_components/dooya/brand/logo.png" alt="Dooya RF" height="90">
+</picture>
+
 Control Dooya RF433 motorized covers (blinds/shutters/rollers) from Home Assistant.
 
 ## Features
@@ -8,6 +13,7 @@ Control Dooya RF433 motorized covers (blinds/shutters/rollers) from Home Assista
 - **Estimated position** based on real opening and closing travel times
 - **Set position** support for partial opening/closing directly from Home Assistant
 - **Manual recalibration services** to mark a cover as open, closed, or set a known position
+- **Bundled Lovelace card** (`custom:dooya-cover-card`) — animated shutter with position, presets and recalibration, no HACS frontend install needed
 - **Automatic detection from the remote** — press UP on the physical remote to read the shutter ID automatically
 - **Manual entry** — enter the shutter ID directly if you already know it
 - **User-friendly setup flow** — choose between manual entry and automatic detection
@@ -162,6 +168,35 @@ It only listens to the signal sent by the physical remote control, then reads:
 - the channel
 
 Once these values are known, Home Assistant can generate **Open**, **Stop**, and **Close** commands for the same shutter.
+
+## Bundled Lovelace Card
+
+The integration ships its own dashboard card — it is registered automatically, nothing to install or declare in Lovelace resources.
+
+Add it from the dashboard card picker ("Dooya Cover Card", with a visual editor), or via YAML:
+
+```yaml
+type: custom:dooya-cover-card
+entity: cover.living_room_shutter
+```
+
+The card shows:
+
+- an **animated window** that tracks the estimated position in real time — click anywhere in the window to send the shutter to that height
+- **Open / Stop / Close** buttons
+- a **position slider** and **preset chips** (0 / 25 / 50 / 75 / 100 %)
+- **recalibration shortcuts** calling `dooya.mark_open` / `dooya.mark_closed` (shown only for Dooya entities)
+
+Options:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `entity` | — | Cover entity (required) |
+| `name` | entity name | Card title |
+| `show_presets` | `true` | Show the preset position chips |
+| `show_calibration` | `true` | Show the recalibration shortcuts |
+
+Labels follow the Home Assistant UI language (English / French).
 
 ## Cleaning Up Old ESPHome Buttons
 

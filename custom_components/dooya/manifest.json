@@ -3,6 +3,7 @@
   "name": "Dooya RF Covers",
   "config_flow": true,
   "dependencies": [],
+  "after_dependencies": ["frontend"],
   "documentation": "https://github.com/dasimon135/ha-dooya",
   "issue_tracker": "https://github.com/dasimon135/ha-dooya/issues",
   "integration_type": "device",
