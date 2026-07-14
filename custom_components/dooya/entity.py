@@ -47,14 +47,13 @@ class DooyaBaseEntity(Entity):
         self._dooya_id: int = data[CONF_DOOYA_ID]
         self._channel: int = data[CONF_CHANNEL]
         self._check: int = data[CONF_CHECK]
-        cover_name: str = data[CONF_COVER_NAME]
+        self._cover_name: str = data[CONF_COVER_NAME]
 
         self._gateway_entity_ids: list[str] = []
 
-        self._attr_name = cover_name
         self._attr_device_info = {
             "identifiers": {(DOMAIN, config_entry.entry_id)},
-            "name": cover_name,
+            "name": self._cover_name,
             "manufacturer": "Dooya",
             "model": "RF433 Cover",
         }
@@ -130,7 +129,7 @@ class DooyaBaseEntity(Entity):
         _LOGGER.debug(
             "%s: ESPHome gateway %s not found in device registry, "
             "availability tracking disabled",
-            self._attr_name,
+            self._cover_name,
             self._esphome_device,
         )
         return []

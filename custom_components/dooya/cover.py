@@ -32,6 +32,7 @@ from .const import (
     DEFAULT_REPEAT_COUNT,
     DEFAULT_TRAVEL_TIME_DOWN,
     DEFAULT_TRAVEL_TIME_UP,
+    DOMAIN,
     ECHO_SUPPRESS_WINDOW_SEC,
     EVENT_DOOYA_RECEIVED,
 )
@@ -81,6 +82,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialiser le volet Dooya."""
         super().__init__(config_entry)
+        self._attr_name = self._cover_name
         options = config_entry.options
         self._travel_time_up = float(
             options.get(
@@ -154,12 +156,20 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             EVENT_DOOYA_RECEIVED, self._handle_dooya_event
         )
 
+        # Share the cover object with the button platform of this entry.
+        self.hass.data.setdefault(DOMAIN, {}).setdefault(
+            self._config_entry.entry_id, {}
+        )["cover"] = self
+
     async def async_will_remove_from_hass(self) -> None:
         """Nettoyer les callbacks lors de la suppression de l'entité."""
         self._cancel_motion_callbacks()
         if self._event_unsub is not None:
             self._event_unsub()
             self._event_unsub = None
+        entry_data = self.hass.data.get(DOMAIN, {}).get(self._config_entry.entry_id)
+        if entry_data is not None:
+            entry_data.pop("cover", None)
 
     async def async_open_cover(self, **kwargs: Any) -> None:
         """Ouvrir le volet (commande UP, button=1)."""

@@ -10,9 +10,11 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import ConfigType
 
+from .const import DOMAIN
+
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.COVER]
+PLATFORMS: list[Platform] = [Platform.COVER, Platform.BUTTON]
 
 CARD_VERSION = "1.0.0"
 CARD_URL = "/dooya_frontend/dooya-cover-card.js"
@@ -41,6 +43,7 @@ async def _async_register_card(hass: HomeAssistant) -> None:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Initialiser un config entry Dooya."""
+    hass.data.setdefault(DOMAIN, {}).setdefault(entry.entry_id, {})
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     # Reload the entry when options change so the new ESPHome device,
     # travel times and repeat count apply without an HA restart.
@@ -55,4 +58,7 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Décharger un config entry Dooya."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if unloaded:
+        hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
+    return unloaded
