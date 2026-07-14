@@ -265,6 +265,25 @@ You can create such an entity with manual entry by setting the channel to `0`. I
 
 Broadcast frames are also understood the other way around: when the remote's "all" button is pressed (or the HA broadcast entity is used), the position estimate of every per-channel cover with the same remote id is updated accordingly.
 
+## Position Confidence
+
+The cover exposes two attributes reflecting how much the estimate may have drifted:
+
+- `moves_since_sync` — number of moves that ended between the end stops since the last full open/close
+- `position_confidence` — `high` (0–4), `medium` (5–9) or `low` (10+)
+
+Every full travel to an end stop (or a manual recalibration) resets the counter. If confidence turns `low`, simply open or close the shutter fully once.
+
+## Automation Blueprint
+
+The repo ships a ready-to-import blueprint ([blueprints/automation/dooya/shutters_sun.yaml](blueprints/automation/dooya/shutters_sun.yaml)) that:
+
+- closes the shutters when the sun drops below a configurable elevation
+- opens them in the morning above a configurable elevation (never before a chosen time)
+- optionally closes them during hot days (outdoor temperature sensor + threshold) and reopens once it cools down
+
+[![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fdasimon135%2Fha-dooya%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fdooya%2Fshutters_sun.yaml)
+
 ## RF Reliability (Repeat Count)
 
 RF433 OOK is a one-way protocol with no acknowledgement. In environments with RF interference (other 433 MHz devices, Wi-Fi, etc.), a command may occasionally be lost.
