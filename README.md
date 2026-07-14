@@ -205,6 +205,8 @@ Options:
 | `show_presets` | `true` | Show the preset position chips |
 | `show_calibration` | `true` | Show the recalibration shortcuts |
 
+The window scenery follows the sun (`sun.sun`): sunrise and sunset tints, bright day, and a starry night with the moon. 🌙
+
 The compact view fits dashboards with many shutters: a clickable position bar (left = closed, right = open), the up/stop/down buttons and the favorite button when one is configured. A star chip also appears in the normal view when a favorite position is set in the integration options.
 
 Labels follow the Home Assistant UI language (English / French).

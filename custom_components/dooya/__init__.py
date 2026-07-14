@@ -19,7 +19,7 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 PLATFORMS: list[Platform] = [Platform.COVER, Platform.BUTTON]
 
-CARD_VERSION = "1.1.0"
+CARD_VERSION = "1.2.0"
 CARD_URL = "/dooya_frontend/dooya-cover-card.js"
 
 

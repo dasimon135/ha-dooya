@@ -10,7 +10,7 @@
  * entities) the manual recalibration actions mark_open / mark_closed.
  */
 
-const VERSION = "1.1.0";
+const VERSION = "1.2.0";
 // eslint-disable-next-line no-console
 console.info(`%c DOOYA-COVER-CARD %c v${VERSION} `, "background:#e8833a;color:#fff;border-radius:3px 0 0 3px", "background:#c95d2e;color:#fff;border-radius:0 3px 3px 0");
 
@@ -98,6 +98,23 @@ class DooyaCoverCard extends HTMLElement {
     return !!(e && e.platform === "dooya");
   }
 
+  _scene() {
+    // Window scenery follows the sun: dawn / day / dusk / night.
+    // Uses sun.sun when available (season-accurate), falls back to the clock.
+    const sun = this._hass && this._hass.states["sun.sun"];
+    if (sun && sun.attributes && typeof sun.attributes.elevation === "number") {
+      const el = sun.attributes.elevation;
+      if (el < -6) return "night";
+      if (el < 8) return sun.attributes.rising ? "dawn" : "dusk";
+      return "day";
+    }
+    const h = new Date().getHours();
+    if (h < 6 || h >= 22) return "night";
+    if (h < 9) return "dawn";
+    if (h >= 19) return "dusk";
+    return "day";
+  }
+
   _favoriteButton() {
     // Sibling button entity on the same device whose id mentions the
     // favorite position (entity ids derive from EN "favorite" or FR
@@ -118,7 +135,7 @@ class DooyaCoverCard extends HTMLElement {
     const s = this._hass.states[this._config.entity];
     if (!s) return this._config.entity + ":none";
     const a = s.attributes;
-    return `${this._config.entity}:${s.state}:${a.current_position}:${this._favoriteButton() || ""}`;
+    return `${this._config.entity}:${s.state}:${a.current_position}:${this._favoriteButton() || ""}:${this._scene()}`;
   }
 
   _call(domain, service, data) {
@@ -213,9 +230,11 @@ class DooyaCoverCard extends HTMLElement {
         <div class="state ${moving ? "moving" : ""}" title="${t.estimated}">${stateLabel}</div>
       </div>
       <div class="hero">
-        <div class="window" data-window title="${t.estimated}">
+        <div class="window sc-${this._scene()}" data-window title="${t.estimated}">
           <div class="sky">
+            <div class="stars"></div>
             <div class="sun"></div>
+            <div class="moon"></div>
             <div class="hill hill1"></div>
             <div class="hill hill2"></div>
           </div>
@@ -318,6 +337,24 @@ class DooyaCoverCard extends HTMLElement {
       .hill { position:absolute; bottom:-14px; border-radius:50%; background:#8fbf6b; }
       .hill1 { left:-30px; width:120px; height:56px; }
       .hill2 { right:-36px; width:140px; height:64px; background:#7bb25a; }
+      .moon, .stars { display:none; }
+      .window.sc-dawn .sky { background:linear-gradient(#8fb7e8, #ffb26b 55%, #ffe3c2); }
+      .window.sc-dusk .sky { background:linear-gradient(#7a5f9e, #ff8e63 55%, #ffd1a1); }
+      .window.sc-night .sky { background:linear-gradient(#101c33, #2e4a6b); }
+      .window.sc-dawn .sun, .window.sc-dusk .sun { top:58%; background:#ff9a3d;
+        box-shadow:0 0 16px 6px rgba(255,140,60,.55); }
+      .window.sc-night .sun { display:none; }
+      .window.sc-night .moon { display:block; position:absolute; top:16px; right:20px;
+        width:22px; height:22px; border-radius:50%; background:#e8ecf5;
+        box-shadow:0 0 10px 2px rgba(220,230,255,.4), inset -5px -3px 0 0 #c2c9da; }
+      .window.sc-night .stars { display:block; position:absolute; top:10px; left:14px;
+        width:3px; height:3px; border-radius:50%; background:#fff;
+        box-shadow:26px 8px 0 0 #fff, 52px 2px 0 0 rgba(255,255,255,.8),
+                   74px 14px 0 0 rgba(255,255,255,.7), 12px 26px 0 0 rgba(255,255,255,.6),
+                   60px 30px 0 0 rgba(255,255,255,.75); }
+      .window.sc-night .hill { filter:brightness(.45) saturate(.7); }
+      .window.sc-dawn .hill, .window.sc-dusk .hill { filter:brightness(.85) saturate(1.1) hue-rotate(-12deg); }
+      .window.sc-night .pos-label { color:rgba(255,255,255,.8); background:rgba(0,0,0,.35); }
       .curtain { position:absolute; top:0; left:0; right:0; transition:height .9s linear;
                  background:repeating-linear-gradient(
                    var(--dooya-slat-color, #e2e2e2) 0px,
