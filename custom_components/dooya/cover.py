@@ -38,6 +38,7 @@ from .const import (
 from .dooya_protocol import BUTTON_DOWN, BUTTON_STOP, BUTTON_UP
 from .echo_filter import TxEchoFilter
 from .entity import DooyaBaseEntity
+from .travel_calc import clamp_position, position_after, travel_duration
 
 _LOGGER = logging.getLogger(__name__)
 ATTR_CURRENT_POSITION = "current_position"
@@ -142,7 +143,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         if (last_state := await self.async_get_last_state()) is not None:
             restored_position = last_state.attributes.get(ATTR_CURRENT_POSITION)
             if restored_position is not None:
-                self._current_position = self._clamp_position(restored_position)
+                self._current_position = clamp_position(restored_position)
             elif last_state.state == "closed":
                 self._current_position = 0
             elif last_state.state == "open":
@@ -177,7 +178,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     async def async_set_cover_position(self, **kwargs: Any) -> None:
         """Déplacer le volet vers une position cible estimée."""
-        position = self._clamp_position(kwargs[ATTR_POSITION])
+        position = clamp_position(kwargs[ATTR_POSITION])
         self._refresh_position()
 
         if self._current_position is None:
@@ -208,7 +209,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     @callback
     def async_set_known_position(self, position: int) -> None:
         """Forcer manuellement une position connue sans envoyer de trame RF."""
-        self._finalize_position(self._clamp_position(position))
+        self._finalize_position(clamp_position(position))
 
     async def _async_transmit(self, button: int, check: int) -> None:
         """Appeler le service ESPHome transmit_dooya."""
@@ -343,15 +344,13 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         travel_time = (
             self._travel_time_up if self._movement_direction > 0 else self._travel_time_down
         )
-        delta = (elapsed / travel_time) * 100
-        current = self._movement_start_position + (self._movement_direction * delta)
-
-        if self._movement_direction > 0:
-            current = min(current, self._target_position)
-        else:
-            current = max(current, self._target_position)
-
-        self._current_position = self._clamp_position(current)
+        self._current_position = position_after(
+            self._movement_start_position,
+            self._movement_direction,
+            elapsed,
+            travel_time,
+            self._target_position,
+        )
 
         if self._current_position == self._target_position:
             self._finalize_position(self._target_position)
@@ -369,7 +368,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     @callback
     def _finalize_position(self, position: int) -> None:
         """Clore un mouvement estimé sur une position cible."""
-        self._current_position = self._clamp_position(position)
+        self._current_position = clamp_position(position)
         self._stop_estimated_motion()
 
     @callback
@@ -382,7 +381,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         travel_time = (
             self._travel_time_up if self._movement_direction > 0 else self._travel_time_down
         )
-        duration = (distance / 100) * travel_time
+        duration = travel_duration(distance, travel_time)
 
         if duration <= 0:
             self._finalize_position(self._target_position)
@@ -443,8 +442,3 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         if self._progress_unsub is not None:
             self._progress_unsub()
             self._progress_unsub = None
-
-    @staticmethod
-    def _clamp_position(value: float | int) -> int:
-        """Limiter une position dans l'intervalle 0..100."""
-        return max(0, min(100, round(float(value))))
