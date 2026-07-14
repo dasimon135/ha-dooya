@@ -17,6 +17,7 @@ from .const import (
     CONF_COVER_NAME,
     CONF_DOOYA_ID,
     CONF_ESPHOME_DEVICE,
+    CONF_FAVORITE_POSITION,
     CONF_REPEAT_COUNT,
     CONF_TRAVEL_TIME_DOWN,
     CONF_TRAVEL_TIME_UP,
@@ -363,6 +364,19 @@ class DooyaOptionsFlow(OptionsFlow):
                 vol.Required(CONF_ESPHOME_DEVICE, default=current_device)
             ] = vol.In(devices)
 
+        favorite_field = (
+            vol.Optional(
+                CONF_FAVORITE_POSITION,
+                description={
+                    "suggested_value": self._config_entry.options.get(
+                        CONF_FAVORITE_POSITION
+                    )
+                },
+            )
+            if self._config_entry.options.get(CONF_FAVORITE_POSITION) is not None
+            else vol.Optional(CONF_FAVORITE_POSITION)
+        )
+
         schema.update(
             {
                 vol.Required(
@@ -377,6 +391,7 @@ class DooyaOptionsFlow(OptionsFlow):
                     CONF_REPEAT_COUNT,
                     default=current_repeat,
                 ): vol.All(int, vol.Range(min=1, max=3)),
+                favorite_field: vol.All(vol.Coerce(int), vol.Range(min=0, max=100)),
             }
         )
 

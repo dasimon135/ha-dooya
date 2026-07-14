@@ -19,6 +19,7 @@ CONF_COVER_NAME: Final = "cover_name"          # Nom du volet
 CONF_TRAVEL_TIME_UP: Final = "travel_time_up"  # Temps d'ouverture complet (s)
 CONF_TRAVEL_TIME_DOWN: Final = "travel_time_down"  # Temps de fermeture complet (s)
 CONF_REPEAT_COUNT: Final = "repeat_count"          # Nombre de répétitions de la trame RF (fiabilité)
+CONF_FAVORITE_POSITION: Final = "favorite_position"  # Position favorite (0-100, optionnelle)
 
 # Received frames matching one of our own transmissions (same button) less
 # than this many seconds old are echoes picked up by another node, not a
