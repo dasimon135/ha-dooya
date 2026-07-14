@@ -130,6 +130,11 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         self._calibration_start: float | None = None
         self._calibration_unsub: Callable[[], None] | None = None
 
+        # Confidence tracking: each move that ends between the end stops
+        # accumulates estimation error; reaching a stop (or a manual
+        # recalibration) resyncs the estimate.
+        self._moves_since_sync = 0
+
     @property
     def is_closed(self) -> bool | None:
         """Retourner l'état fermé estimé."""
@@ -147,6 +152,22 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             return None
         self._refresh_position()
         return self._current_position
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Exposer la confiance dans la position estimée."""
+        if self._is_broadcast:
+            return None
+        if self._moves_since_sync >= 10:
+            confidence = "low"
+        elif self._moves_since_sync >= 5:
+            confidence = "medium"
+        else:
+            confidence = "high"
+        return {
+            "position_confidence": confidence,
+            "moves_since_sync": self._moves_since_sync,
+        }
 
     @property
     def is_opening(self) -> bool:
@@ -171,6 +192,9 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
                 self._current_position = 0
             elif last_state.state == "open":
                 self._current_position = 100
+            restored_moves = last_state.attributes.get("moves_since_sync")
+            if isinstance(restored_moves, int) and restored_moves >= 0:
+                self._moves_since_sync = restored_moves
 
         self._event_unsub = self.hass.bus.async_listen(
             EVENT_DOOYA_RECEIVED, self._handle_dooya_event
@@ -249,6 +273,9 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     def async_set_known_position(self, position: int) -> None:
         """Forcer manuellement une position connue sans envoyer de trame RF."""
         self._finalize_position(clamp_position(position))
+        # The user just told us where the shutter really is.
+        self._moves_since_sync = 0
+        self.async_write_ha_state()
 
     # ---- calibration assistant ------------------------------------------
 
@@ -521,6 +548,10 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     def _stop_estimated_motion(self) -> None:
         """Arrêter le mouvement estimé à la position courante."""
         self._cancel_motion_callbacks()
+        if self._movement_direction != 0 and self._current_position not in (0, 100):
+            # Move ended between the end stops: the estimate drifts a little
+            # more each time until the shutter reaches a stop again.
+            self._moves_since_sync += 1
         self._movement_direction = 0
         self._movement_start_time = None
         self._movement_start_position = None
@@ -531,6 +562,9 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     def _finalize_position(self, position: int) -> None:
         """Clore un mouvement estimé sur une position cible."""
         self._current_position = clamp_position(position)
+        if self._current_position in (0, 100):
+            # End stop reached: the estimate is resynchronized.
+            self._moves_since_sync = 0
         self._stop_estimated_motion()
 
     @callback
