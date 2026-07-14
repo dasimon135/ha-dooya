@@ -11,6 +11,9 @@ L'objectif est simple :
 - regler un pourcentage d'ouverture directement depuis Home Assistant
 - apprendre automatiquement l'identifiant du volet depuis la telecommande physique
 - eviter de multiplier les boutons ESPHome, un par action et par volet
+- profiter de la carte Lovelace fournie avec l'integration (volet anime, vue compacte)
+- mesurer les temps de trajet automatiquement avec l'assistant de calibration
+- definir une position favorite et une entite "tous les volets" (canal 0)
 
 ## Prerequis
 
@@ -144,23 +147,55 @@ En pratique, plus les temps d'ouverture et de fermeture sont proches de la reali
 
 Tu peux ensuite piloter le volet comme n'importe quelle autre entite `cover` dans Home Assistant. Les anciens boutons ESPHome exposes un par un ne sont plus necessaires.
 
-## 7. Recalage manuel si la position derive
+## 7. La carte Lovelace incluse
 
-Comme il n'y a pas de capteur physique, l'etat reste une estimation. Si besoin, tu peux le recaler sans faire bouger le volet avec les services d'entite suivants :
+L'integration embarque sa propre carte de tableau de bord : rien a installer dans HACS frontend, rien a declarer dans les ressources Lovelace. Elle apparait dans le selecteur de cartes sous le nom **Dooya Cover Card**, avec un editeur visuel.
 
-- `dooya.mark_open`
-- `dooya.mark_closed`
-- `dooya.set_known_position`
+```yaml
+type: custom:dooya-cover-card
+entity: cover.volet_salon
+```
 
-Exemple simple :
+La carte affiche une fenetre animee qui suit la position estimee (cliquer dedans envoie le volet a cette hauteur), les boutons Ouvrir / Stop / Fermer, un slider, des positions predefinies et les raccourcis de recalage.
+
+Pour les tableaux de bord avec beaucoup de volets, une **vue compacte** est disponible (option `view: compact` ou champ "Affichage" dans l'editeur) : une seule ligne avec barre de position cliquable et boutons.
+
+## 8. Recalage, calibration et confiance
+
+Comme il n'y a pas de capteur physique, l'etat reste une estimation. Chaque volet expose maintenant des **boutons** sur sa page d'appareil :
+
+- **Marquer ouvert** / **Marquer ferme** : recale la position a 100 % ou 0 % sans faire bouger le volet
+- **Calibrer le temps d'ouverture** / **de fermeture** : l'assistant de calibration (voir ci-dessous)
+
+Les services d'entite `dooya.mark_open`, `dooya.mark_closed` et `dooya.set_known_position` restent disponibles pour les automatisations.
+
+### Assistant de calibration
+
+Plus besoin de chronometre :
 
 1. fermer completement le volet
-2. appeler `dooya.mark_closed`
-3. ouvrir completement en chronometrant
-4. fermer completement en chronometrant
-5. mettre a jour les temps dans les options de l'entree
+2. appuyer sur **Calibrer le temps d'ouverture** : le volet monte
+3. appuyer sur **Stop** (dans HA ou sur la telecommande) pile quand il est completement ouvert
+4. le temps mesure est enregistre automatiquement dans les options (une notification confirme la valeur)
+5. refaire la meme chose depuis la position ouverte avec **Calibrer le temps de fermeture**
 
-## 8. Ameliorer la fiabilite RF (repetition)
+### Confiance dans la position
+
+L'entite expose deux attributs : `position_confidence` (high / medium / low) et `moves_since_sync`. Chaque mouvement qui s'arrete entre les butees fait deriver un peu l'estimation ; une course complete jusqu'a une butee remet le compteur a zero. Si la confiance passe a `low`, il suffit d'ouvrir ou de fermer completement le volet une fois.
+
+## 9. Position favorite
+
+Dans les options de l'entree (bouton **Configurer**), tu peux definir une **position favorite** (par exemple 30 %). Un bouton *Position favorite* apparait alors sur la page de l'appareil, et une pastille etoile sur la carte : un appui envoie le volet a cette position, comme le bouton favori des vraies telecommandes Dooya.
+
+## 10. Canal 0 : tous les volets d'un coup
+
+Les telecommandes multi-canaux Dooya ont un bouton "tous" qui emet sur le canal 0 : tous les volets appaires executent la commande avec une seule trame RF.
+
+Tu peux creer cette entite dans Home Assistant : ajout manuel avec le canal `0` et l'identifiant de la telecommande. L'entite propose Ouvrir / Stop / Fermer (pas de position, chaque volet bougeant independamment). Ideal pour une automatisation "tout fermer le soir" : une seule trame au lieu d'une par volet.
+
+Bonus : quand le bouton "tous" de la telecommande physique est utilise, l'estimation de position de chaque volet individuel est mise a jour automatiquement.
+
+## 11. Ameliorer la fiabilite RF (repetition)
 
 Le protocole RF433 OOK est unidirectionnel : il n'y a pas d'accuse de reception. Dans un environnement avec des interferences (autres appareils 433 MHz, reseaux Wi-Fi proches), une commande peut parfois ne pas etre recue par le moteur.
 
@@ -178,7 +213,17 @@ Pour corriger ce comportement, l'integration propose un reglage **Nombre de repe
 
 Ne pas depasser 3 repetitions : certains moteurs Dooya peuvent interpreter une serie trop longue comme une commande de configuration.
 
-## 8. Depannage rapide
+## 12. Blueprint d'automatisation solaire
+
+Le depot fournit un blueprint pret a importer (`blueprints/automation/dooya/shutters_sun.yaml`) qui :
+
+- ferme les volets quand le soleil descend sous une elevation configurable
+- les ouvre le matin au-dessus d'une elevation donnee (jamais avant une heure choisie)
+- en option, les ferme pendant les journees chaudes (capteur de temperature exterieure + seuil) et les rouvre quand ca se rafraichit
+
+Import : Parametres > Automatisations et scenes > Blueprints > Importer un blueprint, avec l'URL du fichier GitHub.
+
+## 13. Depannage rapide
 
 ### Le boitier ESPHome n'apparait pas dans le flow
 
@@ -213,7 +258,7 @@ Verifier :
 - qu'un stop manuel ou telecommande n'a pas interrompu un mouvement sans recalage
 - que l'entite a bien ete recalee avec `dooya.mark_open`, `dooya.mark_closed` ou `dooya.set_known_position` si necessaire
 
-## 9. Liens utiles
+## 14. Liens utiles
 
 - Depot GitHub : `https://github.com/dasimon135/ha-dooya`
 - Issues : `https://github.com/dasimon135/ha-dooya/issues`
