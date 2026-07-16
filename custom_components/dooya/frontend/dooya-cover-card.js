@@ -10,7 +10,7 @@
  * entities) the manual recalibration actions mark_open / mark_closed.
  */
 
-const VERSION = "1.3.0";
+const VERSION = "1.3.1";
 // eslint-disable-next-line no-console
 console.info(`%c DOOYA-COVER-CARD %c v${VERSION} `, "background:#e8833a;color:#fff;border-radius:3px 0 0 3px", "background:#c95d2e;color:#fff;border-radius:0 3px 3px 0");
 
@@ -327,7 +327,11 @@ class DooyaCoverCard extends HTMLElement {
   // custom properties inherit through the shadow boundary.
   _openCardDialog() {
     if (this._dialog) return;
+    // Self-heal: clear any orphaned popup a prior instance may have left, so a
+    // stale full-screen overlay can never linger and swallow page clicks.
+    document.querySelectorAll("[data-dooya-popup]").forEach((h) => h.remove());
     const host = document.createElement("div");
+    host.setAttribute("data-dooya-popup", "");
     const sr = host.attachShadow({ mode: "open" });
     sr.innerHTML = `<style>
       .scrim { position:fixed; inset:0; z-index:1000; display:grid; place-items:center;
@@ -348,7 +352,9 @@ class DooyaCoverCard extends HTMLElement {
     card.hass = this._hass;
     sr.querySelector(".wrap").appendChild(card);
     const close = () => this._closeCardDialog();
-    sr.querySelector(".scrim").addEventListener("click", (e) => { if (e.target === e.currentTarget) close(); });
+    // Tapping anywhere off the card (scrim OR the empty area around it) closes
+    // it — far easier to dismiss on a phone than aiming at a thin margin.
+    sr.querySelector(".scrim").addEventListener("click", (e) => { if (!e.composedPath().includes(card)) close(); });
     sr.querySelector(".x").addEventListener("click", close);
     this._dialogKey = (e) => { if (e.key === "Escape") close(); };
     window.addEventListener("keydown", this._dialogKey);
