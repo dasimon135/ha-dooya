@@ -18,6 +18,7 @@ from .const import (
     CONF_ESPHOME_DEVICE,
     DOMAIN,
 )
+from .device_match import is_esphome_device
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -80,7 +81,16 @@ class DooyaBaseEntity(Entity):
     async def async_added_to_hass(self) -> None:
         """Suivre la disponibilité de la passerelle ESPHome."""
         await super().async_added_to_hass()
-        self._gateway_entity_ids = self._resolve_gateway_entities()
+        try:
+            self._gateway_entity_ids = self._resolve_gateway_entities()
+        except Exception:  # availability tracking is best-effort by contract
+            _LOGGER.warning(
+                "%s: could not resolve the ESPHome gateway, "
+                "availability tracking disabled",
+                self._cover_name,
+                exc_info=True,
+            )
+            self._gateway_entity_ids = []
         if self._gateway_entity_ids:
             self.async_on_remove(
                 async_track_state_change_event(
@@ -110,7 +120,7 @@ class DooyaBaseEntity(Entity):
         entity_registry = er.async_get(self.hass)
 
         for device in device_registry.devices.values():
-            if not any(domain == "esphome" for domain, _ in device.identifiers):
+            if not is_esphome_device(device.identifiers):
                 continue
             if slugify(device.name or "") != gateway_slug:
                 continue
