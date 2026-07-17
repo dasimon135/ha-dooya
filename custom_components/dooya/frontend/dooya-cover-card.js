@@ -10,7 +10,7 @@
  * entities) the manual recalibration actions mark_open / mark_closed.
  */
 
-const VERSION = "1.2.0";
+const VERSION = "1.3.1";
 // eslint-disable-next-line no-console
 console.info(`%c DOOYA-COVER-CARD %c v${VERSION} `, "background:#e8833a;color:#fff;border-radius:3px 0 0 3px", "background:#c95d2e;color:#fff;border-radius:0 3px 3px 0");
 
@@ -68,9 +68,11 @@ class DooyaCoverCard extends HTMLElement {
       this._sig = sig;
       this._render();
     }
+    if (this._dialogCard) this._dialogCard.hass = hass;
   }
 
   getCardSize() {
+    if (this._config && this._config.view === "tile") return 1;
     return this._config && this._config.view === "compact" ? 2 : 5;
   }
 
@@ -149,6 +151,7 @@ class DooyaCoverCard extends HTMLElement {
     const t = this._t();
     const st = this._hass.states[this._config.entity];
     this._ensureRoot();
+    this._root.classList.toggle("tilecard", this._config.view === "tile");
     if (!st) {
       this._body.innerHTML = `<div class="warn">${t.notFound(this._config.entity)}</div>`;
       return;
@@ -173,6 +176,28 @@ class DooyaCoverCard extends HTMLElement {
     const curtainPct = pos == null ? (closed ? 100 : 0) : 100 - pos;
 
     const favBtn = this._favoriteButton();
+
+    // Tile: an ultra-compact row aligned with HA's native tile cards. Tapping
+    // the icon/name opens the full card in a popup (see _openCardDialog).
+    if (this._config.view === "tile") {
+      const icon = closed ? "mdi:window-shutter" : "mdi:window-shutter-open";
+      this._body.innerHTML = `
+        <div class="tile ${closed ? "off" : ""}">
+          <div class="tinfo" data-act="tileinfo" role="button" tabindex="0" aria-label="${name}">
+            <div class="tdot"><ha-icon icon="${icon}"></ha-icon></div>
+            <div class="ttext">
+              <span class="tname">${name}</span>
+              <span class="tsub">${stateLabel}</span>
+            </div>
+          </div>
+          <div class="tctl">
+            <button class="tbtn ${opening ? "active" : ""}" data-act="open" aria-label="${t.up}"><ha-icon icon="mdi:chevron-up"></ha-icon></button>
+            <button class="tbtn" data-act="stop" aria-label="${t.stop}"><ha-icon icon="mdi:stop"></ha-icon></button>
+            <button class="tbtn ${closing ? "active" : ""}" data-act="close" aria-label="${t.down}"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
+          </div>
+        </div>`;
+      return;
+    }
 
     if (this._config.view === "compact") {
       const fillPct = pos != null ? pos : closed ? 0 : 100;
@@ -272,8 +297,81 @@ class DooyaCoverCard extends HTMLElement {
     this.shadowRoot.appendChild(card);
     this._root = card;
     this._body.addEventListener("click", (e) => this._onClick(e));
+    this._body.addEventListener("keydown", (e) => {
+      if ((e.key === "Enter" || e.key === " ") && e.target.closest("[data-act='tileinfo']")) {
+        e.preventDefault();
+        this._onTileTap();
+      }
+    });
     this._body.addEventListener("change", (e) => this._onChange(e));
   }
+
+  // Tile tap → full card in a popup (or HA's native more-info when
+  // `tile_tap: more-info` is configured).
+  _onTileTap() {
+    if (this._config.tile_tap === "more-info") {
+      this.dispatchEvent(
+        new CustomEvent("hass-more-info", {
+          detail: { entityId: this._config.entity },
+          bubbles: true,
+          composed: true,
+        })
+      );
+      return;
+    }
+    this._openCardDialog();
+  }
+
+  // Self-contained modal overlay (no external dependency). Mounted on
+  // document.body so it is never clipped by the tile's grid cell; HA theme
+  // custom properties inherit through the shadow boundary.
+  _openCardDialog() {
+    if (this._dialog) return;
+    // Self-heal: clear any orphaned popup a prior instance may have left, so a
+    // stale full-screen overlay can never linger and swallow page clicks.
+    document.querySelectorAll("[data-dooya-popup]").forEach((h) => h.remove());
+    const host = document.createElement("div");
+    host.setAttribute("data-dooya-popup", "");
+    const sr = host.attachShadow({ mode: "open" });
+    sr.innerHTML = `<style>
+      .scrim { position:fixed; inset:0; z-index:1000; display:grid; place-items:center;
+        box-sizing:border-box; padding:16px; background:rgba(0,0,0,.5); animation:dcf .15s ease; }
+      @keyframes dcf { from{opacity:0} to{opacity:1} }
+      .wrap { position:relative; width:100%; max-width:400px; }
+      .x { position:absolute; top:-12px; right:-12px; z-index:1; width:34px; height:34px;
+        border-radius:50%; border:none; cursor:pointer; font-size:17px; line-height:1;
+        display:grid; place-items:center;
+        background:var(--card-background-color,#fff); color:var(--primary-text-color,#222);
+        box-shadow:0 2px 10px rgba(0,0,0,.35); }
+      .x:focus-visible { outline:2px solid var(--primary-color,#03a9f4); outline-offset:2px; }
+      @media (prefers-reduced-motion: reduce) { .scrim { animation:none } }
+    </style>
+    <div class="scrim"><div class="wrap"><button class="x" aria-label="Close">✕</button></div></div>`;
+    const card = document.createElement("dooya-cover-card");
+    card.setConfig({ ...this._config, view: "normal" });
+    card.hass = this._hass;
+    sr.querySelector(".wrap").appendChild(card);
+    const close = () => this._closeCardDialog();
+    // Tapping anywhere off the card (scrim OR the empty area around it) closes
+    // it — far easier to dismiss on a phone than aiming at a thin margin.
+    sr.querySelector(".scrim").addEventListener("click", (e) => { if (!e.composedPath().includes(card)) close(); });
+    sr.querySelector(".x").addEventListener("click", close);
+    this._dialogKey = (e) => { if (e.key === "Escape") close(); };
+    window.addEventListener("keydown", this._dialogKey);
+    document.body.appendChild(host);
+    this._dialog = host;
+    this._dialogCard = card;
+  }
+
+  _closeCardDialog() {
+    if (this._dialogKey) window.removeEventListener("keydown", this._dialogKey);
+    if (this._dialog) this._dialog.remove();
+    this._dialog = null;
+    this._dialogCard = null;
+    this._dialogKey = null;
+  }
+
+  disconnectedCallback() { this._closeCardDialog(); }
 
   _onChange(e) {
     const s = e.target.closest("[data-slider]");
@@ -312,7 +410,8 @@ class DooyaCoverCard extends HTMLElement {
       return;
     }
     const act = tgt.dataset.act;
-    if (act === "open") this._call("cover", "open_cover", { entity_id });
+    if (act === "tileinfo") this._onTileTap();
+    else if (act === "open") this._call("cover", "open_cover", { entity_id });
     else if (act === "close") this._call("cover", "close_cover", { entity_id });
     else if (act === "stop") this._call("cover", "stop_cover", { entity_id });
     else if (act === "mark_open") this._call("dooya", "mark_open", { entity_id });
@@ -324,6 +423,30 @@ class DooyaCoverCard extends HTMLElement {
   _css() {
     return `
       ha-card { padding: 16px; }
+      /* Tile (ultra-compact) layout — config: view: tile */
+      ha-card.tilecard { padding: 10px 12px; }
+      .tile { display:flex; align-items:center; gap:12px; }
+      .tinfo { flex:1 1 auto; min-width:0; display:flex; align-items:center; gap:12px;
+               cursor:pointer; border-radius:8px; outline:none; }
+      .tinfo:focus-visible { box-shadow: 0 0 0 2px var(--primary-color); }
+      .tdot { flex:0 0 auto; width:42px; height:42px; border-radius:50%; display:grid; place-items:center;
+              background: var(--divider-color); color: var(--secondary-text-color); }
+      .tile:not(.off) .tdot { background: color-mix(in srgb, var(--primary-color) 22%, var(--card-background-color));
+              color: var(--primary-color);
+              box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 55%, transparent),
+                          0 0 14px 1px color-mix(in srgb, var(--primary-color) 45%, transparent); }
+      .tdot ha-icon { --mdc-icon-size:24px; }
+      .ttext { min-width:0; display:flex; flex-direction:column; gap:1px; }
+      .tname { font-weight:600; font-size:.95rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .tsub { font-size:.78rem; color: var(--secondary-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .tctl { flex:0 0 auto; display:flex; gap:6px; }
+      .tbtn { width:36px; height:34px; border-radius:9px; border:1px solid var(--divider-color);
+              background: var(--card-background-color); color: var(--primary-text-color); cursor:pointer;
+              display:grid; place-items:center; transition: transform .12s, border-color .2s, background .2s; }
+      .tbtn ha-icon { --mdc-icon-size:20px; }
+      .tbtn.active { background: var(--primary-color); color: var(--text-primary-color,#fff); border-color: var(--primary-color); }
+      .tbtn:hover { border-color: var(--primary-color); }
+      .tbtn:active { transform: scale(.9); }
       .head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
       .title { font-size:1.15rem; font-weight:600; }
       .state { font-size:.85rem; color: var(--secondary-text-color); }
@@ -456,6 +579,7 @@ class DooyaCoverCardEditor extends HTMLElement {
             options: [
               { value: "normal", label: fr ? "Normale" : "Normal" },
               { value: "compact", label: fr ? "Réduite" : "Compact" },
+              { value: "tile", label: "Tile" },
             ],
           },
         },
