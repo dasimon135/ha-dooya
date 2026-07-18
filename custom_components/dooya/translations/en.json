@@ -49,13 +49,24 @@
           "travel_time_up": "Full opening time (seconds)",
           "travel_time_down": "Full closing time (seconds)"
         }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Shutter",
+        "description": "Correct the identity of this shutter. The entry reloads with the updated values.",
+        "data": {
+          "cover_name": "Shutter name",
+          "dooya_id": "Shutter identifier (for example: 00D1C917)",
+          "channel": "Channel (1-16, or 0 = all shutters)",
+          "check": "Check code (0-15)"
+        }
       }
     },
     "progress": {
       "listen_remote": "Waiting for a signal from the Dooya remote control"
     },
     "abort": {
-      "no_transmitters": "No compatible RF433 OOK transmitter found. Please set up a transmitter first (ESPHome CC1101 or Broadlink RM4 Pro)."
+      "no_transmitters": "No compatible RF433 OOK transmitter found. Please set up a transmitter first (ESPHome CC1101 or Broadlink RM4 Pro).",
+      "reconfigure_successful": "The shutter was reconfigured successfully."
     },
     "error": {
       "invalid_transmitter": "Selected entity is not a valid transmitter.",

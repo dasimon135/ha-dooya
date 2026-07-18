@@ -49,13 +49,24 @@
           "travel_time_up": "Temps d'ouverture complet (secondes)",
           "travel_time_down": "Temps de fermeture complet (secondes)"
         }
+      },
+      "reconfigure": {
+        "title": "Reconfigurer le volet",
+        "description": "Corrigez l'identité de ce volet. L'entrée se recharge avec les valeurs mises à jour.",
+        "data": {
+          "cover_name": "Nom du volet",
+          "dooya_id": "Identifiant du volet (exemple : 00D1C917)",
+          "channel": "Canal (1-16, ou 0 = tous les volets)",
+          "check": "Code de contrôle (0-15)"
+        }
       }
     },
     "progress": {
       "listen_remote": "En attente d'un signal de la télécommande Dooya"
     },
     "abort": {
-      "no_transmitters": "Aucun transmetteur RF433 OOK compatible trouvé. Configurez d'abord un transmetteur (ESPHome CC1101 ou Broadlink RM4 Pro)."
+      "no_transmitters": "Aucun transmetteur RF433 OOK compatible trouvé. Configurez d'abord un transmetteur (ESPHome CC1101 ou Broadlink RM4 Pro).",
+      "reconfigure_successful": "Le volet a été reconfiguré avec succès."
     },
     "error": {
       "invalid_transmitter": "L'entité sélectionnée n'est pas un transmetteur valide.",

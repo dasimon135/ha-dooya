@@ -297,6 +297,58 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Fix the identity of an existing shutter without recreating it.
+
+        Lets the user correct dooya_id, channel, check code or the cover
+        name; the entry reloads with the updated data.
+        """
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            try:
+                dooya_id = int(user_input[CONF_DOOYA_ID], 16)
+            except ValueError:
+                errors[CONF_DOOYA_ID] = "invalid_dooya_id"
+            else:
+                name = user_input[CONF_COVER_NAME]
+                return self.async_update_reload_and_abort(
+                    entry,
+                    title=name,
+                    data_updates={
+                        CONF_DOOYA_ID: dooya_id,
+                        CONF_CHANNEL: user_input[CONF_CHANNEL],
+                        CONF_CHECK: user_input[CONF_CHECK],
+                        CONF_COVER_NAME: name,
+                    },
+                )
+
+        data = entry.data
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_COVER_NAME, default=data.get(CONF_COVER_NAME, "")
+                    ): str,
+                    vol.Required(
+                        CONF_DOOYA_ID,
+                        default=f"{data.get(CONF_DOOYA_ID, 0):08X}",
+                    ): str,
+                    vol.Required(
+                        CONF_CHANNEL, default=data.get(CONF_CHANNEL, DEFAULT_CHANNEL)
+                    ): vol.All(int, vol.Range(min=0, max=16)),
+                    vol.Required(
+                        CONF_CHECK, default=data.get(CONF_CHECK, 1)
+                    ): vol.All(int, vol.Range(min=0, max=15)),
+                }
+            ),
+            errors=errors,
+        )
+
     @callback
     def _create_entry(
         self,
