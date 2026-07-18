@@ -1,7 +1,7 @@
 """Configuration pytest — permet d'importer dooya_protocol directement sans HA."""
 
-import sys
 import os
+import sys
 
 # Ajouter le dossier du composant directement dans le path
 # pour les tests unitaires qui n'ont pas besoin de HA

@@ -5,8 +5,6 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-import voluptuous as vol
-
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -14,6 +12,7 @@ from homeassistant.config_entries import (
     OptionsFlow,
 )
 from homeassistant.core import callback
+import voluptuous as vol
 
 from .const import (
     CONF_CHANNEL,
@@ -207,7 +206,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
 
         try:
             await asyncio.wait_for(event_received.wait(), timeout=LEARN_TIMEOUT_SEC)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return None
         finally:
             unsubscribe()
