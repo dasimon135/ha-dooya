@@ -65,11 +65,9 @@
       "listen_remote": "En attente d'un signal de la télécommande Dooya"
     },
     "abort": {
-      "no_transmitters": "Aucun transmetteur RF433 OOK compatible trouvé. Configurez d'abord un transmetteur (ESPHome CC1101 ou Broadlink RM4 Pro).",
       "reconfigure_successful": "Le volet a été reconfiguré avec succès."
     },
     "error": {
-      "invalid_transmitter": "L'entité sélectionnée n'est pas un transmetteur valide.",
       "invalid_dooya_id": "Identifiant invalide. Attendu : valeur hexadécimale (ex : 00D1C917).",
       "learn_timeout": "Aucun signal n'a été reçu dans le délai prévu. Vous pouvez réessayer ou choisir la saisie manuelle.",
       "required_esphome_device": "Plusieurs boîtiers ESPHome compatibles ont été trouvés. Choisissez celui qui doit envoyer les commandes du volet.",
