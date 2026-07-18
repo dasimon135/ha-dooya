@@ -14,8 +14,6 @@ def gateway_issue_id(entry_id: str) -> str:
     """Return the per-entry repair issue id for a missing gateway service."""
     return f"{ISSUE_GATEWAY_SERVICE_MISSING}_{entry_id}"
 
-# Ancien événement historique, conservé pour compatibilité documentaire.
-EVENT_DOOYA_TRANSMIT: Final = "dooya.transmit"
 EVENT_DOOYA_RECEIVED: Final = "esphome.dooya_received"
 
 # Clés de configuration
