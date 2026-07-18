@@ -17,7 +17,7 @@ from homeassistant.components.cover import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import entity_platform
+from homeassistant.helpers import entity_platform, issue_registry as ir
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.restore_state import RestoreEntity
@@ -39,6 +39,8 @@ from .const import (
     DOMAIN,
     ECHO_SUPPRESS_WINDOW_SEC,
     EVENT_DOOYA_RECEIVED,
+    ISSUE_GATEWAY_SERVICE_MISSING,
+    gateway_issue_id,
 )
 from .dooya_protocol import BUTTON_DOWN, BUTTON_STOP, BUTTON_UP
 from .echo_filter import TxEchoFilter
@@ -408,7 +410,12 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         ESPHome service is missing, so callers never start an estimated
         motion for a command that was not transmitted.
         """
-        service_name = self._resolve_service_name()
+        try:
+            service_name = self._resolve_service_name()
+        except HomeAssistantError:
+            self._async_report_gateway_issue()
+            raise
+        self._async_clear_gateway_issue()
         _LOGGER.debug(
             "esphome.%s → id=%08X channel=%d button=%d check=%d",
             service_name,
@@ -472,6 +479,46 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
                 "service": f"esphome.{service_name}",
             },
         )
+
+    @callback
+    def _async_report_gateway_issue(self) -> None:
+        """Create an actionable repair issue for a missing gateway service."""
+        device = self._esphome_device
+        service = (
+            f"esphome.{device.replace('-', '_')}_transmit_dooya"
+            if device
+            else "esphome.<node>_transmit_dooya"
+        )
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            gateway_issue_id(self._config_entry.entry_id),
+            is_fixable=False,
+            severity=ir.IssueSeverity.ERROR,
+            translation_key=ISSUE_GATEWAY_SERVICE_MISSING,
+            translation_placeholders={
+                "name": self._cover_name,
+                "device": device or "(not configured)",
+                "service": service,
+            },
+        )
+
+    @callback
+    def _async_clear_gateway_issue(self) -> None:
+        """Delete the repair issue once the gateway service is usable again."""
+        ir.async_delete_issue(
+            self.hass, DOMAIN, gateway_issue_id(self._config_entry.entry_id)
+        )
+
+    @callback
+    def _handle_gateway_state_change(self, _event: Any) -> None:
+        """Clear the repair issue as soon as the gateway service is back."""
+        device = self._esphome_device
+        if device and self.hass.services.has_service(
+            "esphome", f"{device.replace('-', '_')}_transmit_dooya"
+        ):
+            self._async_clear_gateway_issue()
+        super()._handle_gateway_state_change(_event)
 
     @callback
     def _handle_dooya_event(self, event: Any) -> None:

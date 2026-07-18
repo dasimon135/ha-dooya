@@ -85,6 +85,12 @@
       }
     }
   },
+  "issues": {
+    "esphome_service_missing": {
+      "title": "Service de passerelle Dooya indisponible",
+      "description": "Le service ESPHome {service} utilisé par le volet {name} pour émettre les commandes RF n'est pas disponible. Les commandes vers ce volet échoueront tant qu'il n'est pas rétabli.\n\nVérifiez que le boîtier ESPHome {device} est en ligne, que son firmware expose toujours le service transmit_dooya, et que l'option « Autoriser l'appareil à effectuer des actions Home Assistant » est activée pour lui dans l'intégration ESPHome. Vous pouvez aussi sélectionner un autre boîtier passerelle dans les options de l'entrée Dooya."
+    }
+  },
   "exceptions": {
     "no_esphome_device": {
       "message": "Aucune passerelle ESPHome n'est configurée pour {name}. Reconfigurez l'entrée Dooya et sélectionnez le boîtier ESPHome qui émet les commandes RF."

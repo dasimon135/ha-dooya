@@ -8,10 +8,10 @@ from pathlib import Path
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import config_validation as cv, issue_registry as ir
 from homeassistant.helpers.typing import ConfigType
 
-from .const import DOMAIN
+from .const import DOMAIN, gateway_issue_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -64,4 +64,5 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
         hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
+        ir.async_delete_issue(hass, DOMAIN, gateway_issue_id(entry.entry_id))
     return unloaded
