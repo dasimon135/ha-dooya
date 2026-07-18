@@ -31,7 +31,7 @@ def _gradient(size: int, top: tuple, bottom: tuple) -> Image.Image:
     px = img.load()
     for y in range(size):
         t = y / (size - 1)
-        color = tuple(round(a + (b - a) * t) for a, b in zip(top, bottom))
+        color = tuple(round(a + (b - a) * t) for a, b in zip(top, bottom, strict=True))
         for x in range(size):
             px[x, y] = color
     return img
