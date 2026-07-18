@@ -198,8 +198,10 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
             except (KeyError, ValueError, TypeError):
                 return
 
+            # Completing the task is enough: the flow manager watches the
+            # progress_task passed to async_show_progress and advances the
+            # flow itself when it finishes.
             event_received.set()
-            self.hass.async_create_task(self.hass.config_entries.flow.async_configure(self.flow_id))
 
         unsubscribe = self.hass.bus.async_listen(EVENT_DOOYA_RECEIVED, _handle_event)
 
