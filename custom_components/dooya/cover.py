@@ -6,7 +6,7 @@ import asyncio
 from collections.abc import Callable
 import logging
 from time import monotonic
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components import persistent_notification
 from homeassistant.components.cover import (
@@ -14,9 +14,9 @@ from homeassistant.components.cover import (
     CoverEntity,
     CoverEntityFeature,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_platform
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_platform, issue_registry as ir
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.restore_state import RestoreEntity
@@ -38,11 +38,16 @@ from .const import (
     DOMAIN,
     ECHO_SUPPRESS_WINDOW_SEC,
     EVENT_DOOYA_RECEIVED,
+    ISSUE_GATEWAY_SERVICE_MISSING,
+    gateway_issue_id,
 )
 from .dooya_protocol import BUTTON_DOWN, BUTTON_STOP, BUTTON_UP
 from .echo_filter import TxEchoFilter
 from .entity import DooyaBaseEntity
 from .travel_calc import clamp_position, position_after, travel_duration
+
+if TYPE_CHECKING:
+    from . import DooyaConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 ATTR_CURRENT_POSITION = "current_position"
@@ -51,7 +56,7 @@ ATTR_POSITION = "position"
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: DooyaConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Configurer les entités cover Dooya depuis un config entry."""
@@ -76,10 +81,13 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     _attr_device_class = CoverDeviceClass.SHUTTER
     _attr_assumed_state = True
 
-    def __init__(self, config_entry: ConfigEntry) -> None:
+    def __init__(self, config_entry: DooyaConfigEntry) -> None:
         """Initialiser le volet Dooya."""
         super().__init__(config_entry)
-        self._attr_name = self._cover_name
+        # The device already carries the cover name; None makes this the main
+        # entity of the device so the friendly name is just the device name
+        # (instead of a doubled "Name Name" with _attr_has_entity_name).
+        self._attr_name = None
 
         # Channel 0 is the Dooya broadcast channel ("all" button): every
         # paired shutter reacts, so a per-shutter position estimate is
@@ -201,9 +209,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         )
 
         # Share the cover object with the button platform of this entry.
-        self.hass.data.setdefault(DOMAIN, {}).setdefault(
-            self._config_entry.entry_id, {}
-        )["cover"] = self
+        self._config_entry.runtime_data.cover = self
 
     async def async_will_remove_from_hass(self) -> None:
         """Nettoyer les callbacks lors de la suppression de l'entité."""
@@ -212,9 +218,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         if self._event_unsub is not None:
             self._event_unsub()
             self._event_unsub = None
-        entry_data = self.hass.data.get(DOMAIN, {}).get(self._config_entry.entry_id)
-        if entry_data is not None:
-            entry_data.pop("cover", None)
+        self._config_entry.runtime_data.cover = None
 
     async def async_open_cover(self, **kwargs: Any) -> None:
         """Ouvrir le volet (commande UP, button=1)."""
@@ -238,7 +242,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         if self._is_broadcast:
             _LOGGER.warning(
                 "%s: set_position is not supported on the broadcast channel",
-                self._attr_name,
+                self._cover_name,
             )
             return
         position = clamp_position(kwargs[ATTR_POSITION])
@@ -290,7 +294,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         if self._is_broadcast:
             _LOGGER.warning(
                 "%s: calibration is not available on the broadcast channel",
-                self._attr_name,
+                self._cover_name,
             )
             return
 
@@ -298,28 +302,33 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         expected_start = 0 if direction > 0 else 100
         if self._current_position is not None and self._current_position != expected_start:
             self._notify(
-                f"Calibration not started for '{self._attr_name}': the shutter "
+                f"Calibration not started for '{self._cover_name}': the shutter "
                 f"must be fully {'closed' if direction > 0 else 'open'} first "
                 f"(estimated position: {self._current_position}%)."
             )
             return
 
         self._cancel_calibration_timeout()
+
+        # Transmit before arming the calibration state: a failed transmit
+        # (raising HomeAssistantError) must leave no calibration pending.
+        if direction > 0:
+            await self._async_transmit(BUTTON_UP, DEFAULT_CHECK_UP)
+        else:
+            await self._async_transmit(BUTTON_DOWN, DEFAULT_CHECK_DOWN)
+
         self._calibrating = direction
         self._calibration_start = monotonic()
         self._calibration_unsub = async_call_later(
             self.hass, CALIBRATION_TIMEOUT_SEC, self._handle_calibration_timeout
         )
-
         if direction > 0:
-            await self._async_transmit(BUTTON_UP, DEFAULT_CHECK_UP)
             self._start_estimated_motion(direction=1, target_position=100)
         else:
-            await self._async_transmit(BUTTON_DOWN, DEFAULT_CHECK_DOWN)
             self._start_estimated_motion(direction=-1, target_position=0)
 
         self._notify(
-            f"Calibration started for '{self._attr_name}'. Press STOP (in Home "
+            f"Calibration started for '{self._cover_name}'. Press STOP (in Home "
             "Assistant or on the remote) at the exact moment the shutter "
             f"reaches the fully {'open' if direction > 0 else 'closed'} position."
         )
@@ -338,7 +347,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
         if not 1.0 <= elapsed <= CALIBRATION_TIMEOUT_SEC:
             self._notify(
-                f"Calibration for '{self._attr_name}' cancelled: measured "
+                f"Calibration for '{self._cover_name}' cancelled: measured "
                 f"{elapsed:.1f} s is out of the accepted range."
             )
             return
@@ -355,13 +364,13 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             self._config_entry, options=options
         )
         self._notify(
-            f"Calibration done for '{self._attr_name}': full "
+            f"Calibration done for '{self._cover_name}': full "
             f"{'opening' if direction > 0 else 'closing'} time measured at "
             f"{measured} s and saved."
         )
         _LOGGER.info(
             "%s: calibrated %s to %.1f s",
-            self._attr_name,
+            self._cover_name,
             key,
             measured,
         )
@@ -375,7 +384,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         self._calibrating = 0
         self._calibration_start = None
         self._notify(
-            f"Calibration for '{self._attr_name}' cancelled: no STOP received "
+            f"Calibration for '{self._cover_name}' cancelled: no STOP received "
             f"within {int(CALIBRATION_TIMEOUT_SEC)} s."
         )
 
@@ -393,10 +402,18 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         )
 
     async def _async_transmit(self, button: int, check: int) -> None:
-        """Appeler le service ESPHome transmit_dooya."""
-        service_name = self._resolve_service_name()
-        if service_name is None:
-            return
+        """Call the ESPHome transmit_dooya service.
+
+        Raises HomeAssistantError when no gateway is configured or the
+        ESPHome service is missing, so callers never start an estimated
+        motion for a command that was not transmitted.
+        """
+        try:
+            service_name = self._resolve_service_name()
+        except HomeAssistantError:
+            self._async_report_gateway_issue()
+            raise
+        self._async_clear_gateway_issue()
         _LOGGER.debug(
             "esphome.%s → id=%08X channel=%d button=%d check=%d",
             service_name,
@@ -405,13 +422,6 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             button,
             check,
         )
-        if not self.hass.services.has_service("esphome", service_name):
-            _LOGGER.error(
-                "Service ESPHome introuvable: esphome.%s. "
-                "Redémarrer Home Assistant et vérifier que les appels de services ESPHome sont autorisés.",
-                service_name,
-            )
-            return
         payload = {
             "dooya_id": self._dooya_id,
             "channel": self._channel,
@@ -432,30 +442,81 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             )
             self._echo_filter.record_tx(button, monotonic())
 
-    def _resolve_service_name(self) -> str | None:
-        """Déterminer le nom du service ESPHome à appeler."""
+    def _resolve_service_name(self) -> str:
+        """Return the ESPHome service name to call, raising on hard failure."""
         device = self._config_entry.options.get(
             CONF_ESPHOME_DEVICE,
             self._config_entry.data.get(CONF_ESPHOME_DEVICE, ""),
         )
         if not device:
             _LOGGER.error(
-                "Aucun device ESPHome configuré pour %s. "
-                "Reconfigurer l'entrée Dooya avec le bon device.",
-                self._attr_name,
+                "No ESPHome gateway configured for %s; reconfigure the Dooya "
+                "entry with the right device",
+                self._cover_name,
             )
-            return None
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="no_esphome_device",
+                translation_placeholders={"name": self._cover_name},
+            )
 
         service_name = f"{device.replace('-', '_')}_transmit_dooya"
         if self.hass.services.has_service("esphome", service_name):
             return service_name
 
         _LOGGER.error(
-            "Service ESPHome introuvable: esphome.%s. "
-            "Vérifier le nom du device ESPHome configuré.",
+            "ESPHome service not found: esphome.%s. Check that the node is "
+            "online and allowed to expose Home Assistant actions",
             service_name,
         )
-        return None
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="esphome_service_missing",
+            translation_placeholders={
+                "name": self._cover_name,
+                "service": f"esphome.{service_name}",
+            },
+        )
+
+    @callback
+    def _async_report_gateway_issue(self) -> None:
+        """Create an actionable repair issue for a missing gateway service."""
+        device = self._esphome_device
+        service = (
+            f"esphome.{device.replace('-', '_')}_transmit_dooya"
+            if device
+            else "esphome.<node>_transmit_dooya"
+        )
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            gateway_issue_id(self._config_entry.entry_id),
+            is_fixable=False,
+            severity=ir.IssueSeverity.ERROR,
+            translation_key=ISSUE_GATEWAY_SERVICE_MISSING,
+            translation_placeholders={
+                "name": self._cover_name,
+                "device": device or "(not configured)",
+                "service": service,
+            },
+        )
+
+    @callback
+    def _async_clear_gateway_issue(self) -> None:
+        """Delete the repair issue once the gateway service is usable again."""
+        ir.async_delete_issue(
+            self.hass, DOMAIN, gateway_issue_id(self._config_entry.entry_id)
+        )
+
+    @callback
+    def _handle_gateway_state_change(self, _event: Any) -> None:
+        """Clear the repair issue as soon as the gateway service is back."""
+        device = self._esphome_device
+        if device and self.hass.services.has_service(
+            "esphome", f"{device.replace('-', '_')}_transmit_dooya"
+        ):
+            self._async_clear_gateway_issue()
+        super()._handle_gateway_state_change(_event)
 
     @callback
     def _handle_dooya_event(self, event: Any) -> None:
@@ -478,7 +539,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         if self._echo_filter.is_echo(button, monotonic()):
             _LOGGER.debug(
                 "%s: ignoring echo of our own transmission (button=%d)",
-                self._attr_name,
+                self._cover_name,
                 button,
             )
             return
@@ -625,7 +686,24 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     async def _async_complete_partial_move(self) -> None:
         """Terminer un déplacement partiel avec une commande STOP."""
         target_position = self._target_position
-        await self._async_transmit(BUTTON_STOP, DEFAULT_CHECK_STOP)
+        try:
+            await self._async_transmit(BUTTON_STOP, DEFAULT_CHECK_STOP)
+        except HomeAssistantError:
+            # STOP could not be sent: the shutter keeps moving to the end
+            # stop it was heading to, so track the estimate there instead of
+            # freezing it at the partial target.
+            direction = self._movement_direction
+            _LOGGER.error(
+                "%s: could not send STOP for the partial move; the shutter "
+                "will run to its end stop",
+                self._cover_name,
+            )
+            if direction != 0:
+                self._start_estimated_motion(
+                    direction=direction,
+                    target_position=100 if direction > 0 else 0,
+                )
+            return
         if target_position is not None:
             self._finalize_position(target_position)
 

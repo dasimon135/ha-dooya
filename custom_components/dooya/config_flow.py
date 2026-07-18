@@ -5,11 +5,14 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-import voluptuous as vol
-
-from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
-from homeassistant.data_entry_flow import FlowResult
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
 from homeassistant.core import callback
+import voluptuous as vol
 
 from .const import (
     CONF_CHANNEL,
@@ -68,7 +71,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Étape 1 : entrer le nom du device ESPHome transmetteur."""
         errors: dict[str, str] = {}
         available_devices = self._available_esphome_devices()
@@ -106,7 +109,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_method(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Étape 2 : choisir entre apprentissage automatique et saisie manuelle."""
         if user_input is not None:
             if user_input["method"] == "manual":
@@ -129,7 +132,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_learn(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Étape 3a : lancer immédiatement l'apprentissage automatique."""
         if self._learn_task is None:
             self._learn_task = self.hass.async_create_task(
@@ -155,7 +158,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_learn_retry(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Proposer un nouvel essai ou une saisie manuelle après timeout."""
         if user_input is not None:
             if user_input.get("skip"):
@@ -194,14 +197,16 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
             except (KeyError, ValueError, TypeError):
                 return
 
+            # Completing the task is enough: the flow manager watches the
+            # progress_task passed to async_show_progress and advances the
+            # flow itself when it finishes.
             event_received.set()
-            self.hass.async_create_task(self.hass.config_entries.flow.async_configure(self.flow_id))
 
         unsubscribe = self.hass.bus.async_listen(EVENT_DOOYA_RECEIVED, _handle_event)
 
         try:
             await asyncio.wait_for(event_received.wait(), timeout=LEARN_TIMEOUT_SEC)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return None
         finally:
             unsubscribe()
@@ -210,7 +215,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_confirm(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Étape 3 : confirmer les données apprises et nommer le volet."""
         assert self._learned_data is not None
 
@@ -247,7 +252,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_manual(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Étape 3b : saisie manuelle de l'ID Dooya."""
         errors: dict[str, str] = {}
 
@@ -291,6 +296,58 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Fix the identity of an existing shutter without recreating it.
+
+        Lets the user correct dooya_id, channel, check code or the cover
+        name; the entry reloads with the updated data.
+        """
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            try:
+                dooya_id = int(user_input[CONF_DOOYA_ID], 16)
+            except ValueError:
+                errors[CONF_DOOYA_ID] = "invalid_dooya_id"
+            else:
+                name = user_input[CONF_COVER_NAME]
+                return self.async_update_reload_and_abort(
+                    entry,
+                    title=name,
+                    data_updates={
+                        CONF_DOOYA_ID: dooya_id,
+                        CONF_CHANNEL: user_input[CONF_CHANNEL],
+                        CONF_CHECK: user_input[CONF_CHECK],
+                        CONF_COVER_NAME: name,
+                    },
+                )
+
+        data = entry.data
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_COVER_NAME, default=data.get(CONF_COVER_NAME, "")
+                    ): str,
+                    vol.Required(
+                        CONF_DOOYA_ID,
+                        default=f"{data.get(CONF_DOOYA_ID, 0):08X}",
+                    ): str,
+                    vol.Required(
+                        CONF_CHANNEL, default=data.get(CONF_CHANNEL, DEFAULT_CHANNEL)
+                    ): vol.All(int, vol.Range(min=0, max=16)),
+                    vol.Required(
+                        CONF_CHECK, default=data.get(CONF_CHECK, 1)
+                    ): vol.All(int, vol.Range(min=0, max=15)),
+                }
+            ),
+            errors=errors,
+        )
+
     @callback
     def _create_entry(
         self,
@@ -300,7 +357,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
         check: int,
         travel_time_up: float,
         travel_time_down: float,
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Créer l'entrée de configuration."""
         return self.async_create_entry(
             title=name,
@@ -325,7 +382,7 @@ class DooyaOptionsFlow(OptionsFlow):
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Modifier les temps de trajet estimés."""
         current_device = self._config_entry.options.get(
             CONF_ESPHOME_DEVICE,

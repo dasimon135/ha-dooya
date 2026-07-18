@@ -1,0 +1,61 @@
+name: Bug report
+description: Report a problem with the Dooya RF Covers integration
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill in as much of the form as possible — it makes issues much faster to diagnose.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the bug and what you expected to happen instead.
+    validations:
+      required: true
+  - type: input
+    id: ha-version
+    attributes:
+      label: Home Assistant version
+      description: Settings → About (e.g. 2026.7.1)
+      placeholder: "2026.7.1"
+    validations:
+      required: true
+  - type: input
+    id: integration-version
+    attributes:
+      label: Dooya RF Covers version
+      description: HACS → Dooya RF Covers (e.g. 0.6.2)
+      placeholder: "0.6.2"
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: |
+        Settings → Devices & services → Dooya RF Covers → entry menu (⋮) → Download diagnostics.
+        Attach the file or paste its content here (the shutter identifier is redacted automatically).
+      placeholder: Drag and drop the diagnostics JSON file here.
+    validations:
+      required: false
+  - type: textarea
+    id: esphome-node
+    attributes:
+      label: ESPHome node information
+      description: |
+        ESPHome version of the gateway node, board (e.g. ESP32 + CC1101), number of nodes,
+        and whether `esphome.<node>_transmit_dooya` shows up in Developer tools → Actions.
+      placeholder: |
+        ESPHome 2026.6.0, ESP32-WROOM + CC1101, 1 node
+        Service esphome.volets_dooya_rf433_transmit_dooya visible: yes
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Home Assistant logs related to the issue (Settings → System → Logs, filter on "dooya").
+      render: text
+    validations:
+      required: false

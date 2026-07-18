@@ -1,7 +1,6 @@
 """Tests for the pure position-estimation math (travel_calc)."""
 
 import pytest
-
 from travel_calc import clamp_position, position_after, travel_duration
 
 

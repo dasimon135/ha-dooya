@@ -2,22 +2,21 @@
 
 from __future__ import annotations
 
-import pytest
-
 from dooya_protocol import (
+    BIT_ONE_HIGH_US,
+    BIT_ONE_LOW_US,
+    BIT_ZERO_HIGH_US,
+    BIT_ZERO_LOW_US,
     BUTTON_DOWN,
     BUTTON_STOP,
     BUTTON_UP,
     HEADER_HIGH_US,
     HEADER_LOW_US,
-    BIT_ONE_HIGH_US,
-    BIT_ONE_LOW_US,
-    BIT_ZERO_HIGH_US,
-    BIT_ZERO_LOW_US,
     DooyaData,
     decode_dooya,
     encode_dooya,
 )
+import pytest
 
 # IDs tirés de la configuration ESPHome de l'utilisateur
 VOLET_SALON_GAUCHE = DooyaData(id=0x00D1C917, channel=5, button=BUTTON_UP, check=1)
@@ -36,7 +35,7 @@ class TestEncodeDooya:
 
     def test_frame_length(self) -> None:
         """Longueur attendue : 1 header + 24+8+4+4 bits = 41 éléments.
-        
+
         Chaque bit = 2 timings (high + low), sauf le dernier bit du check = 1 timing.
         Total : 2 + (24+8+4)*2 + (3*2+1) = 2 + 72 + 7 = 81 timings.
         """

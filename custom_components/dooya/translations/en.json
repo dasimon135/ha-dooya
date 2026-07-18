@@ -49,16 +49,25 @@
           "travel_time_up": "Full opening time (seconds)",
           "travel_time_down": "Full closing time (seconds)"
         }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Shutter",
+        "description": "Correct the identity of this shutter. The entry reloads with the updated values.",
+        "data": {
+          "cover_name": "Shutter name",
+          "dooya_id": "Shutter identifier (for example: 00D1C917)",
+          "channel": "Channel (1-16, or 0 = all shutters)",
+          "check": "Check code (0-15)"
+        }
       }
     },
     "progress": {
       "listen_remote": "Waiting for a signal from the Dooya remote control"
     },
     "abort": {
-      "no_transmitters": "No compatible RF433 OOK transmitter found. Please set up a transmitter first (ESPHome CC1101 or Broadlink RM4 Pro)."
+      "reconfigure_successful": "The shutter was reconfigured successfully."
     },
     "error": {
-      "invalid_transmitter": "Selected entity is not a valid transmitter.",
       "invalid_dooya_id": "Invalid ID. Expected a hexadecimal value (e.g. 00D1C917).",
       "learn_timeout": "No signal was received in time. You can try again, or choose manual entry.",
       "required_esphome_device": "Several compatible ESPHome devices were found. Choose the one that should send the shutter commands.",
@@ -83,6 +92,20 @@
           "favorite_position": "Position used by the 'Favorite position' button on the device page and on the card. Leave empty to hide the button."
         }
       }
+    }
+  },
+  "issues": {
+    "esphome_service_missing": {
+      "title": "Dooya gateway service unavailable",
+      "description": "The ESPHome service {service} used by the shutter {name} to transmit RF commands is not available. Commands to this shutter will fail until it is restored.\n\nCheck that the ESPHome node {device} is online, that its firmware still exposes the transmit_dooya service, and that the option 'Allow the device to perform Home Assistant actions' is enabled for it in the ESPHome integration. You can also select another gateway node in the Dooya entry options."
+    }
+  },
+  "exceptions": {
+    "no_esphome_device": {
+      "message": "No ESPHome gateway is configured for {name}. Reconfigure the Dooya entry and select the ESPHome device that transmits the RF commands."
+    },
+    "esphome_service_missing": {
+      "message": "The ESPHome service {service} required by {name} is not available. Check that the ESPHome node is online and allowed to perform Home Assistant actions."
     }
   },
   "entity": {

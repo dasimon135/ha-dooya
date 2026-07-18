@@ -36,10 +36,7 @@ def position_after(
     delta = (elapsed / travel_time) * 100
     current = start + direction * delta
 
-    if direction > 0:
-        current = min(current, target)
-    else:
-        current = max(current, target)
+    current = min(current, target) if direction > 0 else max(current, target)
 
     return clamp_position(current)
 

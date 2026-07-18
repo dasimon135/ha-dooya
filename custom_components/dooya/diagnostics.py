@@ -2,23 +2,25 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.diagnostics import async_redact_data
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_DOOYA_ID, DOMAIN
+from .const import CONF_DOOYA_ID
+
+if TYPE_CHECKING:
+    from . import DooyaConfigEntry
 
 # The remote id would let anyone replay frames to the shutters — redact it.
 TO_REDACT = {CONF_DOOYA_ID}
 
 
 async def async_get_config_entry_diagnostics(
-    hass: HomeAssistant, entry: ConfigEntry
+    hass: HomeAssistant, entry: DooyaConfigEntry
 ) -> dict[str, Any]:
     """Retourner les diagnostics d'une entrée de configuration."""
-    cover = hass.data.get(DOMAIN, {}).get(entry.entry_id, {}).get("cover")
+    cover = entry.runtime_data.cover
     cover_state: dict[str, Any] = {}
     if cover is not None:
         cover_state = {
