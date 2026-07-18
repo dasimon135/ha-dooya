@@ -7,8 +7,12 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
-from homeassistant.data_entry_flow import FlowResult
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
 from homeassistant.core import callback
 
 from .const import (
@@ -68,7 +72,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Étape 1 : entrer le nom du device ESPHome transmetteur."""
         errors: dict[str, str] = {}
         available_devices = self._available_esphome_devices()
@@ -106,7 +110,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_method(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Étape 2 : choisir entre apprentissage automatique et saisie manuelle."""
         if user_input is not None:
             if user_input["method"] == "manual":
@@ -129,7 +133,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_learn(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Étape 3a : lancer immédiatement l'apprentissage automatique."""
         if self._learn_task is None:
             self._learn_task = self.hass.async_create_task(
@@ -155,7 +159,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_learn_retry(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Proposer un nouvel essai ou une saisie manuelle après timeout."""
         if user_input is not None:
             if user_input.get("skip"):
@@ -210,7 +214,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_confirm(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Étape 3 : confirmer les données apprises et nommer le volet."""
         assert self._learned_data is not None
 
@@ -247,7 +251,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def async_step_manual(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Étape 3b : saisie manuelle de l'ID Dooya."""
         errors: dict[str, str] = {}
 
@@ -300,7 +304,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
         check: int,
         travel_time_up: float,
         travel_time_down: float,
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Créer l'entrée de configuration."""
         return self.async_create_entry(
             title=name,
@@ -325,7 +329,7 @@ class DooyaOptionsFlow(OptionsFlow):
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Modifier les temps de trajet estimés."""
         current_device = self._config_entry.options.get(
             CONF_ESPHOME_DEVICE,
