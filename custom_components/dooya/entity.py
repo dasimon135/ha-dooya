@@ -130,7 +130,7 @@ class DooyaBaseEntity(Entity):
             entity_ids = [entry.entity_id for entry in entries]
             _LOGGER.debug(
                 "%s: availability linked to gateway %s (%d entities)",
-                self._attr_name,
+                self._cover_name,
                 self._esphome_device,
                 len(entity_ids),
             )

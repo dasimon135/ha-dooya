@@ -79,7 +79,10 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialiser le volet Dooya."""
         super().__init__(config_entry)
-        self._attr_name = self._cover_name
+        # The device already carries the cover name; None makes this the main
+        # entity of the device so the friendly name is just the device name
+        # (instead of a doubled "Name Name" with _attr_has_entity_name).
+        self._attr_name = None
 
         # Channel 0 is the Dooya broadcast channel ("all" button): every
         # paired shutter reacts, so a per-shutter position estimate is
@@ -238,7 +241,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         if self._is_broadcast:
             _LOGGER.warning(
                 "%s: set_position is not supported on the broadcast channel",
-                self._attr_name,
+                self._cover_name,
             )
             return
         position = clamp_position(kwargs[ATTR_POSITION])
@@ -290,7 +293,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         if self._is_broadcast:
             _LOGGER.warning(
                 "%s: calibration is not available on the broadcast channel",
-                self._attr_name,
+                self._cover_name,
             )
             return
 
@@ -298,7 +301,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         expected_start = 0 if direction > 0 else 100
         if self._current_position is not None and self._current_position != expected_start:
             self._notify(
-                f"Calibration not started for '{self._attr_name}': the shutter "
+                f"Calibration not started for '{self._cover_name}': the shutter "
                 f"must be fully {'closed' if direction > 0 else 'open'} first "
                 f"(estimated position: {self._current_position}%)."
             )
@@ -319,7 +322,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             self._start_estimated_motion(direction=-1, target_position=0)
 
         self._notify(
-            f"Calibration started for '{self._attr_name}'. Press STOP (in Home "
+            f"Calibration started for '{self._cover_name}'. Press STOP (in Home "
             "Assistant or on the remote) at the exact moment the shutter "
             f"reaches the fully {'open' if direction > 0 else 'closed'} position."
         )
@@ -338,7 +341,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
         if not 1.0 <= elapsed <= CALIBRATION_TIMEOUT_SEC:
             self._notify(
-                f"Calibration for '{self._attr_name}' cancelled: measured "
+                f"Calibration for '{self._cover_name}' cancelled: measured "
                 f"{elapsed:.1f} s is out of the accepted range."
             )
             return
@@ -355,13 +358,13 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             self._config_entry, options=options
         )
         self._notify(
-            f"Calibration done for '{self._attr_name}': full "
+            f"Calibration done for '{self._cover_name}': full "
             f"{'opening' if direction > 0 else 'closing'} time measured at "
             f"{measured} s and saved."
         )
         _LOGGER.info(
             "%s: calibrated %s to %.1f s",
-            self._attr_name,
+            self._cover_name,
             key,
             measured,
         )
@@ -375,7 +378,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         self._calibrating = 0
         self._calibration_start = None
         self._notify(
-            f"Calibration for '{self._attr_name}' cancelled: no STOP received "
+            f"Calibration for '{self._cover_name}' cancelled: no STOP received "
             f"within {int(CALIBRATION_TIMEOUT_SEC)} s."
         )
 
@@ -442,7 +445,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             _LOGGER.error(
                 "Aucun device ESPHome configuré pour %s. "
                 "Reconfigurer l'entrée Dooya avec le bon device.",
-                self._attr_name,
+                self._cover_name,
             )
             return None
 
@@ -478,7 +481,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         if self._echo_filter.is_echo(button, monotonic()):
             _LOGGER.debug(
                 "%s: ignoring echo of our own transmission (button=%d)",
-                self._attr_name,
+                self._cover_name,
                 button,
             )
             return
