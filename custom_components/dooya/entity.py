@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_state_change_event
@@ -19,6 +19,9 @@ from .const import (
     DOMAIN,
 )
 from .device_match import is_esphome_device
+
+if TYPE_CHECKING:
+    from . import DooyaConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -39,7 +42,7 @@ class DooyaBaseEntity(Entity):
     _attr_has_entity_name = True
     _attr_should_poll = False
 
-    def __init__(self, config_entry: ConfigEntry) -> None:
+    def __init__(self, config_entry: DooyaConfigEntry) -> None:
         """Initialiser l'entité Dooya."""
         self._config_entry = config_entry
         self._attr_unique_id = config_entry.entry_id

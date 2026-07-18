@@ -8,22 +8,26 @@ service explicite.
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from homeassistant.components.button import ButtonEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CONF_FAVORITE_POSITION, DOMAIN
+from .const import CONF_FAVORITE_POSITION
 from .entity import DooyaBaseEntity
+
+if TYPE_CHECKING:
+    from . import DooyaConfigEntry
+    from .cover import DooyaCover
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: DooyaConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Configurer les boutons Dooya depuis un config entry."""
@@ -47,20 +51,16 @@ class DooyaButtonBase(DooyaBaseEntity, ButtonEntity):
     _attr_entity_category = EntityCategory.CONFIG
     translation_key: str
 
-    def __init__(self, config_entry: ConfigEntry) -> None:
+    def __init__(self, config_entry: DooyaConfigEntry) -> None:
         """Initialiser le bouton."""
         super().__init__(config_entry)
         self._attr_translation_key = self.translation_key
         self._attr_unique_id = f"{config_entry.entry_id}_{self.translation_key}"
 
     @property
-    def _cover(self):
+    def _cover(self) -> DooyaCover | None:
         """Retourner l'entité cover de cette entrée (ou None)."""
-        cover = (
-            self.hass.data.get(DOMAIN, {})
-            .get(self._config_entry.entry_id, {})
-            .get("cover")
-        )
+        cover = self._config_entry.runtime_data.cover
         if cover is None:
             _LOGGER.warning(
                 "%s: cover entity not ready, button press ignored",

@@ -6,7 +6,7 @@ import asyncio
 from collections.abc import Callable
 import logging
 from time import monotonic
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components import persistent_notification
 from homeassistant.components.cover import (
@@ -14,7 +14,6 @@ from homeassistant.components.cover import (
     CoverEntity,
     CoverEntityFeature,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_platform, issue_registry as ir
@@ -47,6 +46,9 @@ from .echo_filter import TxEchoFilter
 from .entity import DooyaBaseEntity
 from .travel_calc import clamp_position, position_after, travel_duration
 
+if TYPE_CHECKING:
+    from . import DooyaConfigEntry
+
 _LOGGER = logging.getLogger(__name__)
 ATTR_CURRENT_POSITION = "current_position"
 ATTR_POSITION = "position"
@@ -54,7 +56,7 @@ ATTR_POSITION = "position"
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: ConfigEntry,
+    config_entry: DooyaConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Configurer les entités cover Dooya depuis un config entry."""
@@ -79,7 +81,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     _attr_device_class = CoverDeviceClass.SHUTTER
     _attr_assumed_state = True
 
-    def __init__(self, config_entry: ConfigEntry) -> None:
+    def __init__(self, config_entry: DooyaConfigEntry) -> None:
         """Initialiser le volet Dooya."""
         super().__init__(config_entry)
         # The device already carries the cover name; None makes this the main
@@ -207,9 +209,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         )
 
         # Share the cover object with the button platform of this entry.
-        self.hass.data.setdefault(DOMAIN, {}).setdefault(
-            self._config_entry.entry_id, {}
-        )["cover"] = self
+        self._config_entry.runtime_data.cover = self
 
     async def async_will_remove_from_hass(self) -> None:
         """Nettoyer les callbacks lors de la suppression de l'entité."""
@@ -218,9 +218,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         if self._event_unsub is not None:
             self._event_unsub()
             self._event_unsub = None
-        entry_data = self.hass.data.get(DOMAIN, {}).get(self._config_entry.entry_id)
-        if entry_data is not None:
-            entry_data.pop("cover", None)
+        self._config_entry.runtime_data.cover = None
 
     async def async_open_cover(self, **kwargs: Any) -> None:
         """Ouvrir le volet (commande UP, button=1)."""
