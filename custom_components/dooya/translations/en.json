@@ -85,6 +85,14 @@
       }
     }
   },
+  "exceptions": {
+    "no_esphome_device": {
+      "message": "No ESPHome gateway is configured for {name}. Reconfigure the Dooya entry and select the ESPHome device that transmits the RF commands."
+    },
+    "esphome_service_missing": {
+      "message": "The ESPHome service {service} required by {name} is not available. Check that the ESPHome node is online and allowed to perform Home Assistant actions."
+    }
+  },
   "entity": {
     "button": {
       "mark_open": {

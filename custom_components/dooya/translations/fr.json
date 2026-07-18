@@ -85,6 +85,14 @@
       }
     }
   },
+  "exceptions": {
+    "no_esphome_device": {
+      "message": "Aucune passerelle ESPHome n'est configurée pour {name}. Reconfigurez l'entrée Dooya et sélectionnez le boîtier ESPHome qui émet les commandes RF."
+    },
+    "esphome_service_missing": {
+      "message": "Le service ESPHome {service} requis par {name} n'est pas disponible. Vérifiez que le boîtier ESPHome est en ligne et autorisé à effectuer des actions Home Assistant."
+    }
+  },
   "entity": {
     "button": {
       "mark_open": { "name": "Marquer ouvert" },

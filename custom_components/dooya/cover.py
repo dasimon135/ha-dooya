@@ -16,6 +16,7 @@ from homeassistant.components.cover import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later
@@ -308,17 +309,22 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             return
 
         self._cancel_calibration_timeout()
+
+        # Transmit before arming the calibration state: a failed transmit
+        # (raising HomeAssistantError) must leave no calibration pending.
+        if direction > 0:
+            await self._async_transmit(BUTTON_UP, DEFAULT_CHECK_UP)
+        else:
+            await self._async_transmit(BUTTON_DOWN, DEFAULT_CHECK_DOWN)
+
         self._calibrating = direction
         self._calibration_start = monotonic()
         self._calibration_unsub = async_call_later(
             self.hass, CALIBRATION_TIMEOUT_SEC, self._handle_calibration_timeout
         )
-
         if direction > 0:
-            await self._async_transmit(BUTTON_UP, DEFAULT_CHECK_UP)
             self._start_estimated_motion(direction=1, target_position=100)
         else:
-            await self._async_transmit(BUTTON_DOWN, DEFAULT_CHECK_DOWN)
             self._start_estimated_motion(direction=-1, target_position=0)
 
         self._notify(
@@ -396,10 +402,13 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         )
 
     async def _async_transmit(self, button: int, check: int) -> None:
-        """Appeler le service ESPHome transmit_dooya."""
+        """Call the ESPHome transmit_dooya service.
+
+        Raises HomeAssistantError when no gateway is configured or the
+        ESPHome service is missing, so callers never start an estimated
+        motion for a command that was not transmitted.
+        """
         service_name = self._resolve_service_name()
-        if service_name is None:
-            return
         _LOGGER.debug(
             "esphome.%s → id=%08X channel=%d button=%d check=%d",
             service_name,
@@ -408,13 +417,6 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             button,
             check,
         )
-        if not self.hass.services.has_service("esphome", service_name):
-            _LOGGER.error(
-                "Service ESPHome introuvable: esphome.%s. "
-                "Redémarrer Home Assistant et vérifier que les appels de services ESPHome sont autorisés.",
-                service_name,
-            )
-            return
         payload = {
             "dooya_id": self._dooya_id,
             "channel": self._channel,
@@ -435,30 +437,41 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             )
             self._echo_filter.record_tx(button, monotonic())
 
-    def _resolve_service_name(self) -> str | None:
-        """Déterminer le nom du service ESPHome à appeler."""
+    def _resolve_service_name(self) -> str:
+        """Return the ESPHome service name to call, raising on hard failure."""
         device = self._config_entry.options.get(
             CONF_ESPHOME_DEVICE,
             self._config_entry.data.get(CONF_ESPHOME_DEVICE, ""),
         )
         if not device:
             _LOGGER.error(
-                "Aucun device ESPHome configuré pour %s. "
-                "Reconfigurer l'entrée Dooya avec le bon device.",
+                "No ESPHome gateway configured for %s; reconfigure the Dooya "
+                "entry with the right device",
                 self._cover_name,
             )
-            return None
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="no_esphome_device",
+                translation_placeholders={"name": self._cover_name},
+            )
 
         service_name = f"{device.replace('-', '_')}_transmit_dooya"
         if self.hass.services.has_service("esphome", service_name):
             return service_name
 
         _LOGGER.error(
-            "Service ESPHome introuvable: esphome.%s. "
-            "Vérifier le nom du device ESPHome configuré.",
+            "ESPHome service not found: esphome.%s. Check that the node is "
+            "online and allowed to expose Home Assistant actions",
             service_name,
         )
-        return None
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="esphome_service_missing",
+            translation_placeholders={
+                "name": self._cover_name,
+                "service": f"esphome.{service_name}",
+            },
+        )
 
     @callback
     def _handle_dooya_event(self, event: Any) -> None:
@@ -628,7 +641,24 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     async def _async_complete_partial_move(self) -> None:
         """Terminer un déplacement partiel avec une commande STOP."""
         target_position = self._target_position
-        await self._async_transmit(BUTTON_STOP, DEFAULT_CHECK_STOP)
+        try:
+            await self._async_transmit(BUTTON_STOP, DEFAULT_CHECK_STOP)
+        except HomeAssistantError:
+            # STOP could not be sent: the shutter keeps moving to the end
+            # stop it was heading to, so track the estimate there instead of
+            # freezing it at the partial target.
+            direction = self._movement_direction
+            _LOGGER.error(
+                "%s: could not send STOP for the partial move; the shutter "
+                "will run to its end stop",
+                self._cover_name,
+            )
+            if direction != 0:
+                self._start_estimated_motion(
+                    direction=direction,
+                    target_position=100 if direction > 0 else 0,
+                )
+            return
         if target_position is not None:
             self._finalize_position(target_position)
 
