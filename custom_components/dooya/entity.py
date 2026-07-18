@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.util import slugify
@@ -55,12 +56,22 @@ class DooyaBaseEntity(Entity):
 
         self._gateway_entity_ids: list[str] = []
 
-        self._attr_device_info = {
-            "identifiers": {(DOMAIN, config_entry.entry_id)},
-            "name": self._cover_name,
-            "manufacturer": "Dooya",
-            "model": "RF433 Cover",
-        }
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info, linked to the ESPHome gateway when known."""
+        info = DeviceInfo(
+            identifiers={(DOMAIN, self._config_entry.entry_id)},
+            name=self._cover_name,
+            manufacturer="Dooya",
+            model="RF433 Cover",
+        )
+        gateway = self._find_gateway_device()
+        if gateway is not None:
+            for ident in gateway.identifiers:
+                if ident and len(ident) >= 2 and ident[0] == "esphome":
+                    info["via_device"] = (ident[0], ident[1])
+                    break
+        return info
 
     @property
     def _esphome_device(self) -> str:
@@ -107,42 +118,52 @@ class DooyaBaseEntity(Entity):
         """Répercuter un changement d'état de la passerelle sur l'entité."""
         self.async_write_ha_state()
 
-    def _resolve_gateway_entities(self) -> list[str]:
-        """Trouver les entités du device ESPHome configuré.
+    def _find_gateway_device(self) -> dr.DeviceEntry | None:
+        """Return the registry device of the configured ESPHome gateway.
 
-        Le config entry ne stocke que le slug du device (ex.
-        `volets-dooya-rf433`) ; on le fait correspondre au nom du device
-        ESPHome dans le registre. Si rien ne correspond, l'entité reste
-        toujours disponible (aucune régression).
+        The config entry only stores the device slug (e.g.
+        `volets-dooya-rf433`); match it against the ESPHome device names in
+        the registry.
         """
+        if getattr(self, "hass", None) is None:
+            return None
         gateway_slug = slugify(self._esphome_device)
         if not gateway_slug:
-            return []
+            return None
 
         device_registry = dr.async_get(self.hass)
-        entity_registry = er.async_get(self.hass)
-
         for device in device_registry.devices.values():
             if not is_esphome_device(device.identifiers):
                 continue
-            if slugify(device.name or "") != gateway_slug:
-                continue
-            entries = er.async_entries_for_device(
-                entity_registry, device.id, include_disabled_entities=False
-            )
-            entity_ids = [entry.entity_id for entry in entries]
+            if slugify(device.name or "") == gateway_slug:
+                return device
+        return None
+
+    def _resolve_gateway_entities(self) -> list[str]:
+        """Trouver les entités du device ESPHome configuré.
+
+        Si rien ne correspond, l'entité reste toujours disponible (aucune
+        régression).
+        """
+        device = self._find_gateway_device()
+        if device is None:
             _LOGGER.debug(
-                "%s: availability linked to gateway %s (%d entities)",
+                "%s: ESPHome gateway %s not found in device registry, "
+                "availability tracking disabled",
                 self._cover_name,
                 self._esphome_device,
-                len(entity_ids),
             )
-            return entity_ids
+            return []
 
+        entity_registry = er.async_get(self.hass)
+        entries = er.async_entries_for_device(
+            entity_registry, device.id, include_disabled_entities=False
+        )
+        entity_ids = [entry.entity_id for entry in entries]
         _LOGGER.debug(
-            "%s: ESPHome gateway %s not found in device registry, "
-            "availability tracking disabled",
+            "%s: availability linked to gateway %s (%d entities)",
             self._cover_name,
             self._esphome_device,
+            len(entity_ids),
         )
-        return []
+        return entity_ids
