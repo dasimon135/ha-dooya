@@ -1,62 +1,38 @@
 # Message de suivi HACF — v0.8.0
 
 > À poster en réponse dans le fil `[Integration] ha-dooya`.
-> Le message d'origine (`post-hacf.md`) s'arrêtait à la v0.4.0 : celui-ci fait
-> le pont jusqu'à la v0.8.0.
+> Fait suite au message d'annonce de la v0.6.1 : ne réexplique donc ni la carte
+> Lovelace, ni l'assistant de calibration, ni le canal 0, ni le multi-nœuds,
+> déjà couverts là-bas. Couvre v0.6.2 → v0.8.0.
 
 ---
 
-Petit point d'étape sur `ha-dooya` 👋
+Salut à tous 👋
 
-Le fil s'était arrêté à la v0.4.0 et il s'est passé pas mal de choses depuis. Voici l'essentiel, avec la **v0.8.0** qui vient de sortir.
+Petit point depuis l'annonce de la v0.6.1. Pas de nouveauté cette fois, plutôt de la fiabilité — mais il y a deux ou trois choses que vous avez intérêt à connaître.
 
-D'abord un grand merci à celui d'entre vous qui m'avait remonté le bug des entités grisées en v0.6.0 : le traceback fourni a permis de corriger en v0.6.2. C'était un appareil tiers dont les identifiants ne rentraient pas dans le format que je supposais, et ça faisait tomber toutes les entités de l'intégration. Typiquement le genre de chose qu'on ne voit pas chez soi. 🙏
+D'abord, **v0.6.2** : un bug bien vilain m'a été remonté ici même juste après la v0.6.1. Toutes les entités de l'intégration se retrouvaient grisées, « no longer provided ». La cause était un appareil tiers dont les identifiants n'avaient pas tout à fait la forme que je supposais dans le code de suivi de disponibilité — donc impossible à reproduire chez moi. Le traceback collé dans le fil m'a permis de comprendre en dix minutes. Merci encore 🙏, et si vous étiez restés en 0.6.0 ou 0.6.1 sans comprendre, c'était ça.
 
-## Ce qui est arrivé depuis la v0.4.0
+Ensuite **v0.7.0**, une passe de qualité sans changement visible, et surtout **v0.8.0** qui vient de sortir.
 
-**Une carte Lovelace intégrée** 🎨 — `custom:dooya-cover-card`, livrée avec l'intégration : rien à installer ni à déclarer dans les ressources Lovelace. Volet animé qui suit la position estimée, curseur, raccourcis 0/25/50/75/100 %, éditeur visuel. Trois affichages : complet, compact (une ligne) et tuile. La fenêtre suit même la course du soleil via `sun.sun` — aube, jour, crépuscule, nuit.
+## La v0.8.0
 
-**Un assistant de calibration** ⏱️ — fini le chronomètre à la main. Volet en butée, on appuie sur « Calibrer le temps d'ouverture », et on appuie sur STOP au moment exact où il arrive en haut. Le temps mesuré est enregistré tout seul dans les options.
+J'ai repris l'intégration à froid, en mode chasse aux bugs. J'en ai trouvé quatre, tous reproduits dans un banc de test avant d'être corrigés — pas juste supposés en relisant le code, parce que je me suis fait avoir une fois en croyant tenir un bug qui n'en était pas un.
 
-**Des boutons de recalage** sur la page de l'appareil : « Marquer ouvert », « Marquer fermé », et une **position favorite** optionnelle qui fait apparaître un bouton dédié.
+Le plus vicieux : **le code de contrôle n'arrivait jamais dans la trame RF**. La valeur était bien stockée, mais plus jamais relue derrière. Le champ « Code de contrôle » de la saisie manuelle ne servait donc strictement à rien. Et le pire, c'est que le mode apprentissage, lui, lit correctement le vrai code sur votre télécommande. Donc si vous aviez une télécommande dont ce code diffère du code bouton, elle était apprise juste puis émise faux — et ça ressemble à un problème de portée RF, pas à un bug logiciel. Bon courage pour le dépannage. Le code est maintenant dérivé du bouton.
 
-**Un indicateur de confiance** — la position étant estimée, chaque arrêt en milieu de course ajoute un peu d'erreur. L'attribut `position_confidence` passe de `high` à `medium` puis `low`, et se remet à zéro dès que le volet atteint une butée.
+⚠️ Conséquence directe : **le champ « Code de contrôle » disparaît des écrans de configuration**. Comme il n'avait aucun effet, rien ne change pour vos volets et vous n'avez rien à reconfigurer.
 
-**Le canal 0 (bouton « tous »)** — les télécommandes multi-canaux Dooya émettent sur le canal 0, exécuté par tous les volets appairés. On peut créer cette entité dans HA : une seule trame RF au lieu d'une par volet pour un « tout fermer le soir ».
+Celui que vous remarquerez sans doute le plus au quotidien : **lire l'état d'un volet pouvait perturber son mouvement**. Concrètement, sur un « mettre à 50 % », la commande STOP pouvait passer à la trappe et le volet filait jusqu'en butée.
 
-**Le multi-nœuds** 📡 — pour les maisons en béton armé, on peut déployer plusieurs nœuds ESPHome et assigner chaque volet au plus proche, depuis les options et sans recréer l'entrée. Un filtre anti-écho évite qu'un nœud en réception prenne la trame émise par un autre pour un appui télécommande.
+Les deux autres sont plus discrets. **Un même volet pouvait être ajouté deux fois** : rien ne l'empêchait, et les deux entrées se disputaient ensuite la position en permanence, chacune prenant les émissions de l'autre pour un appui sur la télécommande. Et **les identifiants trop longs** étaient acceptés puis tronqués en silence, donc le nœud émettait un identifiant différent de celui affiché à l'écran.
 
-**Divers** : une alerte de réparation quand le service ESPHome de la passerelle disparaît (nœud hors ligne), une étape de reconfiguration pour corriger l'identité d'un volet sans le recréer, un blueprint d'automatisation volets/soleil, et un panneau de diagnostic.
-
-## La v0.8.0 : une passe de débogage complète
-
-Celle-ci n'apporte pas de fonctionnalité, mais corrige quatre défauts. Chacun a été **reproduit dans un banc de test Home Assistant avant d'être corrigé**, pas juste supposé à la lecture du code.
-
-**Le code de contrôle n'arrivait jamais dans la trame RF.** La valeur était stockée puis jamais relue : le champ « Check code » de la saisie manuelle ne servait à rien. Plus embêtant, le mode apprentissage lit le vrai code de contrôle sur votre télécommande — donc une télécommande dont ce code diffère du code bouton était apprise correctement puis émise faux, et la panne ressemblait à un problème de portée RF. Le code est maintenant dérivé du bouton.
-
-⚠️ **Conséquence visible : le champ « Code de contrôle » disparaît des écrans de configuration.** Comme il n'avait aucun effet, rien ne change pour vos volets et il n'y a rien à reconfigurer.
-
-**Un même volet pouvait être ajouté deux fois.** Rien ne l'empêchait, et les deux entrées se disputaient alors l'estimation de position en permanence, chacune voyant les émissions de l'autre comme un appui télécommande. C'est maintenant bloqué à l'ajout comme à la reconfiguration.
-
-**Les identifiants trop longs étaient acceptés** puis tronqués silencieusement : le nœud émettait un identifiant différent de celui affiché. Désormais refusé avec un message clair.
-
-**Lire l'état d'un volet pouvait perturber son mouvement.** Sur un déplacement partiel (« mettre à 50 % »), la commande STOP pouvait être perdue et le volet continuait jusqu'en butée. C'est le correctif le plus concret au quotidien.
-
-Côté tests, on est passé de 54 à 77, avec une couverture ajoutée sur l'assistant de calibration, le filtre anti-écho, la resynchronisation par télécommande physique et la restauration après redémarrage.
+Côté tests, on est passé des 40 dont je parlais dans mon message précédent à 77, avec de la couverture ajoutée là où il n'y en avait pas : l'assistant de calibration, le filtre anti-écho, la resynchronisation quand on utilise la télécommande physique, et la restauration après redémarrage.
 
 ## Pour mettre à jour
 
-Via HACS, puis redémarrage de Home Assistant. **Rien à changer sur le nœud ESPHome** : le contrat entre l'intégration et le nœud n'a pas bougé. Pas besoin non plus de recréer ou reconfigurer vos volets.
+Via HACS puis redémarrage, c'est tout. **Rien à toucher côté ESPHome**, le contrat entre l'intégration et le nœud n'a pas changé. Pas besoin non plus de recréer ni de reconfigurer vos volets.
 
-## Toujours preneur de retours
+Pour ceux qui suivaient : la demande d'inclusion au store HACS par défaut est toujours en attente côté mainteneurs. En attendant, c'est toujours via « Dépôts personnalisés ».
 
-Le dépôt : `https://github.com/dasimon135/ha-dooya`
-
-Ce qui m'intéresse particulièrement :
-
-- d'autres moteurs Dooya ou OEM compatibles, et d'autres télécommandes
-- le comportement de la position estimée selon les moteurs
-- les retours sur la carte Lovelace et l'assistant de calibration
-- les configurations multi-nœuds, si certains ont de gros volumes ou des murs difficiles
-
-Et si vous tombez sur un bug, un traceback vaut de l'or — le correctif de la v0.6.2 en est la preuve. 🙌
+Et si vous tombez sur un bug, n'hésitez vraiment pas — la v0.6.2 est là pour rappeler qu'un traceback bien collé vaut de l'or. 🙌

@@ -1,8 +1,9 @@
 # [Integration] ha-dooya - Piloter des volets Dooya RF433 dans Home Assistant avec ESPHome
 
 > **Message d'origine du fil HACF, à jour jusqu'à la v0.4.0.**
-> Le suivi v0.4.0 → v0.8.0 (carte Lovelace, assistant de calibration,
-> multi-nœuds, canal 0, passe de débogage) est dans `post-hacf-v080.md`.
+> Une annonce v0.6.1 a été postée ensuite dans le fil (carte Lovelace,
+> assistant de calibration, canal 0, multi-nœuds) mais n'a pas été archivée
+> ici. Le suivi v0.6.2 → v0.8.0 est dans `post-hacf-v080.md`.
 
 Bonjour à tous 👋
 
