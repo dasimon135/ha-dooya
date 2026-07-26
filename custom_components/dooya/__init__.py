@@ -12,6 +12,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv, issue_registry as ir
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.loader import async_get_integration
 
 from .const import DOMAIN, gateway_issue_id
 
@@ -34,7 +35,6 @@ class DooyaRuntimeData:
 
 type DooyaConfigEntry = ConfigEntry[DooyaRuntimeData]
 
-CARD_VERSION = "1.3.1"
 CARD_URL = "/dooya_frontend/dooya-cover-card.js"
 
 
@@ -42,13 +42,25 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Register the bundled Lovelace card (served and auto-loaded by the frontend)."""
     try:
         await _async_register_card(hass)
-    except Exception:  # pragma: no cover - card registration is best-effort
-        _LOGGER.warning("Dooya: could not register the bundled card", exc_info=True)
+    except Exception:
+        # The card is a convenience on top of a working integration: failing to
+        # serve it must never stop the covers from being set up.
+        _LOGGER.error(
+            "Could not register the bundled Dooya card; the integration still "
+            "works but 'custom:dooya-cover-card' will not be available",
+            exc_info=True,
+        )
     return True
 
 
 async def _async_register_card(hass: HomeAssistant) -> None:
-    """Serve the card file and add it as a frontend module."""
+    """Serve the card file and add it as a frontend module.
+
+    `http` is a hard dependency because `hass.http` is dereferenced here;
+    `frontend` is only an after_dependency. The card is a convenience, and
+    environments without the `hass_frontend` package (the HA test harness, for
+    one) must still be able to set the integration up.
+    """
     from homeassistant.components import frontend
     from homeassistant.components.http import StaticPathConfig
 
@@ -56,7 +68,10 @@ async def _async_register_card(hass: HomeAssistant) -> None:
     await hass.http.async_register_static_paths(
         [StaticPathConfig(CARD_URL, str(card_path), True)]
     )
-    frontend.add_extra_js_url(hass, f"{CARD_URL}?v={CARD_VERSION}")
+    # Cache-bust on the integration version rather than a hand-maintained
+    # constant: a released update can never serve a stale card.
+    integration = await async_get_integration(hass, DOMAIN)
+    frontend.add_extra_js_url(hass, f"{CARD_URL}?v={integration.version}")
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: DooyaConfigEntry) -> bool:

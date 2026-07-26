@@ -29,9 +29,6 @@ from .const import (
     CONF_REPEAT_COUNT,
     CONF_TRAVEL_TIME_DOWN,
     CONF_TRAVEL_TIME_UP,
-    DEFAULT_CHECK_DOWN,
-    DEFAULT_CHECK_STOP,
-    DEFAULT_CHECK_UP,
     DEFAULT_REPEAT_COUNT,
     DEFAULT_TRAVEL_TIME_DOWN,
     DEFAULT_TRAVEL_TIME_UP,
@@ -41,7 +38,7 @@ from .const import (
     ISSUE_GATEWAY_SERVICE_MISSING,
     gateway_issue_id,
 )
-from .dooya_protocol import BUTTON_DOWN, BUTTON_STOP, BUTTON_UP
+from .dooya_protocol import BUTTON_DOWN, BUTTON_STOP, BUTTON_UP, check_for_button
 from .echo_filter import TxEchoFilter
 from .entity import DooyaBaseEntity
 from .travel_calc import clamp_position, position_after, travel_duration
@@ -222,18 +219,18 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     async def async_open_cover(self, **kwargs: Any) -> None:
         """Ouvrir le volet (commande UP, button=1)."""
-        await self._async_transmit(BUTTON_UP, DEFAULT_CHECK_UP)
+        await self._async_transmit(BUTTON_UP)
         self._start_estimated_motion(direction=1, target_position=100)
 
     async def async_close_cover(self, **kwargs: Any) -> None:
         """Fermer le volet (commande DOWN, button=3)."""
-        await self._async_transmit(BUTTON_DOWN, DEFAULT_CHECK_DOWN)
+        await self._async_transmit(BUTTON_DOWN)
         self._start_estimated_motion(direction=-1, target_position=0)
 
     async def async_stop_cover(self, **kwargs: Any) -> None:
         """Stopper le volet (commande STOP, button=5)."""
         self._refresh_position()
-        await self._async_transmit(BUTTON_STOP, DEFAULT_CHECK_STOP)
+        await self._async_transmit(BUTTON_STOP)
         self._finish_calibration()
         self._stop_estimated_motion()
 
@@ -256,11 +253,11 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             return
 
         if position > current_position:
-            await self._async_transmit(BUTTON_UP, DEFAULT_CHECK_UP)
+            await self._async_transmit(BUTTON_UP)
             self._start_estimated_motion(direction=1, target_position=position)
             return
 
-        await self._async_transmit(BUTTON_DOWN, DEFAULT_CHECK_DOWN)
+        await self._async_transmit(BUTTON_DOWN)
         self._start_estimated_motion(direction=-1, target_position=position)
 
     @callback
@@ -313,9 +310,9 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         # Transmit before arming the calibration state: a failed transmit
         # (raising HomeAssistantError) must leave no calibration pending.
         if direction > 0:
-            await self._async_transmit(BUTTON_UP, DEFAULT_CHECK_UP)
+            await self._async_transmit(BUTTON_UP)
         else:
-            await self._async_transmit(BUTTON_DOWN, DEFAULT_CHECK_DOWN)
+            await self._async_transmit(BUTTON_DOWN)
 
         self._calibrating = direction
         self._calibration_start = monotonic()
@@ -401,13 +398,17 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             self.hass, message, title="Dooya calibration"
         )
 
-    async def _async_transmit(self, button: int, check: int) -> None:
+    async def _async_transmit(self, button: int) -> None:
         """Call the ESPHome transmit_dooya service.
+
+        The check nibble is derived from the button (see
+        `dooya_protocol.check_for_button`), never read from the config entry.
 
         Raises HomeAssistantError when no gateway is configured or the
         ESPHome service is missing, so callers never start an estimated
         motion for a command that was not transmitted.
         """
+        check = check_for_button(button)
         try:
             service_name = self._resolve_service_name()
         except HomeAssistantError:
@@ -415,7 +416,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             raise
         self._async_clear_gateway_issue()
         _LOGGER.debug(
-            "esphome.%s → id=%08X channel=%d button=%d check=%d",
+            "esphome.%s → id=%06X channel=%d button=%d check=%d",
             service_name,
             self._dooya_id,
             self._channel,
@@ -581,7 +582,20 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     @callback
     def _refresh_position(self) -> None:
-        """Mettre à jour la position estimée selon le temps écoulé."""
+        """Update the estimated position from the elapsed travel time.
+
+        Deliberately free of side effects beyond `_current_position`: it never
+        ends a movement, never cancels a timer and never writes state.
+
+        Home Assistant reads `is_closed`, `is_opening`, `is_closing` and
+        `current_cover_position` *while* it is building a state object, and all
+        four call this method. Ending a movement from here would re-enter
+        `async_write_ha_state`, and cancelling timers from here would let a
+        plain state read drop the pending STOP of a partial move.
+
+        Ending a movement is the job of the timer callbacks that own it:
+        `_handle_target_reached` and `_handle_partial_target_reached`.
+        """
         if (
             self._movement_direction == 0
             or self._movement_start_time is None
@@ -601,9 +615,6 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             travel_time,
             self._target_position,
         )
-
-        if self._current_position == self._target_position:
-            self._finalize_position(self._target_position)
 
     @callback
     def _stop_estimated_motion(self) -> None:
@@ -679,15 +690,21 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     @callback
     def _handle_partial_target_reached(self, _now: Any) -> None:
-        """Envoyer STOP au bon moment pour un déplacement partiel."""
+        """Transmit STOP at the right moment for a partial move."""
         self._target_reached_unsub = None
-        self.hass.async_create_task(self._async_complete_partial_move())
+        # Tracked by the config entry so an unload waits for the STOP instead
+        # of leaving the shutter running to its end stop.
+        self._config_entry.async_create_task(
+            self.hass,
+            self._async_complete_partial_move(),
+            "dooya partial move stop",
+        )
 
     async def _async_complete_partial_move(self) -> None:
         """Terminer un déplacement partiel avec une commande STOP."""
         target_position = self._target_position
         try:
-            await self._async_transmit(BUTTON_STOP, DEFAULT_CHECK_STOP)
+            await self._async_transmit(BUTTON_STOP)
         except HomeAssistantError:
             # STOP could not be sent: the shutter keeps moving to the end
             # stop it was heading to, so track the estimate there instead of

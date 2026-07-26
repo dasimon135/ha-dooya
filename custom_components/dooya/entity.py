@@ -13,7 +13,6 @@ from homeassistant.util import slugify
 
 from .const import (
     CONF_CHANNEL,
-    CONF_CHECK,
     CONF_COVER_NAME,
     CONF_DOOYA_ID,
     CONF_ESPHOME_DEVICE,
@@ -51,8 +50,11 @@ class DooyaBaseEntity(Entity):
         data = config_entry.data
         self._dooya_id: int = data[CONF_DOOYA_ID]
         self._channel: int = data[CONF_CHANNEL]
-        self._check: int = data[CONF_CHECK]
         self._cover_name: str = data[CONF_COVER_NAME]
+        # CONF_CHECK is deliberately not read here: the check nibble is derived
+        # from the button at transmit time (dooya_protocol.check_for_button).
+        # The key is still kept in the entry data as a record of what the learn
+        # step observed on the remote.
 
         self._gateway_entity_ids: list[str] = []
 

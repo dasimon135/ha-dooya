@@ -1,12 +1,21 @@
-"""Encodage du protocole Dooya RF433 (OOK).
+"""Dooya RF433 (OOK) protocol description.
 
-Timings extraits de ESPHome dooya_protocol.cpp :
-- Header  : 5000 µs HIGH + 1500 µs LOW
-- Bit 0   : 350 µs HIGH + 750 µs LOW
-- Bit 1   : 750 µs HIGH + 350 µs LOW
-- Trame   : header + 24 bits id + 8 bits channel + 4 bits button + 4 bits check
+Timings taken from ESPHome's dooya_protocol.cpp:
+- Header : 5000 µs HIGH + 1500 µs LOW
+- Bit 0  : 350 µs HIGH + 750 µs LOW
+- Bit 1  : 750 µs HIGH + 350 µs LOW
+- Frame  : header + 24-bit id + 8-bit channel + 4-bit button + 4-bit check
 
-Référence : https://github.com/esphome/esphome/blob/dev/esphome/components/remote_base/dooya_protocol.cpp
+Reference: https://github.com/esphome/esphome/blob/dev/esphome/components/remote_base/dooya_protocol.cpp
+
+IMPORTANT — `encode_dooya` and `decode_dooya` are NOT the transmit path.
+
+Frames are encoded and decoded on the ESP32 by ESPHome's own C++
+`DooyaProtocol`; this integration only passes it the four field values (see
+`cover.py::_async_transmit` and `esphome/dooya-node.yaml`). The two functions
+below are a reference implementation kept so the unit tests can assert the
+timing table above, which the ESPHome side must agree with. Changing them has
+no effect whatsoever on what the hardware transmits.
 """
 
 from __future__ import annotations
@@ -24,10 +33,26 @@ BIT_ONE_LOW_US: int = 350
 # Fréquence Dooya RF433 en Hz
 DOOYA_FREQUENCY_HZ: int = 433_920_000
 
-# Boutons Dooya
+# Dooya button codes
 BUTTON_UP: int = 1
 BUTTON_DOWN: int = 3
 BUTTON_STOP: int = 5
+
+# Widest id a Dooya frame can carry (the id field is 24 bits).
+MAX_DOOYA_ID: int = 0xFFFFFF
+
+
+def check_for_button(button: int) -> int:
+    """Return the 4-bit check nibble that goes with a button code.
+
+    On the remotes this integration was built against, the check nibble simply
+    repeats the button code. It is derived here rather than configured on
+    purpose: a single stored value cannot be correct for UP, DOWN and STOP at
+    once, and the learn step only ever observes the check of an UP press, so
+    honouring a stored check would send the wrong nibble for the other two
+    buttons.
+    """
+    return button
 
 
 @dataclass

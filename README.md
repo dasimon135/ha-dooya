@@ -314,9 +314,16 @@ Frame: `header + 24-bit ID + 8-bit channel + 4-bit button + 4-bit check`
 
 Buttons: `UP=1`, `DOWN=3`, `STOP=5`
 
-## Release Status
+The 4-bit check nibble repeats the button code, so it is derived from the
+button at transmit time rather than configured per shutter. A single stored
+value cannot be correct for UP, DOWN and STOP at once.
 
-Current version: `0.4.0`
+Frames are encoded on the ESP32 by ESPHome's own `DooyaProtocol`. The
+`dooya_protocol.py` module in this repository is a reference implementation
+used by the unit tests to pin the timing table above — it is not the transmit
+path.
+
+## Release Status
 
 Current architecture:
 

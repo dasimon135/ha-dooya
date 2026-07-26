@@ -84,7 +84,6 @@ async def test_user_flow_manual_happy_path(
             CONF_COVER_NAME: "Salon",
             CONF_DOOYA_ID: "00D1C917",
             CONF_CHANNEL: 5,
-            CONF_CHECK: 1,
             CONF_TRAVEL_TIME_UP: 20.0,
             CONF_TRAVEL_TIME_DOWN: 18.0,
         },
@@ -138,7 +137,6 @@ async def test_manual_step_rejects_invalid_dooya_id(
             CONF_COVER_NAME: "Salon",
             CONF_DOOYA_ID: "NOT-HEX",
             CONF_CHANNEL: 5,
-            CONF_CHECK: 1,
             CONF_TRAVEL_TIME_UP: 20.0,
             CONF_TRAVEL_TIME_DOWN: 18.0,
         },
@@ -183,9 +181,8 @@ async def test_reconfigure_updates_entry(
         result["flow_id"],
         {
             CONF_COVER_NAME: "Salon gauche",
-            CONF_DOOYA_ID: "00ABCDEF",
+            CONF_DOOYA_ID: "ABCDEF",
             CONF_CHANNEL: 7,
-            CONF_CHECK: 2,
         },
     )
     await hass.async_block_till_done()
@@ -193,11 +190,146 @@ async def test_reconfigure_updates_entry(
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
     assert entry.title == "Salon gauche"
-    assert entry.data[CONF_DOOYA_ID] == 0x00ABCDEF
+    assert entry.data[CONF_DOOYA_ID] == 0xABCDEF
     assert entry.data[CONF_CHANNEL] == 7
-    assert entry.data[CONF_CHECK] == 2
     assert entry.data[CONF_COVER_NAME] == "Salon gauche"
     # Travel times are untouched by a reconfigure.
     assert entry.data[CONF_TRAVEL_TIME_UP] == 20.0
 
     assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_manual_step_rejects_oversized_dooya_id(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """An id wider than 24 bits is rejected instead of being truncated."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_ESPHOME_DEVICE: GATEWAY_SLUG}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"method": "manual"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_COVER_NAME: "Salon",
+            CONF_DOOYA_ID: "FFFFFFFFFF",  # 40 bits
+            CONF_CHANNEL: 5,
+            CONF_TRAVEL_TIME_UP: 20.0,
+            CONF_TRAVEL_TIME_DOWN: 18.0,
+        },
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {CONF_DOOYA_ID: "invalid_dooya_id"}
+
+
+async def _run_manual_flow(
+    hass: HomeAssistant, dooya_id: str, channel: int, name: str
+) -> dict:
+    """Drive the manual flow to completion and return the final result."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_ESPHOME_DEVICE: GATEWAY_SLUG}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"method": "manual"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_COVER_NAME: name,
+            CONF_DOOYA_ID: dooya_id,
+            CONF_CHANNEL: channel,
+            CONF_TRAVEL_TIME_UP: 20.0,
+            CONF_TRAVEL_TIME_DOWN: 18.0,
+        },
+    )
+    await hass.async_block_till_done()
+    return result
+
+
+async def test_same_shutter_cannot_be_added_twice(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """Two entries for one shutter would fight over the position estimate."""
+    first = await _run_manual_flow(hass, "D1C917", 5, "Salon")
+    assert first["type"] is FlowResultType.CREATE_ENTRY
+
+    second = await _run_manual_flow(hass, "D1C917", 5, "Salon (doublon)")
+    assert second["type"] is FlowResultType.ABORT
+    assert second["reason"] == "already_configured"
+
+
+async def test_broadcast_channel_coexists_with_per_channel_entry(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """Channel 0 is a different shutter identity, not a duplicate."""
+    first = await _run_manual_flow(hass, "D1C917", 5, "Salon")
+    assert first["type"] is FlowResultType.CREATE_ENTRY
+
+    broadcast = await _run_manual_flow(hass, "D1C917", 0, "Tous les volets")
+    assert broadcast["type"] is FlowResultType.CREATE_ENTRY
+
+
+async def test_reconfigure_refuses_to_collide_with_another_entry(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """Editing an entry onto another entry's identity is refused."""
+    assert (await _run_manual_flow(hass, "D1C917", 5, "Salon"))[
+        "type"
+    ] is FlowResultType.CREATE_ENTRY
+    assert (await _run_manual_flow(hass, "D1C917", 6, "Cuisine"))[
+        "type"
+    ] is FlowResultType.CREATE_ENTRY
+
+    cuisine = next(
+        e for e in hass.config_entries.async_entries(DOMAIN) if e.title == "Cuisine"
+    )
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={
+            "source": config_entries.SOURCE_RECONFIGURE,
+            "entry_id": cuisine.entry_id,
+        },
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_COVER_NAME: "Cuisine", CONF_DOOYA_ID: "D1C917", CONF_CHANNEL: 5},
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {CONF_DOOYA_ID: "duplicate_shutter"}
+    # The entry is untouched.
+    assert cuisine.data[CONF_CHANNEL] == 6
+
+
+async def test_reconfigure_keeping_own_identity_is_allowed(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """Renaming without changing id/channel must not self-collide."""
+    assert (await _run_manual_flow(hass, "D1C917", 5, "Salon"))[
+        "type"
+    ] is FlowResultType.CREATE_ENTRY
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={
+            "source": config_entries.SOURCE_RECONFIGURE,
+            "entry_id": entry.entry_id,
+        },
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_COVER_NAME: "Salon gauche", CONF_DOOYA_ID: "D1C917", CONF_CHANNEL: 5},
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_COVER_NAME] == "Salon gauche"
