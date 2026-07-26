@@ -53,7 +53,7 @@ def _make_entry() -> MockConfigEntry:
             CONF_ESPHOME_DEVICE: GATEWAY_SLUG,
             CONF_DOOYA_ID: 0x00D1C917,
             CONF_CHANNEL: 5,
-            CONF_CHECK: 1,
+            CONF_CHECK: 7,
             CONF_COVER_NAME: "Salon",
             CONF_TRAVEL_TIME_UP: 20.0,
             CONF_TRAVEL_TIME_DOWN: 18.0,
@@ -163,3 +163,32 @@ async def test_unload_clears_repair_issue(hass: HomeAssistant) -> None:
         issue_registry.async_get_issue(DOMAIN, gateway_issue_id(entry.entry_id))
         is None
     )
+
+
+async def test_transmitted_check_follows_the_button(hass: HomeAssistant) -> None:
+    """The check nibble comes from the button, never from the entry data.
+
+    The learn step only ever observes the check of an UP press, so honouring a
+    single stored value would send the wrong nibble for DOWN and STOP.
+    """
+    calls: list[dict] = []
+
+    @callback
+    def _record(call) -> None:
+        calls.append(dict(call.data))
+
+    hass.services.async_register("esphome", GATEWAY_SERVICE, _record)
+
+    entry = _make_entry()
+    assert entry.data[CONF_CHECK] == 7  # deliberately not a button code
+    await _setup_entry(hass, entry)
+
+    for service in ("open_cover", "close_cover", "stop_cover"):
+        await hass.services.async_call(
+            "cover", service, {"entity_id": ENTITY_ID}, blocking=True
+        )
+    await hass.async_block_till_done()
+
+    assert [(c["btn"], c["check"]) for c in calls] == [(1, 1), (3, 3), (5, 5)]
+
+    assert await hass.config_entries.async_unload(entry.entry_id)

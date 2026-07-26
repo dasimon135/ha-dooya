@@ -43,9 +43,8 @@
         "description": "Saisissez manuellement les informations du volet. Utilisez ce mode si vous connaissez déjà l'identifiant, ou si vous ne souhaitez pas utiliser la détection automatique.",
         "data": {
           "cover_name": "Nom du volet",
-          "dooya_id": "Identifiant du volet (exemple : 00D1C917)",
+          "dooya_id": "Identifiant du volet (par exemple : D1C917)",
           "channel": "Canal (1-16, ou 0 = tous les volets)",
-          "check": "Code de contrôle (0-15)",
           "travel_time_up": "Temps d'ouverture complet (secondes)",
           "travel_time_down": "Temps de fermeture complet (secondes)"
         }
@@ -55,9 +54,8 @@
         "description": "Corrigez l'identité de ce volet. L'entrée se recharge avec les valeurs mises à jour.",
         "data": {
           "cover_name": "Nom du volet",
-          "dooya_id": "Identifiant du volet (exemple : 00D1C917)",
-          "channel": "Canal (1-16, ou 0 = tous les volets)",
-          "check": "Code de contrôle (0-15)"
+          "dooya_id": "Identifiant du volet (par exemple : D1C917)",
+          "channel": "Canal (1-16, ou 0 = tous les volets)"
         }
       }
     },
@@ -65,13 +63,15 @@
       "listen_remote": "En attente d'un signal de la télécommande Dooya"
     },
     "abort": {
-      "reconfigure_successful": "Le volet a été reconfiguré avec succès."
+      "reconfigure_successful": "Le volet a été reconfiguré avec succès.",
+      "already_configured": "Ce volet est déjà configuré."
     },
     "error": {
-      "invalid_dooya_id": "Identifiant invalide. Attendu : valeur hexadécimale (ex : 00D1C917).",
+      "invalid_dooya_id": "Identifiant invalide. Une valeur hexadécimale sur 24 bits est attendue, 6 chiffres maximum (ex. D1C917).",
       "learn_timeout": "Aucun signal n'a été reçu dans le délai prévu. Vous pouvez réessayer ou choisir la saisie manuelle.",
       "required_esphome_device": "Plusieurs boîtiers ESPHome compatibles ont été trouvés. Choisissez celui qui doit envoyer les commandes du volet.",
-      "unknown_esphome_device": "Aucun boîtier ESPHome compatible n'a été trouvé avec ce nom. Vérifiez le nom et réessayez."
+      "unknown_esphome_device": "Aucun boîtier ESPHome compatible n'a été trouvé avec ce nom. Vérifiez le nom et réessayez.",
+      "duplicate_shutter": "Ce volet (même identifiant et même canal) est déjà configuré. Deux entrées pour un seul volet se disputeraient l'estimation de position."
     }
   },
   "options": {
@@ -110,11 +110,21 @@
   },
   "entity": {
     "button": {
-      "mark_open": { "name": "Marquer ouvert" },
-      "mark_closed": { "name": "Marquer fermé" },
-      "calibrate_up": { "name": "Calibrer le temps d'ouverture" },
-      "calibrate_down": { "name": "Calibrer le temps de fermeture" },
-      "favorite": { "name": "Position favorite" }
+      "mark_open": {
+        "name": "Marquer ouvert"
+      },
+      "mark_closed": {
+        "name": "Marquer fermé"
+      },
+      "calibrate_up": {
+        "name": "Calibrer le temps d'ouverture"
+      },
+      "calibrate_down": {
+        "name": "Calibrer le temps de fermeture"
+      },
+      "favorite": {
+        "name": "Position favorite"
+      }
     }
   },
   "services": {

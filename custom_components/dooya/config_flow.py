@@ -31,10 +31,32 @@ from .const import (
     DOMAIN,
     EVENT_DOOYA_RECEIVED,
 )
-from .dooya_protocol import DooyaData
+from .dooya_protocol import BUTTON_UP, MAX_DOOYA_ID, DooyaData, check_for_button
 
-# Délai maximum d'attente en mode apprentissage (secondes)
+# Maximum time spent listening for a remote in learn mode (seconds)
 LEARN_TIMEOUT_SEC = 30
+
+
+def _parse_dooya_id(raw: str) -> int:
+    """Parse a hexadecimal remote id, rejecting anything wider than 24 bits.
+
+    The id field of a Dooya frame is 24 bits: a wider value would be silently
+    truncated by the encoder on the ESP32 and the node would transmit a
+    different remote id than the one shown in the UI.
+    """
+    value = int(raw, 16)
+    if not 0 <= value <= MAX_DOOYA_ID:
+        raise ValueError(f"dooya id {value:X} does not fit in 24 bits")
+    return value
+
+
+def shutter_unique_id(dooya_id: int, channel: int) -> str:
+    """Return the unique id identifying one physical shutter.
+
+    Keyed on id + channel, not id alone: the broadcast channel 0 legitimately
+    coexists with the per-channel entries of the same remote.
+    """
+    return f"{dooya_id:06X}_{channel}"
 
 
 def _list_transmit_devices(hass) -> list[str]:
@@ -220,7 +242,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
         assert self._learned_data is not None
 
         if user_input is not None:
-            return self._create_entry(
+            return await self._async_create_entry(
                 name=user_input[CONF_COVER_NAME],
                 dooya_id=self._learned_data.id,
                 channel=self._learned_data.channel,
@@ -245,7 +267,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                 }
             ),
             description_placeholders={
-                "dooya_id": f"0x{self._learned_data.id:08X}",
+                "dooya_id": f"0x{self._learned_data.id:06X}",
                 "channel": str(self._learned_data.channel),
             },
         )
@@ -253,20 +275,22 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_manual(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Étape 3b : saisie manuelle de l'ID Dooya."""
+        """Step 3b: manual entry of the Dooya id."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
             try:
-                dooya_id = int(user_input[CONF_DOOYA_ID], 16)
+                dooya_id = _parse_dooya_id(user_input[CONF_DOOYA_ID])
             except ValueError:
                 errors[CONF_DOOYA_ID] = "invalid_dooya_id"
             else:
-                return self._create_entry(
+                return await self._async_create_entry(
                     name=user_input[CONF_COVER_NAME],
                     dooya_id=dooya_id,
                     channel=user_input[CONF_CHANNEL],
-                    check=user_input[CONF_CHECK],
+                    # The check nibble is derived from the button at transmit
+                    # time; record the UP value for reference only.
+                    check=check_for_button(BUTTON_UP),
                     travel_time_up=user_input[CONF_TRAVEL_TIME_UP],
                     travel_time_down=user_input[CONF_TRAVEL_TIME_DOWN],
                 )
@@ -279,9 +303,6 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_DOOYA_ID): str,
                     vol.Required(CONF_CHANNEL, default=DEFAULT_CHANNEL): vol.All(
                         int, vol.Range(min=0, max=16)
-                    ),
-                    vol.Required(CONF_CHECK, default=1): vol.All(
-                        int, vol.Range(min=0, max=15)
                     ),
                     vol.Required(
                         CONF_TRAVEL_TIME_UP,
@@ -301,29 +322,37 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Fix the identity of an existing shutter without recreating it.
 
-        Lets the user correct dooya_id, channel, check code or the cover
-        name; the entry reloads with the updated data.
+        Lets the user correct dooya_id, channel or the cover name; the entry
+        reloads with the updated data.
         """
         entry = self._get_reconfigure_entry()
         errors: dict[str, str] = {}
 
         if user_input is not None:
             try:
-                dooya_id = int(user_input[CONF_DOOYA_ID], 16)
+                dooya_id = _parse_dooya_id(user_input[CONF_DOOYA_ID])
             except ValueError:
                 errors[CONF_DOOYA_ID] = "invalid_dooya_id"
             else:
-                name = user_input[CONF_COVER_NAME]
-                return self.async_update_reload_and_abort(
-                    entry,
-                    title=name,
-                    data_updates={
-                        CONF_DOOYA_ID: dooya_id,
-                        CONF_CHANNEL: user_input[CONF_CHANNEL],
-                        CONF_CHECK: user_input[CONF_CHECK],
-                        CONF_COVER_NAME: name,
-                    },
-                )
+                channel = user_input[CONF_CHANNEL]
+                # Editing an entry into an identity another entry already owns
+                # would create the same duplicate the user step guards against.
+                if self._conflicting_entry(
+                    dooya_id, channel, ignore_entry_id=entry.entry_id
+                ):
+                    errors[CONF_DOOYA_ID] = "duplicate_shutter"
+                else:
+                    name = user_input[CONF_COVER_NAME]
+                    return self.async_update_reload_and_abort(
+                        entry,
+                        title=name,
+                        unique_id=shutter_unique_id(dooya_id, channel),
+                        data_updates={
+                            CONF_DOOYA_ID: dooya_id,
+                            CONF_CHANNEL: channel,
+                            CONF_COVER_NAME: name,
+                        },
+                    )
 
         data = entry.data
         return self.async_show_form(
@@ -335,21 +364,36 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                     ): str,
                     vol.Required(
                         CONF_DOOYA_ID,
-                        default=f"{data.get(CONF_DOOYA_ID, 0):08X}",
+                        default=f"{data.get(CONF_DOOYA_ID, 0):06X}",
                     ): str,
                     vol.Required(
                         CONF_CHANNEL, default=data.get(CONF_CHANNEL, DEFAULT_CHANNEL)
                     ): vol.All(int, vol.Range(min=0, max=16)),
-                    vol.Required(
-                        CONF_CHECK, default=data.get(CONF_CHECK, 1)
-                    ): vol.All(int, vol.Range(min=0, max=15)),
                 }
             ),
             errors=errors,
         )
 
     @callback
-    def _create_entry(
+    def _conflicting_entry(
+        self, dooya_id: int, channel: int, *, ignore_entry_id: str | None = None
+    ) -> ConfigEntry | None:
+        """Return an existing entry already driving this shutter, if any.
+
+        Matches on the entry data rather than on the unique id so that entries
+        created before unique ids were introduced are caught too.
+        """
+        for entry in self._async_current_entries():
+            if entry.entry_id == ignore_entry_id:
+                continue
+            if (
+                entry.data.get(CONF_DOOYA_ID) == dooya_id
+                and entry.data.get(CONF_CHANNEL) == channel
+            ):
+                return entry
+        return None
+
+    async def _async_create_entry(
         self,
         name: str,
         dooya_id: int,
@@ -358,7 +402,18 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
         travel_time_up: float,
         travel_time_down: float,
     ) -> ConfigFlowResult:
-        """Créer l'entrée de configuration."""
+        """Create the config entry, refusing to drive the same shutter twice.
+
+        Two entries for one shutter would each run their own position estimate
+        and would each see the other's transmissions as a physical remote
+        press, so the two estimates would drift apart permanently.
+        """
+        if self._conflicting_entry(dooya_id, channel) is not None:
+            return self.async_abort(reason="already_configured")
+
+        await self.async_set_unique_id(shutter_unique_id(dooya_id, channel))
+        self._abort_if_unique_id_configured()
+
         return self.async_create_entry(
             title=name,
             data={

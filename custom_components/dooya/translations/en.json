@@ -43,9 +43,8 @@
         "description": "Enter the shutter information manually. Use this mode if you already know the identifier, or if you do not want to use automatic detection.",
         "data": {
           "cover_name": "Shutter name",
-          "dooya_id": "Shutter identifier (for example: 00D1C917)",
+          "dooya_id": "Shutter identifier (for example: D1C917)",
           "channel": "Channel (1-16, or 0 = all shutters)",
-          "check": "Check code (0-15)",
           "travel_time_up": "Full opening time (seconds)",
           "travel_time_down": "Full closing time (seconds)"
         }
@@ -55,9 +54,8 @@
         "description": "Correct the identity of this shutter. The entry reloads with the updated values.",
         "data": {
           "cover_name": "Shutter name",
-          "dooya_id": "Shutter identifier (for example: 00D1C917)",
-          "channel": "Channel (1-16, or 0 = all shutters)",
-          "check": "Check code (0-15)"
+          "dooya_id": "Shutter identifier (for example: D1C917)",
+          "channel": "Channel (1-16, or 0 = all shutters)"
         }
       }
     },
@@ -65,13 +63,15 @@
       "listen_remote": "Waiting for a signal from the Dooya remote control"
     },
     "abort": {
-      "reconfigure_successful": "The shutter was reconfigured successfully."
+      "reconfigure_successful": "The shutter was reconfigured successfully.",
+      "already_configured": "This shutter is already configured."
     },
     "error": {
-      "invalid_dooya_id": "Invalid ID. Expected a hexadecimal value (e.g. 00D1C917).",
+      "invalid_dooya_id": "Invalid ID. Expected a 24-bit hexadecimal value, up to 6 digits (e.g. D1C917).",
       "learn_timeout": "No signal was received in time. You can try again, or choose manual entry.",
       "required_esphome_device": "Several compatible ESPHome devices were found. Choose the one that should send the shutter commands.",
-      "unknown_esphome_device": "No compatible ESPHome device was found with this name. Check the name and try again."
+      "unknown_esphome_device": "No compatible ESPHome device was found with this name. Check the name and try again.",
+      "duplicate_shutter": "This shutter (same identifier and channel) is already configured. Two entries for one shutter would fight over the estimated position."
     }
   },
   "options": {

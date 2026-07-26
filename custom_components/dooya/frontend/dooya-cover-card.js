@@ -10,6 +10,9 @@
  * entities) the manual recalibration actions mark_open / mark_closed.
  */
 
+// Console banner only. Cache-busting uses the integration version from
+// manifest.json (see __init__.py::_async_register_card), so this does not need
+// to be kept in sync with any Python constant.
 const VERSION = "1.3.1";
 // eslint-disable-next-line no-console
 console.info(`%c DOOYA-COVER-CARD %c v${VERSION} `, "background:#e8833a;color:#fff;border-radius:3px 0 0 3px", "background:#c95d2e;color:#fff;border-radius:0 3px 3px 0");
@@ -118,17 +121,33 @@ class DooyaCoverCard extends HTMLElement {
   }
 
   _favoriteButton() {
-    // Sibling button entity on the same device whose id mentions the
-    // favorite position (entity ids derive from EN "favorite" or FR
-    // "favori(te)" names, both matched by "favori").
+    // Sibling button entity on the same device. Matched on the unique-id
+    // suffix the integration assigns (`<entry_id>_favorite`, see button.py),
+    // never on the entity id: entity ids are derived from the *translated*
+    // name, so an id-based match silently breaks on any new locale.
     const reg = (this._hass && this._hass.entities) || {};
     const coverReg = reg[this._config.entity];
     const devId = coverReg && coverReg.device_id;
     if (!devId) return null;
     return (
-      Object.keys(reg).find(
-        (e) => e.startsWith("button.") && reg[e].device_id === devId && /favori/i.test(e)
-      ) || null
+      Object.keys(reg).find((e) => {
+        const ent = reg[e];
+        if (!e.startsWith("button.") || ent.device_id !== devId) return false;
+        const uid = ent.unique_id || "";
+        // Fall back to the entity id for HA versions that do not expose
+        // unique_id on the frontend entity registry.
+        return uid ? uid.endsWith("_favorite") : /favori/i.test(e);
+      }) || null
+    );
+  }
+
+  _esc(value) {
+    // Every interpolation below lands in innerHTML: shutter names and card
+    // config are user-controlled text, not markup.
+    return String(value == null ? "" : value).replace(
+      /[&<>"']/g,
+      (c) =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]
     );
   }
 
@@ -153,7 +172,7 @@ class DooyaCoverCard extends HTMLElement {
     this._ensureRoot();
     this._root.classList.toggle("tilecard", this._config.view === "tile");
     if (!st) {
-      this._body.innerHTML = `<div class="warn">${t.notFound(this._config.entity)}</div>`;
+      this._body.innerHTML = `<div class="warn">${this._esc(t.notFound(this._config.entity))}</div>`;
       return;
     }
 
@@ -162,7 +181,9 @@ class DooyaCoverCard extends HTMLElement {
     const closing = st.state === "closing";
     const moving = opening || closing;
     const closed = st.state === "closed" || pos === 0;
-    const name = this._config.name || st.attributes.friendly_name || "Cover";
+    const name = this._esc(
+      this._config.name || st.attributes.friendly_name || "Cover"
+    );
 
     let stateLabel;
     if (opening) stateLabel = t.opening;
@@ -210,7 +231,7 @@ class DooyaCoverCard extends HTMLElement {
           <div class="cbar" data-bar title="${t.estimated}">
             <div class="cfill ${moving ? "moving" : ""}" style="width:${fillPct}%"></div>
           </div>
-          ${favBtn ? `<button class="ctl mini" data-fav="${favBtn}" title="${t.favorite}"><ha-icon icon="mdi:star"></ha-icon></button>` : ""}
+          ${favBtn ? `<button class="ctl mini" data-fav="${this._esc(favBtn)}" title="${t.favorite}"><ha-icon icon="mdi:star"></ha-icon></button>` : ""}
           <button class="ctl mini ${opening ? "active" : ""}" data-act="open" title="${t.up}"><ha-icon icon="mdi:chevron-up"></ha-icon></button>
           <button class="ctl mini" data-act="stop" title="${t.stop}"><ha-icon icon="mdi:stop"></ha-icon></button>
           <button class="ctl mini ${closing ? "active" : ""}" data-act="close" title="${t.down}"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
@@ -234,7 +255,7 @@ class DooyaCoverCard extends HTMLElement {
           })
           .join("") +
         (favBtn
-          ? `<button class="chip star" data-fav="${favBtn}" title="${t.favorite}"><ha-icon icon="mdi:star"></ha-icon></button>`
+          ? `<button class="chip star" data-fav="${this._esc(favBtn)}" title="${t.favorite}"><ha-icon icon="mdi:star"></ha-icon></button>`
           : "") +
         `</div>`;
     }
