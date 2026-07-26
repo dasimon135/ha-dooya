@@ -54,7 +54,13 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def _async_register_card(hass: HomeAssistant) -> None:
-    """Serve the card file and add it as a frontend module."""
+    """Serve the card file and add it as a frontend module.
+
+    `http` is a hard dependency because `hass.http` is dereferenced here;
+    `frontend` is only an after_dependency. The card is a convenience, and
+    environments without the `hass_frontend` package (the HA test harness, for
+    one) must still be able to set the integration up.
+    """
     from homeassistant.components import frontend
     from homeassistant.components.http import StaticPathConfig
 
