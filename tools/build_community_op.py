@@ -132,7 +132,7 @@ Two projects grew out of this thread, and which one you want depends on what you
 **Raw capture and replay, with state sync from the physical remote** — @cpecorari's build for a Naterial-branded (Dooya 433.88 MHz) awning. It captures and replays raw frames instead of decoding the Dooya fields, and updates the cover state in Home Assistant when someone presses the physical remote. The `REVERSE_ENGINEERING.md` in the repo documents ten gotchas they hit, several of which apply well beyond Naterial:
 https://github.com/cpecorari/esp32-naterial-awning
 
-**A cover entity with a position, instead of three buttons** — see the reply further down this thread for `ha-dooya`, a custom integration that turns the node above into one proper cover entity per blind, with a position estimated from your measured travel times.
+**A cover entity with a position, instead of three buttons** — [`ha-dooya`](https://community.home-assistant.io/t/control-dooya-rf433-blinds-with-esp32-cc1101-via-esphome/984671/11), a custom integration that turns the node above into one proper cover entity per blind, with a position estimated from your measured travel times.
 
 ---
 
