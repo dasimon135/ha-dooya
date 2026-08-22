@@ -1,5 +1,15 @@
 # Community forum — edits to apply to the original post
 
+> **To actually post, use [`post-community-op-full.md`](post-community-op-full.md)**:
+> it is the complete post with all of these edits already applied, ready to
+> select-all / paste over the existing post. This file is the rationale — what
+> changed and why — kept for the record.
+>
+> Regenerate the full version with `python tools/build_community_op.py`: it
+> refetches `/raw/984671/1` and re-applies the eleven anchored edits, failing
+> loudly if an anchor no longer matches (i.e. if the live post was edited
+> in the meantime).
+>
 > Target: <https://community.home-assistant.io/t/control-dooya-rf433-blinds-with-esp32-cc1101-via-esphome/984671>
 > post #1, last edited 2026-02-10 (version 2).
 >
