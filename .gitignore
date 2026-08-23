@@ -5,3 +5,6 @@ __pycache__/
 .coverage
 dist/
 *.egg-info/
+
+# Personal Claude Code permissions, never shared
+.claude/settings.local.json
