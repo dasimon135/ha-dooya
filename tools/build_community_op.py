@@ -1,4 +1,6 @@
-import io, os, sys, urllib.request
+import os
+import sys
+import urllib.request
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -149,7 +151,7 @@ sub(
     "footer",
 )
 
-with io.open(OUT, "w", encoding="utf-8", newline="\n") as f:
+with open(OUT, "w", encoding="utf-8", newline="\n") as f:
     f.write(src)
 
 print("edits applied:", ", ".join(edits))

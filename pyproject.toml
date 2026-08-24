@@ -27,6 +27,8 @@ known-first-party = ["custom_components.dooya"]
 [tool.ruff.lint.per-file-ignores]
 # E402: HA-harness test modules import after pytest.importorskip
 "tests/*" = ["B011", "E402"]
+# RUF001: the community-post generators embed forum prose verbatim, en dashes included
+"tools/*" = ["RUF001"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
