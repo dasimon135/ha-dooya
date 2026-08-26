@@ -44,7 +44,7 @@
         "data": {
           "cover_name": "Shutter name",
           "dooya_id": "Shutter identifier (for example: D1C917)",
-          "channel": "Channel (1-16, or 0 = all shutters)",
+          "channel": "Channel (1-255, or 0 = all shutters)",
           "travel_time_up": "Full opening time (seconds)",
           "travel_time_down": "Full closing time (seconds)"
         }
@@ -55,7 +55,7 @@
         "data": {
           "cover_name": "Shutter name",
           "dooya_id": "Shutter identifier (for example: D1C917)",
-          "channel": "Channel (1-16, or 0 = all shutters)"
+          "channel": "Channel (1-255, or 0 = all shutters)"
         }
       }
     },

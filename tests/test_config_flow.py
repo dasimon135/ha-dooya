@@ -19,7 +19,7 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.dooya.const import (
@@ -333,3 +333,137 @@ async def test_reconfigure_keeping_own_identity_is_allowed(
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
     assert entry.data[CONF_COVER_NAME] == "Salon gauche"
+
+
+async def test_manual_step_accepts_channel_above_16(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """Channels above 16 are legal: the frame carries the channel on 8 bits.
+
+    Reported in issue #18 by a user whose remotes start at channel 81.
+    """
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_ESPHOME_DEVICE: GATEWAY_SLUG}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"method": "manual"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_COVER_NAME: "Chambre",
+            CONF_DOOYA_ID: "00D1C917",
+            CONF_CHANNEL: 81,
+            CONF_TRAVEL_TIME_UP: 20.0,
+            CONF_TRAVEL_TIME_DOWN: 18.0,
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_CHANNEL] == 81
+
+
+@pytest.mark.parametrize("channel", [0, 255])
+async def test_manual_step_accepts_full_8_bit_channel_range(
+    hass: HomeAssistant, gateway_service: list[dict], channel: int
+) -> None:
+    """Both ends of the 8-bit field are valid: 0 is broadcast, 255 is the max."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_ESPHOME_DEVICE: GATEWAY_SLUG}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"method": "manual"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_COVER_NAME: f"Volet {channel}",
+            CONF_DOOYA_ID: "00D1C917",
+            CONF_CHANNEL: channel,
+            CONF_TRAVEL_TIME_UP: 20.0,
+            CONF_TRAVEL_TIME_DOWN: 18.0,
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_CHANNEL] == channel
+
+
+async def test_manual_step_rejects_channel_above_255(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """A channel wider than the 8-bit field cannot be transmitted."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_ESPHOME_DEVICE: GATEWAY_SLUG}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"method": "manual"}
+    )
+
+    with pytest.raises(InvalidData):
+        await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                CONF_COVER_NAME: "Trop haut",
+                CONF_DOOYA_ID: "00D1C917",
+                CONF_CHANNEL: 256,
+                CONF_TRAVEL_TIME_UP: 20.0,
+                CONF_TRAVEL_TIME_DOWN: 18.0,
+            },
+        )
+
+
+async def test_reconfigure_accepts_channel_above_16(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """Reconfiguring onto a channel above 16 must work too (issue #18)."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Chambre",
+        data={
+            CONF_ESPHOME_DEVICE: GATEWAY_SLUG,
+            CONF_DOOYA_ID: 0x00D1C917,
+            CONF_CHANNEL: 5,
+            CONF_CHECK: 1,
+            CONF_COVER_NAME: "Chambre",
+            CONF_TRAVEL_TIME_UP: 20.0,
+            CONF_TRAVEL_TIME_DOWN: 18.0,
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={
+            "source": config_entries.SOURCE_RECONFIGURE,
+            "entry_id": entry.entry_id,
+        },
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_COVER_NAME: "Chambre",
+            CONF_DOOYA_ID: "00D1C917",
+            CONF_CHANNEL: 200,
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_CHANNEL] == 200
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
