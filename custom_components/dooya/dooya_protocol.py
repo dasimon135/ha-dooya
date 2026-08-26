@@ -61,7 +61,8 @@ class DooyaData:
 
     Attributs:
         id      : identifiant de la télécommande (24 bits)
-        channel : canal du volet (8 bits, 1-16 typiquement)
+        channel : canal du volet (8 bits, 0-255 ; 1-16 sur les
+                  télécommandes courantes, 0 = broadcast)
         button  : code bouton — 1=monter, 3=descendre, 5=stop (4 bits)
         check   : checksum/code de contrôle (4 bits, souvent == button)
     """

@@ -30,6 +30,7 @@ from .const import (
     DEFAULT_TRAVEL_TIME_UP,
     DOMAIN,
     EVENT_DOOYA_RECEIVED,
+    MAX_CHANNEL,
 )
 from .dooya_protocol import BUTTON_UP, MAX_DOOYA_ID, DooyaData, check_for_button
 
@@ -302,7 +303,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_COVER_NAME): str,
                     vol.Required(CONF_DOOYA_ID): str,
                     vol.Required(CONF_CHANNEL, default=DEFAULT_CHANNEL): vol.All(
-                        int, vol.Range(min=0, max=16)
+                        int, vol.Range(min=0, max=MAX_CHANNEL)
                     ),
                     vol.Required(
                         CONF_TRAVEL_TIME_UP,
@@ -368,7 +369,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                     ): str,
                     vol.Required(
                         CONF_CHANNEL, default=data.get(CONF_CHANNEL, DEFAULT_CHANNEL)
-                    ): vol.All(int, vol.Range(min=0, max=16)),
+                    ): vol.All(int, vol.Range(min=0, max=MAX_CHANNEL)),
                 }
             ),
             errors=errors,

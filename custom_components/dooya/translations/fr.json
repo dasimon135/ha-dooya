@@ -44,7 +44,7 @@
         "data": {
           "cover_name": "Nom du volet",
           "dooya_id": "Identifiant du volet (par exemple : D1C917)",
-          "channel": "Canal (1-16, ou 0 = tous les volets)",
+          "channel": "Canal (1-255, ou 0 = tous les volets)",
           "travel_time_up": "Temps d'ouverture complet (secondes)",
           "travel_time_down": "Temps de fermeture complet (secondes)"
         }
@@ -55,7 +55,7 @@
         "data": {
           "cover_name": "Nom du volet",
           "dooya_id": "Identifiant du volet (par exemple : D1C917)",
-          "channel": "Canal (1-16, ou 0 = tous les volets)"
+          "channel": "Canal (1-255, ou 0 = tous les volets)"
         }
       }
     },

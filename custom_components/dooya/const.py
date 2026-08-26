@@ -19,7 +19,7 @@ EVENT_DOOYA_RECEIVED: Final = "esphome.dooya_received"
 # Clés de configuration
 CONF_ESPHOME_DEVICE: Final = "esphome_device"  # Nom du device ESPHome (slug)
 CONF_DOOYA_ID: Final = "dooya_id"              # Identifiant 24 bits de la télécommande
-CONF_CHANNEL: Final = "channel"                # Canal du volet (1-16)
+CONF_CHANNEL: Final = "channel"                # Canal du volet (8 bits)
 CONF_CHECK: Final = "check"                    # Code de contrôle (4 bits)
 CONF_COVER_NAME: Final = "cover_name"          # Nom du volet
 CONF_TRAVEL_TIME_UP: Final = "travel_time_up"  # Temps d'ouverture complet (s)
@@ -41,6 +41,12 @@ CALIBRATION_TIMEOUT_SEC: Final = 240.0
 # volets appairés à la même télécommande (bouton "tous" des télécommandes
 # multi-canaux).
 BROADCAST_CHANNEL: Final = 0
+
+# Le canal occupe 8 bits dans la trame (voir dooya_protocol : header + id 24
+# bits + canal 8 bits + bouton 4 bits + check 4 bits). Les télécommandes
+# courantes s'arrêtent à 16, mais rien dans l'encodage ne l'impose : des
+# installations réelles utilisent des canaux bien au-delà (issue #18).
+MAX_CHANNEL: Final = 255
 
 # Valeurs par défaut
 DEFAULT_CHANNEL: Final = 1
