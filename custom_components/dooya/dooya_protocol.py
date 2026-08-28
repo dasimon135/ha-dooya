@@ -1,6 +1,7 @@
 """Dooya RF433 (OOK) protocol description.
 
 Timings taken from ESPHome's dooya_protocol.cpp:
+- Carrier: 433.92 MHz
 - Header : 5000 µs HIGH + 1500 µs LOW
 - Bit 0  : 350 µs HIGH + 750 µs LOW
 - Bit 1  : 750 µs HIGH + 350 µs LOW
@@ -29,9 +30,6 @@ BIT_ZERO_HIGH_US: int = 350
 BIT_ZERO_LOW_US: int = 750
 BIT_ONE_HIGH_US: int = 750
 BIT_ONE_LOW_US: int = 350
-
-# Fréquence Dooya RF433 en Hz
-DOOYA_FREQUENCY_HZ: int = 433_920_000
 
 # Dooya button codes
 BUTTON_UP: int = 1

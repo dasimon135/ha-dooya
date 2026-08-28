@@ -13,7 +13,7 @@
 // Console banner only. Cache-busting uses the integration version from
 // manifest.json (see __init__.py::_async_register_card), so this does not need
 // to be kept in sync with any Python constant.
-const VERSION = "1.3.1";
+const VERSION = "1.3.2";
 // eslint-disable-next-line no-console
 console.info(`%c DOOYA-COVER-CARD %c v${VERSION} `, "background:#e8833a;color:#fff;border-radius:3px 0 0 3px", "background:#c95d2e;color:#fff;border-radius:0 3px 3px 0");
 
@@ -155,10 +155,15 @@ class DooyaCoverCard extends HTMLElement {
 
   _signature() {
     if (!this._config || !this._hass) return null;
+    // The language belongs in the signature: every label rendered below is
+    // translated, so a language change has to re-render even when the shutter
+    // itself has not moved. Without it the card stays in the previous language
+    // until the next state change.
+    const lang = this._hass.language || "";
     const s = this._hass.states[this._config.entity];
-    if (!s) return this._config.entity + ":none";
+    if (!s) return `${this._config.entity}:none:${lang}`;
     const a = s.attributes;
-    return `${this._config.entity}:${s.state}:${a.current_position}:${this._favoriteButton() || ""}:${this._scene()}`;
+    return `${this._config.entity}:${s.state}:${a.current_position}:${this._favoriteButton() || ""}:${this._scene()}:${lang}`;
   }
 
   _call(domain, service, data) {
@@ -571,14 +576,6 @@ class DooyaCoverCardEditor extends HTMLElement {
     const fr = (this._hass.language || "en").startsWith("fr");
     if (!this._form) {
       this._form = document.createElement("ha-form");
-      this._form.computeLabel = (s) =>
-        ({
-          entity: fr ? "Entité cover (requis)" : "Cover entity (required)",
-          name: fr ? "Nom (optionnel)" : "Name (optional)",
-          view: fr ? "Affichage" : "View",
-          show_presets: fr ? "Afficher les positions prédéfinies" : "Show preset positions",
-          show_calibration: fr ? "Afficher le recalage manuel" : "Show manual recalibration",
-        }[s.name] || s.name);
       this._form.addEventListener("value-changed", (e) => {
         this.dispatchEvent(
           new CustomEvent("config-changed", {
@@ -590,6 +587,17 @@ class DooyaCoverCardEditor extends HTMLElement {
       });
       this.appendChild(this._form);
     }
+    // Reassigned on every render, like `schema` below: assigning it once inside
+    // the block above would close over the `fr` of the first render and leave
+    // the field labels in the original language after a language change.
+    this._form.computeLabel = (s) =>
+      ({
+        entity: fr ? "Entité cover (requis)" : "Cover entity (required)",
+        name: fr ? "Nom (optionnel)" : "Name (optional)",
+        view: fr ? "Affichage" : "View",
+        show_presets: fr ? "Afficher les positions prédéfinies" : "Show preset positions",
+        show_calibration: fr ? "Afficher le recalage manuel" : "Show manual recalibration",
+      }[s.name] || s.name);
     this._form.hass = this._hass;
     this._form.schema = [
       { name: "entity", required: true, selector: { entity: { domain: "cover" } } },
