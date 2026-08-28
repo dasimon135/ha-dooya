@@ -1,2 +1,10 @@
-pytest>=8
-pytest-homeassistant-custom-component
+# Pinned on purpose. `pytest-homeassistant-custom-component` pins one exact
+# Home Assistant release, so leaving it open means CI silently tests against
+# whatever shipped that morning — and, worse, pip backtracks to an old release
+# when the Python version is too low: on Python 3.13 it resolved to 0.13.316,
+# testing against HA 2026.2.3 while hacs.json declares a 2026.5.0 floor.
+#
+# 0.13.357 is the newest release pinning a *stable* Home Assistant (2026.8.3);
+# 0.13.358 pins the 2026.9.0b0 beta. Bump deliberately, not by accident.
+# Requires Python >= 3.14 (see .github/workflows/tests.yml).
+pytest-homeassistant-custom-component==0.13.357
