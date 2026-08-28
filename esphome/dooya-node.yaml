@@ -65,7 +65,7 @@ api:
   services:
     - service: transmit_dooya
       variables:
-        dooya_id: int   # 24-bit shutter identifier (e.g. 0x00D1C917 = 13749527)
+        dooya_id: int   # 24-bit shutter identifier (e.g. 0x00D1C917 = 13748503)
         channel: int    # channel (0-255, 0 = broadcast)
         btn: int        # 1=up, 3=down, 5=stop
         check: int      # check code (1=up, 3=down, 5=stop)
@@ -78,6 +78,11 @@ api:
             d.check   = (uint8_t)check;
             auto call = id(rf_transmitter).transmit();
             esphome::remote_base::DooyaProtocol().encode(call.get_data(), d);
+            // Five sends per service call, and the integration may call the
+            // service up to `repeat_count` times (1-3, in the options), so a
+            // single button press transmits 5 to 15 frames. Raising this
+            // number also widens the window the integration's echo filter has
+            // to cover (ECHO_SUPPRESS_WINDOW_SEC in const.py).
             call.set_send_times(5);
             call.set_send_wait(1000);
             call.perform();

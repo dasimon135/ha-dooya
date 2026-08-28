@@ -8,7 +8,14 @@ blueprint:
 
     Designed for Dooya RF covers but works with any cover entity.
   domain: automation
+  author: dasimon135
   source_url: https://github.com/dasimon135/ha-dooya/blob/main/blueprints/automation/dooya/shutters_sun.yaml
+  homeassistant:
+    # The body uses the plural `triggers:`/`actions:` keys and the in-item
+    # `trigger:`/`action:` keys, which landed in 2024.10. Declaring it makes
+    # Home Assistant refuse the import on an older version, instead of
+    # accepting the blueprint and failing obscurely at runtime.
+    min_version: "2024.10.0"
   input:
     covers:
       name: Shutters
@@ -43,6 +50,12 @@ blueprint:
       default: "07:30:00"
       selector:
         time: {}
+    # An entity input would normally be left required, but this one is
+    # genuinely optional: the empty default is what makes the hot-weather rule
+    # opt-in. It is also why the two temperature triggers below are templates
+    # rather than `numeric_state` — a numeric_state trigger with an empty
+    # entity_id fails validation and would stop the whole automation loading
+    # for everyone who does not use this feature.
     temperature_sensor:
       name: Outdoor temperature sensor (optional)
       description: >-
