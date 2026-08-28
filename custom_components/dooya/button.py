@@ -1,8 +1,7 @@
-"""Plateforme button pour les volets Dooya RF433.
+"""Button platform for Dooya RF433 shutters.
 
-Expose les actions de recalage comme entités sur l'appareil du volet,
-utilisables depuis la page appareil et les automatisations sans appel de
-service explicite.
+Exposes the recalibration actions as entities on the shutter's device, usable
+from the device page and from automations without an explicit service call.
 """
 
 from __future__ import annotations
@@ -30,7 +29,7 @@ async def async_setup_entry(
     config_entry: DooyaConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Configurer les boutons Dooya depuis un config entry."""
+    """Set up the Dooya buttons from a config entry."""
     entities: list[DooyaButtonBase] = [
         DooyaMarkOpenButton(config_entry),
         DooyaMarkClosedButton(config_entry),
@@ -46,20 +45,20 @@ async def async_setup_entry(
 
 
 class DooyaButtonBase(DooyaBaseEntity, ButtonEntity):
-    """Bouton lié au volet Dooya de la même entrée de configuration."""
+    """Button bound to the Dooya shutter of the same config entry."""
 
     _attr_entity_category = EntityCategory.CONFIG
     translation_key: str
 
     def __init__(self, config_entry: DooyaConfigEntry) -> None:
-        """Initialiser le bouton."""
+        """Initialize the button."""
         super().__init__(config_entry)
         self._attr_translation_key = self.translation_key
         self._attr_unique_id = f"{config_entry.entry_id}_{self.translation_key}"
 
     @property
     def _cover(self) -> DooyaCover | None:
-        """Retourner l'entité cover de cette entrée (ou None)."""
+        """Return the cover entity of this entry, or None when not ready."""
         cover = self._config_entry.runtime_data.cover
         if cover is None:
             _LOGGER.warning(
@@ -70,62 +69,62 @@ class DooyaButtonBase(DooyaBaseEntity, ButtonEntity):
 
 
 class DooyaMarkOpenButton(DooyaButtonBase):
-    """Recale la position estimée à 100 % sans émettre de trame RF."""
+    """Resync the estimate to 100% without transmitting an RF frame."""
 
     translation_key = "mark_open"
     _attr_icon = "mdi:arrow-collapse-up"
 
     async def async_press(self) -> None:
-        """Marquer le volet comme ouvert."""
+        """Mark the shutter as open."""
         if (cover := self._cover) is not None:
             cover.async_mark_open()
 
 
 class DooyaMarkClosedButton(DooyaButtonBase):
-    """Recale la position estimée à 0 % sans émettre de trame RF."""
+    """Resync the estimate to 0% without transmitting an RF frame."""
 
     translation_key = "mark_closed"
     _attr_icon = "mdi:arrow-collapse-down"
 
     async def async_press(self) -> None:
-        """Marquer le volet comme fermé."""
+        """Mark the shutter as closed."""
         if (cover := self._cover) is not None:
             cover.async_mark_closed()
 
 
 class DooyaCalibrateUpButton(DooyaButtonBase):
-    """Mesure le temps d'ouverture complet (volet fermé requis)."""
+    """Measure the full opening time (the shutter must be closed first)."""
 
     translation_key = "calibrate_up"
     _attr_icon = "mdi:timer-play-outline"
 
     async def async_press(self) -> None:
-        """Démarrer la mesure du temps d'ouverture."""
+        """Start measuring the opening time."""
         if (cover := self._cover) is not None:
             await cover.async_start_calibration(1)
 
 
 class DooyaCalibrateDownButton(DooyaButtonBase):
-    """Mesure le temps de fermeture complet (volet ouvert requis)."""
+    """Measure the full closing time (the shutter must be open first)."""
 
     translation_key = "calibrate_down"
     _attr_icon = "mdi:timer-stop-outline"
 
     async def async_press(self) -> None:
-        """Démarrer la mesure du temps de fermeture."""
+        """Start measuring the closing time."""
         if (cover := self._cover) is not None:
             await cover.async_start_calibration(-1)
 
 
 class DooyaFavoriteButton(DooyaButtonBase):
-    """Envoie le volet à sa position favorite configurée."""
+    """Send the shutter to its configured favorite position."""
 
     translation_key = "favorite"
     _attr_icon = "mdi:star"
     _attr_entity_category = None  # control, not configuration
 
     async def async_press(self) -> None:
-        """Aller à la position favorite."""
+        """Go to the favorite position."""
         favorite = self._config_entry.options.get(CONF_FAVORITE_POSITION)
         if favorite is None or (cover := self._cover) is None:
             return

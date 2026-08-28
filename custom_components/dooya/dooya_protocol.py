@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# Timings en µs (µsecondes)
+# Timings in microseconds
 HEADER_HIGH_US: int = 5000
 HEADER_LOW_US: int = 1500
 BIT_ZERO_HIGH_US: int = 350
@@ -55,14 +55,14 @@ def check_for_button(button: int) -> int:
 
 @dataclass
 class DooyaData:
-    """Données d'une commande Dooya.
+    """Fields of one Dooya command.
 
-    Attributs:
-        id      : identifiant de la télécommande (24 bits)
-        channel : canal du volet (8 bits, 0-255 ; 1-16 sur les
-                  télécommandes courantes, 0 = broadcast)
-        button  : code bouton — 1=monter, 3=descendre, 5=stop (4 bits)
-        check   : checksum/code de contrôle (4 bits, souvent == button)
+    Attributes:
+        id      : remote identifier (24 bits)
+        channel : shutter channel (8 bits, 0-255; 1-16 on common remotes,
+                  0 = broadcast)
+        button  : button code — 1=up, 3=down, 5=stop (4 bits)
+        check   : check nibble (4 bits, usually == button)
     """
 
     id: int
@@ -72,17 +72,17 @@ class DooyaData:
 
 
 def encode_dooya(data: DooyaData) -> list[int]:
-    """Encode une commande Dooya en liste de timings OOK (µs).
+    """Encode a Dooya command into a list of OOK timings (µs).
 
-    Format de la liste retournée : [high, low, high, low, ...]
-    Compatible avec ESPHome remote_transmitter et avec une éventuelle
-    réutilisation côté Home Assistant.
+    Returned list format: [high, low, high, low, ...] — compatible with
+    ESPHome's remote_transmitter, and with any reuse on the Home Assistant
+    side.
 
     Args:
-        data: données de la commande Dooya
+        data: the Dooya command fields
 
     Returns:
-        Liste de timings en µs alternant HIGH/LOW, commençant par HIGH.
+        Timings in µs alternating HIGH/LOW, starting with HIGH.
     """
     timings: list[int] = []
 
@@ -109,14 +109,14 @@ def encode_dooya(data: DooyaData) -> list[int]:
     # button : 4 bits
     _encode_bits(data.button, 4)
 
-    # check : 4 bits (dernier bit = mark uniquement, pas de LOW final)
-    # Les 3 premiers bits sont des items complets (high+low)
+    # check: 4 bits (the last bit is a mark only, with no trailing LOW).
+    # The first 3 bits are complete items (high+low).
     for shift in range(3, 0, -1):
         if (data.check >> shift) & 1:
             _add_item(BIT_ONE_HIGH_US, BIT_ONE_LOW_US)
         else:
             _add_item(BIT_ZERO_HIGH_US, BIT_ZERO_LOW_US)
-    # Dernier bit du check : mark uniquement (conforme au décodeur ESPHome)
+    # Last check bit: mark only, matching the ESPHome decoder.
     if data.check & 1:
         timings.append(BIT_ONE_HIGH_US)
     else:
@@ -126,22 +126,22 @@ def encode_dooya(data: DooyaData) -> list[int]:
 
 
 def decode_dooya(timings: list[int]) -> DooyaData | None:
-    """Décode une liste de timings OOK en données Dooya.
+    """Decode a list of OOK timings into Dooya fields.
 
-    Utilisé par le mode apprentissage pour extraire l'ID d'une télécommande.
+    Used by the learn mode to extract a remote's id.
 
     Args:
-        timings: liste de timings en µs alternant HIGH/LOW
+        timings: timings in µs alternating HIGH/LOW
 
     Returns:
-        DooyaData si la trame est valide, None sinon.
+        DooyaData when the frame is valid, None otherwise.
     """
-    TOLERANCE = 0.35  # 35% de tolérance sur les timings
+    TOLERANCE = 0.35  # 35% tolerance on every timing
 
     def _match(value: int, reference: int) -> bool:
         return abs(value - reference) <= reference * TOLERANCE
 
-    pos = [0]  # liste pour permettre la mutation depuis les closures
+    pos = [0]  # a list so the closures below can mutate the cursor
 
     def _read() -> int | None:
         if pos[0] >= len(timings):
@@ -193,11 +193,11 @@ def decode_dooya(timings: list[int]) -> DooyaData | None:
     if button_val is None:
         return None
 
-    # check (3 bits complets + 1 mark)
+    # check (3 complete bits + 1 mark)
     check_val = _read_bits(3)
     if check_val is None:
         return None
-    # Dernier bit : mark uniquement
+    # Last bit: mark only
     h = _read()
     if h is None:
         return None

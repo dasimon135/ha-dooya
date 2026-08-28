@@ -1,4 +1,4 @@
-"""Entité de base pour les volets Dooya RF."""
+"""Base entity for Dooya RF shutters."""
 
 from __future__ import annotations
 
@@ -29,12 +29,12 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class DooyaBaseEntity(Entity):
-    """Entité de base pour les volets Dooya.
+    """Base entity for Dooya shutters.
 
-    Stocke les paramètres appris/manuels d'un volet Dooya.
+    Holds the learned or manually entered settings of one Dooya shutter.
 
-    Les commandes sont envoyées par la plateforme cover via le service/action
-    ESPHome `transmit_dooya`.
+    Commands are sent by the cover platform through the ESPHome
+    `transmit_dooya` action.
 
     Availability mirrors the configured ESPHome gateway: when every entity of
     the gateway device is unavailable (node offline), Dooya entities become
@@ -45,7 +45,7 @@ class DooyaBaseEntity(Entity):
     _attr_should_poll = False
 
     def __init__(self, config_entry: DooyaConfigEntry) -> None:
-        """Initialiser l'entité Dooya."""
+        """Initialize the Dooya entity."""
         self._config_entry = config_entry
         self._attr_unique_id = config_entry.entry_id
 
@@ -79,12 +79,12 @@ class DooyaBaseEntity(Entity):
 
     @property
     def _esphome_device(self) -> str:
-        """Slug du device ESPHome configuré (les options priment sur data)."""
+        """Slug of the configured ESPHome device (options win over data)."""
         return entry_value(self._config_entry, CONF_ESPHOME_DEVICE, "")
 
     @property
     def available(self) -> bool:
-        """Refléter la disponibilité de la passerelle ESPHome."""
+        """Mirror the availability of the ESPHome gateway."""
         if not self._gateway_entity_ids:
             return True
         return any(
@@ -94,7 +94,7 @@ class DooyaBaseEntity(Entity):
         )
 
     async def async_added_to_hass(self) -> None:
-        """Suivre la disponibilité de la passerelle ESPHome."""
+        """Start tracking the availability of the ESPHome gateway."""
         await super().async_added_to_hass()
         try:
             self._gateway_entity_ids = self._resolve_gateway_entities()
@@ -117,7 +117,7 @@ class DooyaBaseEntity(Entity):
 
     @callback
     def _handle_gateway_state_change(self, _event) -> None:
-        """Répercuter un changement d'état de la passerelle sur l'entité.
+        """Reflect a gateway state change on this entity.
 
         `@callback` is load-bearing: without it Home Assistant treats this as a
         blocking job and runs it in an executor thread, and calling
@@ -149,10 +149,10 @@ class DooyaBaseEntity(Entity):
         return None
 
     def _resolve_gateway_entities(self) -> list[str]:
-        """Trouver les entités du device ESPHome configuré.
+        """Find the entities of the configured ESPHome device.
 
-        Si rien ne correspond, l'entité reste toujours disponible (aucune
-        régression).
+        When nothing matches, the entity stays permanently available: losing
+        availability tracking must never be a regression.
         """
         device = self._find_gateway_device()
         if device is None:

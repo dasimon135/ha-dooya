@@ -1,4 +1,4 @@
-"""Diagnostics pour l'intégration Dooya RF Covers."""
+"""Diagnostics for the Dooya RF Covers integration."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ TO_REDACT = {CONF_DOOYA_ID}
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: DooyaConfigEntry
 ) -> dict[str, Any]:
-    """Retourner les diagnostics d'une entrée de configuration."""
+    """Return diagnostics for a config entry."""
     cover = entry.runtime_data.cover
     cover_state: dict[str, Any] = {}
     if cover is not None:

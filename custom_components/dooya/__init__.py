@@ -1,4 +1,4 @@
-"""Intégration Dooya RF Covers pour Home Assistant."""
+"""Dooya RF Covers integration for Home Assistant."""
 
 from __future__ import annotations
 
@@ -75,7 +75,7 @@ async def _async_register_card(hass: HomeAssistant) -> None:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: DooyaConfigEntry) -> bool:
-    """Initialiser un config entry Dooya."""
+    """Set up a Dooya config entry."""
     entry.runtime_data = DooyaRuntimeData()
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     # Reload the entry when options change so the new ESPHome device,
@@ -85,12 +85,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: DooyaConfigEntry) -> boo
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: DooyaConfigEntry) -> None:
-    """Recharger l'entrée après un changement d'options."""
+    """Reload the entry after its options changed."""
     await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: DooyaConfigEntry) -> bool:
-    """Décharger un config entry Dooya."""
+    """Unload a Dooya config entry."""
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
         ir.async_delete_issue(hass, DOMAIN, gateway_issue_id(entry.entry_id))
