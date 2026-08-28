@@ -304,7 +304,7 @@ async def test_broadcast_channel_coexists_with_per_channel_entry(
     first = await _run_manual_flow(hass, "D1C917", 5, "Salon")
     assert first["type"] is FlowResultType.CREATE_ENTRY
 
-    broadcast = await _run_manual_flow(hass, "D1C917", 0, "Tous les volets")
+    broadcast = await _run_manual_flow(hass, "D1C917", 0, "All shutters")
     assert broadcast["type"] is FlowResultType.CREATE_ENTRY
 
 

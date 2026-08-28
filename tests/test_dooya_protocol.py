@@ -36,8 +36,8 @@ class TestEncodeDooya:
     def test_frame_length(self) -> None:
         """Expected length: 1 header + 24+8+4+4 bits = 41 items.
 
-        Chaque bit = 2 timings (high + low), sauf le dernier bit du check = 1 timing.
-        Total : 2 + (24+8+4)*2 + (3*2+1) = 2 + 72 + 7 = 81 timings.
+        Each bit is 2 timings (high + low), except the last check bit which is
+        a mark only: 2 + (24+8+4)*2 + (3*2+1) = 2 + 72 + 7 = 81 timings.
         """
         timings = encode_dooya(VOLET_SALON_GAUCHE)
         assert len(timings) == 81
