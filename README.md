@@ -19,7 +19,7 @@ Control Dooya RF433 motorized covers (blinds/shutters/rollers) from Home Assista
 - **Broadcast channel 0** — one entity that opens/closes every shutter paired with the remote in a single RF frame
 - **Gateway-linked availability** — entities become `unavailable` when the ESPHome node is offline
 - **Diagnostics download** for easier GitHub issues
-- **Bundled Lovelace card** (`custom:dooya-cover-card`) — animated shutter with position, presets and recalibration, normal & compact views, no HACS frontend install needed
+- **Bundled Lovelace card** (`custom:dooya-cover-card`) — animated shutter with position, presets and recalibration, in normal, compact and tile views, no HACS frontend install needed
 - **Automatic detection from the remote** — press UP on the physical remote to read the shutter ID automatically
 - **Manual entry** — enter the shutter ID directly if you already know it
 - **User-friendly setup flow** — choose between manual entry and automatic detection
@@ -68,7 +68,13 @@ Your ESPHome node must:
 - have **Allow service calls** enabled in the ESPHome integration options
 - optionally expose a `remote_receiver` with `dump: dooya` if you want automatic detection from the remote
 
-Example ESPHome pieces required for automatic detection and transmission:
+The complete, maintained node configuration is
+[`esphome/dooya-node.yaml`](esphome/dooya-node.yaml) — copy that file, change
+only its `substitutions` block, and you are done. It also documents the CC1101
+wiring and the antenna tip.
+
+The excerpt below shows just the two pieces this integration depends on, for
+readers fitting them into an existing node:
 
 ```yaml
 esphome:
@@ -100,7 +106,7 @@ api:
 
 cc1101:
   id: mycc1101
-  cs_pin: GPIO5
+  cs_pin: 5
   frequency: 433.92MHz
   output_power: 10
   modulation_type: ASK/OOK
@@ -110,7 +116,7 @@ cc1101:
 remote_transmitter:
   - id: rf_transmitter
     pin:
-      number: GPIO4
+      number: 4
     carrier_duty_percent: 100%
     non_blocking: false
     on_transmit:
@@ -121,8 +127,10 @@ remote_transmitter:
         - cc1101.begin_rx: mycc1101
 
 remote_receiver:
-  pin: GPIO16
-  dump: dooya
+  pin:
+    number: 16
+  dump:
+    - dooya
   on_dooya:
     then:
       - if:
@@ -150,7 +158,7 @@ remote_receiver:
                     return std::to_string(x.check);
           else:
             - logger.log:
-                format: "Trame Dooya reçue mais Home Assistant n'est pas connecté via l'API, événement non envoyé"
+                format: "Dooya frame received but Home Assistant is not connected through the API, event not sent"
                 level: WARN
 ```
 
@@ -201,13 +209,16 @@ Options:
 |--------|---------|-------------|
 | `entity` | — | Cover entity (required) |
 | `name` | entity name | Card title |
-| `view` | `normal` | `normal` (full animated window) or `compact` (one-line bar with up/stop/down) |
+| `view` | `normal` | `normal` (full animated window), `compact` (one-line bar with up/stop/down) or `tile` (icon + name + three buttons) |
+| `tile_tap` | popup | `tile` view only: what tapping the icon/name does — the default opens the full card in a popup, `more-info` opens the standard Home Assistant dialog |
 | `show_presets` | `true` | Show the preset position chips |
 | `show_calibration` | `true` | Show the recalibration shortcuts |
 
 The window scenery follows the sun (`sun.sun`): sunrise and sunset tints, bright day, and a starry night with the moon. 🌙
 
 The compact view fits dashboards with many shutters: a clickable position bar (left = closed, right = open), the up/stop/down buttons and the favorite button when one is configured. A star chip also appears in the normal view when a favorite position is set in the integration options.
+
+The tile view is smaller still — an icon, the name, the state and three buttons, aligned with Home Assistant's own tile cards. Tapping the icon or the name opens the full animated card in a popup, so a dense dashboard keeps the detailed view one tap away; set `tile_tap: more-info` if you would rather get the standard Home Assistant dialog.
 
 Labels follow the Home Assistant UI language (English / French).
 
@@ -264,6 +275,14 @@ Set a **favorite position** (for example 30 %) in the integration options. A *Fa
 Dooya multi-channel remotes have an "all" button that transmits on **channel 0**: every shutter paired with the remote executes the command from a single RF frame.
 
 You can create such an entity with manual entry by setting the channel to `0`. It exposes open/close/stop only (no position estimate, since each shutter moves independently), and is ideal for "close everything" automations — one RF frame instead of one per shutter.
+
+### Channel numbers above 16
+
+The channel is an 8-bit field, so **any value from 0 to 255 is accepted**. Common
+remotes stop at 16, but nothing in the protocol requires that, and real
+installations do use higher channels — the integration was capped at 16 until a
+user reported 19 shutters starting at channel 81 ([#18](https://github.com/dasimon135/ha-dooya/issues/18)).
+Automatic detection reads whatever the remote sends and was never affected.
 
 Broadcast frames are also understood the other way around: when the remote's "all" button is pressed (or the HA broadcast entity is used), the position estimate of every per-channel cover with the same remote id is updated accordingly.
 
