@@ -1,4 +1,4 @@
-"""Constantes pour l'intégration Dooya RF Covers."""
+"""Constants for the Dooya RF Covers integration."""
 
 from __future__ import annotations
 
@@ -46,16 +46,16 @@ def entry_value(entry: ConfigEntry, key: str, default: Any = None) -> Any:
 
 EVENT_DOOYA_RECEIVED: Final = "esphome.dooya_received"
 
-# Clés de configuration
-CONF_ESPHOME_DEVICE: Final = "esphome_device"  # Nom du device ESPHome (slug)
-CONF_DOOYA_ID: Final = "dooya_id"              # Identifiant 24 bits de la télécommande
-CONF_CHANNEL: Final = "channel"                # Canal du volet (8 bits)
-CONF_CHECK: Final = "check"                    # Code de contrôle (4 bits)
-CONF_COVER_NAME: Final = "cover_name"          # Nom du volet
-CONF_TRAVEL_TIME_UP: Final = "travel_time_up"  # Temps d'ouverture complet (s)
-CONF_TRAVEL_TIME_DOWN: Final = "travel_time_down"  # Temps de fermeture complet (s)
-CONF_REPEAT_COUNT: Final = "repeat_count"          # Nombre de répétitions de la trame RF (fiabilité)
-CONF_FAVORITE_POSITION: Final = "favorite_position"  # Position favorite (0-100, optionnelle)
+# Configuration keys
+CONF_ESPHOME_DEVICE: Final = "esphome_device"  # ESPHome device name (slug)
+CONF_DOOYA_ID: Final = "dooya_id"              # 24-bit remote identifier
+CONF_CHANNEL: Final = "channel"                # Shutter channel (8 bits)
+CONF_CHECK: Final = "check"                    # Check nibble (4 bits)
+CONF_COVER_NAME: Final = "cover_name"          # Shutter name
+CONF_TRAVEL_TIME_UP: Final = "travel_time_up"  # Full opening time (s)
+CONF_TRAVEL_TIME_DOWN: Final = "travel_time_down"  # Full closing time (s)
+CONF_REPEAT_COUNT: Final = "repeat_count"          # RF frame repetitions (reliability)
+CONF_FAVORITE_POSITION: Final = "favorite_position"  # Favorite position (0-100, optional)
 
 # Received frames matching one of our own transmissions (same button) less
 # than this many seconds old are echoes picked up by another node, not a
@@ -63,25 +63,24 @@ CONF_FAVORITE_POSITION: Final = "favorite_position"  # Position favorite (0-100,
 # transmit call plus event latency.
 ECHO_SUPPRESS_WINDOW_SEC: Final = 2.0
 
-# Calibration assistante : délai maximum entre le départ (UP/DOWN) et le
-# STOP de l'utilisateur avant abandon de la mesure.
+# Calibration assistant: longest gap allowed between the start (UP/DOWN) and
+# the user's STOP before the measurement is abandoned.
 CALIBRATION_TIMEOUT_SEC: Final = 240.0
 
-# Canal broadcast Dooya : les trames canal 0 sont exécutées par tous les
-# volets appairés à la même télécommande (bouton "tous" des télécommandes
-# multi-canaux).
+# Dooya broadcast channel: channel 0 frames are executed by every shutter
+# paired with the same remote (the "all" button on multi-channel remotes).
 BROADCAST_CHANNEL: Final = 0
 
-# Le canal occupe 8 bits dans la trame (voir dooya_protocol : header + id 24
-# bits + canal 8 bits + bouton 4 bits + check 4 bits). Les télécommandes
-# courantes s'arrêtent à 16, mais rien dans l'encodage ne l'impose : des
-# installations réelles utilisent des canaux bien au-delà (issue #18).
+# The channel occupies 8 bits of the frame (see dooya_protocol: header +
+# 24-bit id + 8-bit channel + 4-bit button + 4-bit check). Common remotes stop
+# at 16, but nothing in the encoding requires that: real installations use
+# channels well beyond it (issue #18).
 MAX_CHANNEL: Final = 255
 
-# Valeurs par défaut
+# Defaults
 DEFAULT_CHANNEL: Final = 1
 # No DEFAULT_CHECK_* here on purpose: the check nibble is derived from the
 # button at transmit time (dooya_protocol.check_for_button), never defaulted.
 DEFAULT_TRAVEL_TIME_UP: Final = 20.0
 DEFAULT_TRAVEL_TIME_DOWN: Final = 20.0
-DEFAULT_REPEAT_COUNT: Final = 1  # 1 = une seule émission (comportement par défaut)
+DEFAULT_REPEAT_COUNT: Final = 1  # 1 = a single transmission (default behaviour)

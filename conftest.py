@@ -1,8 +1,8 @@
-"""Configuration pytest — permet d'importer dooya_protocol directement sans HA."""
+"""Pytest configuration: import dooya_protocol directly, without Home Assistant."""
 
 import os
 import sys
 
-# Ajouter le dossier du composant directement dans le path
-# pour les tests unitaires qui n'ont pas besoin de HA
+# Put the component directory on the path so the unit tests that need no
+# Home Assistant at all can import its pure modules directly.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "custom_components", "dooya"))

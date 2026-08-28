@@ -1,4 +1,4 @@
-"""Config flow pour l'intégration Dooya RF Covers."""
+"""Config flow for the Dooya RF Covers integration."""
 
 from __future__ import annotations
 
@@ -75,30 +75,30 @@ def _list_transmit_devices(hass) -> list[str]:
 
 
 class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Config flow pour ajouter un volet Dooya."""
+    """Config flow adding one Dooya shutter."""
 
     VERSION = 1
 
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> DooyaOptionsFlow:
-        """Retourner le flow d'options pour une entrée existante."""
+        """Return the options flow for an existing entry."""
         return DooyaOptionsFlow(config_entry)
 
     def __init__(self) -> None:
-        """Initialiser le config flow."""
+        """Initialize the config flow."""
         self._learned_data: DooyaData | None = None
         self._esphome_device: str = ""
         self._learn_task: asyncio.Task[DooyaData | None] | None = None
 
     def _available_esphome_devices(self) -> list[str]:
-        """Lister les devices ESPHome exposant un service transmit_dooya."""
+        """List the ESPHome devices exposing a transmit_dooya service."""
         return _list_transmit_devices(self.hass)
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Étape 1 : entrer le nom du device ESPHome transmetteur."""
+        """Step 1: name the transmitting ESPHome device."""
         errors: dict[str, str] = {}
         available_devices = self._available_esphome_devices()
         default_device = available_devices[0] if len(available_devices) == 1 else ""
@@ -136,7 +136,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_method(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Étape 2 : choisir entre apprentissage automatique et saisie manuelle."""
+        """Step 2: choose between automatic learning and manual entry."""
         if user_input is not None:
             if user_input["method"] == "manual":
                 return await self.async_step_manual()
@@ -159,7 +159,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_learn(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Étape 3a : lancer immédiatement l'apprentissage automatique."""
+        """Step 3a: start listening for a remote straight away."""
         if self._learn_task is None:
             self._learn_task = self.hass.async_create_task(
                 self._async_wait_for_dooya_signal()
@@ -185,7 +185,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_learn_retry(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Proposer un nouvel essai ou une saisie manuelle après timeout."""
+        """Offer another attempt, or manual entry, after a learn timeout."""
         if user_input is not None:
             if user_input.get("skip"):
                 return await self.async_step_manual()
@@ -203,7 +203,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     async def _async_wait_for_dooya_signal(self) -> DooyaData | None:
-        """Écouter l'événement HA publié par ESPHome lors d'une réception Dooya."""
+        """Listen for the HA event ESPHome fires when it receives a Dooya frame."""
         result: DooyaData | None = None
         event_received = asyncio.Event()
 
@@ -242,7 +242,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Étape 3 : confirmer les données apprises et nommer le volet."""
+        """Step 3: confirm the learned fields and name the shutter."""
         assert self._learned_data is not None
 
         if user_input is not None:
@@ -433,16 +433,16 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class DooyaOptionsFlow(OptionsFlow):
-    """Options flow pour ajuster les temps de trajet d'un volet Dooya."""
+    """Options flow adjusting the travel times of a Dooya shutter."""
 
     def __init__(self, config_entry: ConfigEntry) -> None:
-        """Initialiser le flow d'options."""
+        """Initialize the options flow."""
         self._config_entry = config_entry
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Modifier les temps de trajet estimés."""
+        """Edit the estimated travel times."""
         entry = self._config_entry
         current_device = entry_value(entry, CONF_ESPHOME_DEVICE, "")
         current_up = entry_value(entry, CONF_TRAVEL_TIME_UP, DEFAULT_TRAVEL_TIME_UP)

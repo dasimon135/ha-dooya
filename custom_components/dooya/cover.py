@@ -1,4 +1,4 @@
-"""Plateforme cover pour les volets Dooya RF433."""
+"""Cover platform for Dooya RF433 shutters."""
 
 from __future__ import annotations
 
@@ -58,7 +58,7 @@ async def async_setup_entry(
     config_entry: DooyaConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Configurer les entités cover Dooya depuis un config entry."""
+    """Set up the Dooya cover entities from a config entry."""
     platform = entity_platform.async_get_current_platform()
     platform.async_register_entity_service("mark_open", {}, "async_mark_open")
     platform.async_register_entity_service("mark_closed", {}, "async_mark_closed")
@@ -75,13 +75,13 @@ async def async_setup_entry(
 
 
 class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
-    """Volet Dooya RF433 à position estimée par le temps."""
+    """Dooya RF433 shutter whose position is estimated from travel time."""
 
     _attr_device_class = CoverDeviceClass.SHUTTER
     _attr_assumed_state = True
 
     def __init__(self, config_entry: DooyaConfigEntry) -> None:
-        """Initialiser le volet Dooya."""
+        """Initialize the Dooya shutter."""
         super().__init__(config_entry)
         # The device already carries the cover name; None makes this the main
         # entity of the device so the friendly name is just the device name
@@ -132,7 +132,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     @property
     def is_closed(self) -> bool | None:
-        """Retourner l'état fermé estimé."""
+        """Return the estimated closed state."""
         if self._is_broadcast:
             return None
         self._refresh_position()
@@ -142,7 +142,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     @property
     def current_cover_position(self) -> int | None:
-        """Retourner la position estimée du volet."""
+        """Return the estimated position of the shutter."""
         if self._is_broadcast:
             return None
         self._refresh_position()
@@ -150,7 +150,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
-        """Exposer la confiance dans la position estimée."""
+        """Expose how much the estimated position can be trusted."""
         if self._is_broadcast:
             return None
         if self._moves_since_sync >= 10:
@@ -166,18 +166,18 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     @property
     def is_opening(self) -> bool:
-        """Indiquer si le volet est en cours d'ouverture."""
+        """Return whether the shutter is currently opening."""
         self._refresh_position()
         return self._movement_direction > 0
 
     @property
     def is_closing(self) -> bool:
-        """Indiquer si le volet est en cours de fermeture."""
+        """Return whether the shutter is currently closing."""
         self._refresh_position()
         return self._movement_direction < 0
 
     async def async_added_to_hass(self) -> None:
-        """Restaurer l'état précédent depuis le storage HA."""
+        """Restore the previous state from Home Assistant storage."""
         await super().async_added_to_hass()
         if (last_state := await self.async_get_last_state()) is not None:
             restored_position = last_state.attributes.get(ATTR_CURRENT_POSITION)
@@ -199,7 +199,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         self._config_entry.runtime_data.cover = self
 
     async def async_will_remove_from_hass(self) -> None:
-        """Nettoyer les callbacks lors de la suppression de l'entité."""
+        """Cancel the pending callbacks when the entity is removed."""
         self._cancel_motion_callbacks()
         self._cancel_calibration_timeout()
         if self._event_unsub is not None:
@@ -208,24 +208,24 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         self._config_entry.runtime_data.cover = None
 
     async def async_open_cover(self, **kwargs: Any) -> None:
-        """Ouvrir le volet (commande UP, button=1)."""
+        """Open the shutter (UP command, button=1)."""
         await self._async_transmit(BUTTON_UP)
         self._start_estimated_motion(direction=1, target_position=100)
 
     async def async_close_cover(self, **kwargs: Any) -> None:
-        """Fermer le volet (commande DOWN, button=3)."""
+        """Close the shutter (DOWN command, button=3)."""
         await self._async_transmit(BUTTON_DOWN)
         self._start_estimated_motion(direction=-1, target_position=0)
 
     async def async_stop_cover(self, **kwargs: Any) -> None:
-        """Stopper le volet (commande STOP, button=5)."""
+        """Stop the shutter (STOP command, button=5)."""
         self._refresh_position()
         await self._async_transmit(BUTTON_STOP)
         self._finish_calibration()
         self._stop_estimated_motion()
 
     async def async_set_cover_position(self, **kwargs: Any) -> None:
-        """Déplacer le volet vers une position cible estimée."""
+        """Move the shutter towards an estimated target position."""
         if self._is_broadcast:
             _LOGGER.warning(
                 "%s: set_position is not supported on the broadcast channel",
@@ -252,17 +252,17 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     @callback
     def async_mark_open(self) -> None:
-        """Recaler manuellement le volet à 100%."""
+        """Manually resync the shutter to 100%."""
         self._finalize_position(100)
 
     @callback
     def async_mark_closed(self) -> None:
-        """Recaler manuellement le volet à 0%."""
+        """Manually resync the shutter to 0%."""
         self._finalize_position(0)
 
     @callback
     def async_set_known_position(self, position: int) -> None:
-        """Forcer manuellement une position connue sans envoyer de trame RF."""
+        """Force a known position manually, transmitting no RF frame."""
         self._finalize_position(clamp_position(position))
         # The user just told us where the shutter really is.
         self._moves_since_sync = 0
@@ -271,12 +271,12 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     # ---- calibration assistant ------------------------------------------
 
     async def async_start_calibration(self, direction: int) -> None:
-        """Mesurer un temps de trajet complet.
+        """Measure one full travel time.
 
-        Depuis la butée opposée, envoie UP/DOWN et chronomètre jusqu'au
-        prochain STOP (bouton HA, service ou télécommande physique). Le
-        temps mesuré est enregistré dans les options de l'entrée, qui se
-        recharge automatiquement.
+        Starting from the opposite end stop, sends UP/DOWN and times the run
+        until the next STOP — from a Home Assistant button, a service call or
+        the physical remote. The measured time is written to the entry
+        options, which reloads the entry automatically.
         """
         if self._is_broadcast:
             _LOGGER.warning(
@@ -322,7 +322,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     @callback
     def _finish_calibration(self) -> None:
-        """Clore une mesure de calibration sur réception d'un STOP."""
+        """Close a calibration measurement when a STOP arrives."""
         if self._calibrating == 0 or self._calibration_start is None:
             return
 
@@ -364,7 +364,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     @callback
     def _handle_calibration_timeout(self, _now: Any) -> None:
-        """Abandonner une calibration restée sans STOP."""
+        """Abandon a calibration that never received its STOP."""
         self._calibration_unsub = None
         if self._calibrating == 0:
             return
@@ -377,13 +377,13 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     @callback
     def _cancel_calibration_timeout(self) -> None:
-        """Annuler le timer de timeout de calibration."""
+        """Cancel the calibration timeout timer."""
         if self._calibration_unsub is not None:
             self._calibration_unsub()
             self._calibration_unsub = None
 
     def _notify(self, message: str) -> None:
-        """Publier une notification persistante liée à la calibration."""
+        """Raise a persistent notification about the calibration."""
         persistent_notification.async_create(
             self.hass, message, title="Dooya calibration"
         )
@@ -508,7 +508,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     @callback
     def _handle_dooya_event(self, event: Any) -> None:
-        """Synchroniser la position estimée quand la télécommande physique est utilisée."""
+        """Resync the estimate when the physical remote is used."""
         data = event.data
         try:
             event_id = int(data["id"], 16) if isinstance(data["id"], str) else int(data["id"])
@@ -543,7 +543,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     @callback
     def _start_estimated_motion(self, direction: int, target_position: int) -> None:
-        """Démarrer ou redémarrer un mouvement estimé."""
+        """Start, or restart, an estimated movement."""
         if self._is_broadcast:
             self.async_write_ha_state()
             return
@@ -616,7 +616,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     @callback
     def _stop_estimated_motion(self) -> None:
-        """Arrêter le mouvement estimé à la position courante."""
+        """Stop the estimated movement at the current position."""
         self._cancel_motion_callbacks()
         if self._movement_direction != 0 and self._current_position not in (0, 100):
             # Move ended between the end stops: the estimate drifts a little
@@ -630,7 +630,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     @callback
     def _finalize_position(self, position: int) -> None:
-        """Clore un mouvement estimé sur une position cible."""
+        """End an estimated movement on a target position."""
         self._current_position = clamp_position(position)
         if self._current_position in (0, 100):
             # End stop reached: the estimate is resynchronized.
@@ -639,7 +639,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     @callback
     def _schedule_target_reached(self) -> None:
-        """Programmer la fin logique du mouvement et un STOP si besoin."""
+        """Schedule the logical end of the movement, and a STOP if needed."""
         assert self._current_position is not None
         assert self._target_position is not None
 
@@ -662,14 +662,14 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     @callback
     def _schedule_progress_tick(self) -> None:
-        """Programmer une mise à jour visuelle périodique de la position."""
+        """Schedule a periodic visual refresh of the position."""
         if self._movement_direction == 0:
             return
         self._progress_unsub = async_call_later(self.hass, 1, self._handle_progress_tick)
 
     @callback
     def _handle_progress_tick(self, _now: Any) -> None:
-        """Rafraîchir l'état pendant le mouvement."""
+        """Refresh the state while the shutter is moving."""
         self._progress_unsub = None
         self._refresh_position()
         self.async_write_ha_state()
@@ -678,7 +678,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     @callback
     def _handle_target_reached(self, _now: Any) -> None:
-        """Clore un mouvement jusqu'en butée sans envoyer STOP."""
+        """End a movement that ran to its end stop, sending no STOP."""
         self._target_reached_unsub = None
         if self._target_position is not None:
             self._finalize_position(self._target_position)
@@ -696,7 +696,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         )
 
     async def _async_complete_partial_move(self) -> None:
-        """Terminer un déplacement partiel avec une commande STOP."""
+        """Finish a partial move with a STOP command."""
         target_position = self._target_position
         try:
             await self._async_transmit(BUTTON_STOP)
@@ -721,7 +721,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     @callback
     def _cancel_motion_callbacks(self) -> None:
-        """Annuler les timers actifs liés au mouvement estimé."""
+        """Cancel the timers currently driving the estimated movement."""
         if self._target_reached_unsub is not None:
             self._target_reached_unsub()
             self._target_reached_unsub = None
