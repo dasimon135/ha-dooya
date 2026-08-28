@@ -34,6 +34,7 @@ const STRINGS = {
     markClosed: "Set as closed",
     favorite: "Favorite",
     notFound: (e) => `Entity ${e} not found`,
+    closeDialog: "Close",
   },
   fr: {
     open: "Ouvert",
@@ -51,6 +52,7 @@ const STRINGS = {
     markClosed: "Marquer fermé",
     favorite: "Favori",
     notFound: (e) => `Entité ${e} introuvable`,
+    closeDialog: "Fermer",
   },
 };
 
@@ -367,7 +369,7 @@ class DooyaCoverCard extends HTMLElement {
       .x:focus-visible { outline:2px solid var(--primary-color,#03a9f4); outline-offset:2px; }
       @media (prefers-reduced-motion: reduce) { .scrim { animation:none } }
     </style>
-    <div class="scrim"><div class="wrap"><button class="x" aria-label="Close">✕</button></div></div>`;
+    <div class="scrim"><div class="wrap"><button class="x" aria-label="${this._t().closeDialog}">✕</button></div></div>`;
     const card = document.createElement("dooya-cover-card");
     card.setConfig({ ...this._config, view: "normal" });
     card.hass = this._hass;
@@ -600,7 +602,7 @@ class DooyaCoverCardEditor extends HTMLElement {
             options: [
               { value: "normal", label: fr ? "Normale" : "Normal" },
               { value: "compact", label: fr ? "Réduite" : "Compact" },
-              { value: "tile", label: "Tile" },
+              { value: "tile", label: fr ? "Tuile" : "Tile" },
             ],
           },
         },

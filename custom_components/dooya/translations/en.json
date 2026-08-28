@@ -2,8 +2,8 @@
   "config": {
     "step": {
       "user": {
-        "title": "Dooya RF Cover — Transmitter",
-        "description": "Enter the name of the ESPHome device that will send commands to the shutter. Compatible device(s) found: {detected}.",
+        "title": "Dooya RF Cover — ESPHome Device",
+        "description": "Enter the name of the ESPHome device that will send commands to the shutter (for example: `volets-dooya-rf433`). Compatible device(s) found: {detected}.",
         "data": {
           "esphome_device": "ESPHome device name"
         }
@@ -33,7 +33,7 @@
         "title": "Confirm Learned Data",
         "description": "Signal received.\n- Identifier: **{dooya_id}**\n- Channel: **{channel}**\n\nChoose a name for this shutter.",
         "data": {
-          "cover_name": "Cover name",
+          "cover_name": "Shutter name",
           "travel_time_up": "Full opening time (seconds)",
           "travel_time_down": "Full closing time (seconds)"
         }
