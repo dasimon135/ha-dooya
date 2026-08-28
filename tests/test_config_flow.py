@@ -103,6 +103,38 @@ async def test_user_flow_manual_happy_path(
     }
 
 
+async def test_user_step_lists_the_detected_devices(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """The first step names the nodes it found, so the user can copy one."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+
+    assert result["description_placeholders"]["detected"] == GATEWAY_SLUG
+
+
+async def test_user_step_placeholder_stays_locale_neutral(
+    hass: HomeAssistant,
+) -> None:
+    """With no node found, the placeholder must not carry a word.
+
+    It is interpolated into a sentence Home Assistant has already translated,
+    so any word here is wrong in every language but its own — a hardcoded
+    French "aucun" used to be shown to English users. Asserting that the value
+    contains no letters is what actually pins the invariant: a future
+    translated word cannot slip back in unnoticed.
+    """
+    # No `gateway_service` fixture: nothing exposes a transmit_dooya action.
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+
+    detected = result["description_placeholders"]["detected"]
+    assert detected == "0"
+    assert not any(char.isalpha() for char in detected)
+
+
 async def test_user_step_rejects_unknown_device(
     hass: HomeAssistant, gateway_service: list[dict]
 ) -> None:

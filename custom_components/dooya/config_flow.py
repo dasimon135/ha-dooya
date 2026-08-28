@@ -127,8 +127,13 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                 }
             ),
             description_placeholders={
-                "example": "volets-dooya-rf433",
-                "detected": ", ".join(available_devices) if available_devices else "aucun",
+                # Locale-neutral on purpose. This value is interpolated into a
+                # sentence Home Assistant has already translated, so any word
+                # put here is wrong in every language but the one it is written
+                # in — which is how a hardcoded French "aucun" ended up being
+                # shown to English users. "0" reads correctly after both
+                # "found:" and "détecté(s) :".
+                "detected": ", ".join(available_devices) if available_devices else "0",
             },
             errors=errors,
         )
