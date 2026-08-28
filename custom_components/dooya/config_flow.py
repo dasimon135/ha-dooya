@@ -31,6 +31,8 @@ from .const import (
     DOMAIN,
     EVENT_DOOYA_RECEIVED,
     MAX_CHANNEL,
+    TRANSMIT_SERVICE_SUFFIX,
+    entry_value,
 )
 from .dooya_protocol import BUTTON_UP, MAX_DOOYA_ID, DooyaData, check_for_button
 
@@ -64,10 +66,11 @@ def _list_transmit_devices(hass) -> list[str]:
     """List ESPHome devices exposing a transmit_dooya service."""
     esphome_services = hass.services.async_services().get("esphome", {})
     devices = []
-    suffix = "_transmit_dooya"
     for service_name in esphome_services:
-        if service_name.endswith(suffix):
-            devices.append(service_name[: -len(suffix)].replace("_", "-"))
+        if service_name.endswith(TRANSMIT_SERVICE_SUFFIX):
+            devices.append(
+                service_name[: -len(TRANSMIT_SERVICE_SUFFIX)].replace("_", "-")
+            )
     return sorted(devices)
 
 
@@ -440,25 +443,14 @@ class DooyaOptionsFlow(OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Modifier les temps de trajet estimés."""
-        current_device = self._config_entry.options.get(
-            CONF_ESPHOME_DEVICE,
-            self._config_entry.data.get(CONF_ESPHOME_DEVICE, ""),
-        )
-        current_up = self._config_entry.options.get(
-            CONF_TRAVEL_TIME_UP,
-            self._config_entry.data.get(CONF_TRAVEL_TIME_UP, DEFAULT_TRAVEL_TIME_UP),
-        )
-        current_down = self._config_entry.options.get(
-            CONF_TRAVEL_TIME_DOWN,
-            self._config_entry.data.get(
-                CONF_TRAVEL_TIME_DOWN, DEFAULT_TRAVEL_TIME_DOWN
-            ),
+        entry = self._config_entry
+        current_device = entry_value(entry, CONF_ESPHOME_DEVICE, "")
+        current_up = entry_value(entry, CONF_TRAVEL_TIME_UP, DEFAULT_TRAVEL_TIME_UP)
+        current_down = entry_value(
+            entry, CONF_TRAVEL_TIME_DOWN, DEFAULT_TRAVEL_TIME_DOWN
         )
         current_repeat = int(
-            self._config_entry.options.get(
-                CONF_REPEAT_COUNT,
-                self._config_entry.data.get(CONF_REPEAT_COUNT, DEFAULT_REPEAT_COUNT),
-            )
+            entry_value(entry, CONF_REPEAT_COUNT, DEFAULT_REPEAT_COUNT)
         )
 
         if user_input is not None:

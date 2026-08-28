@@ -25,7 +25,6 @@ import voluptuous as vol
 from .const import (
     BROADCAST_CHANNEL,
     CALIBRATION_TIMEOUT_SEC,
-    CONF_ESPHOME_DEVICE,
     CONF_REPEAT_COUNT,
     CONF_TRAVEL_TIME_DOWN,
     CONF_TRAVEL_TIME_UP,
@@ -36,7 +35,10 @@ from .const import (
     ECHO_SUPPRESS_WINDOW_SEC,
     EVENT_DOOYA_RECEIVED,
     ISSUE_GATEWAY_SERVICE_MISSING,
+    TRANSMIT_SERVICE_SUFFIX,
+    entry_value,
     gateway_issue_id,
+    transmit_service_name,
 )
 from .dooya_protocol import BUTTON_DOWN, BUTTON_STOP, BUTTON_UP, check_for_button
 from .echo_filter import TxEchoFilter
@@ -98,26 +100,14 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         if not self._is_broadcast:
             self._attr_supported_features |= CoverEntityFeature.SET_POSITION
 
-        options = config_entry.options
         self._travel_time_up = float(
-            options.get(
-                CONF_TRAVEL_TIME_UP,
-                config_entry.data.get(CONF_TRAVEL_TIME_UP, DEFAULT_TRAVEL_TIME_UP),
-            )
+            entry_value(config_entry, CONF_TRAVEL_TIME_UP, DEFAULT_TRAVEL_TIME_UP)
         )
         self._travel_time_down = float(
-            options.get(
-                CONF_TRAVEL_TIME_DOWN,
-                config_entry.data.get(
-                    CONF_TRAVEL_TIME_DOWN, DEFAULT_TRAVEL_TIME_DOWN
-                ),
-            )
+            entry_value(config_entry, CONF_TRAVEL_TIME_DOWN, DEFAULT_TRAVEL_TIME_DOWN)
         )
         self._repeat_count: int = int(
-            options.get(
-                CONF_REPEAT_COUNT,
-                config_entry.data.get(CONF_REPEAT_COUNT, DEFAULT_REPEAT_COUNT),
-            )
+            entry_value(config_entry, CONF_REPEAT_COUNT, DEFAULT_REPEAT_COUNT)
         )
         self._current_position: int | None = None
         self._movement_direction = 0
@@ -445,10 +435,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     def _resolve_service_name(self) -> str:
         """Return the ESPHome service name to call, raising on hard failure."""
-        device = self._config_entry.options.get(
-            CONF_ESPHOME_DEVICE,
-            self._config_entry.data.get(CONF_ESPHOME_DEVICE, ""),
-        )
+        device = self._esphome_device
         if not device:
             _LOGGER.error(
                 "No ESPHome gateway configured for %s; reconfigure the Dooya "
@@ -461,7 +448,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
                 translation_placeholders={"name": self._cover_name},
             )
 
-        service_name = f"{device.replace('-', '_')}_transmit_dooya"
+        service_name = transmit_service_name(device)
         if self.hass.services.has_service("esphome", service_name):
             return service_name
 
@@ -484,9 +471,9 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         """Create an actionable repair issue for a missing gateway service."""
         device = self._esphome_device
         service = (
-            f"esphome.{device.replace('-', '_')}_transmit_dooya"
+            f"esphome.{transmit_service_name(device)}"
             if device
-            else "esphome.<node>_transmit_dooya"
+            else f"esphome.<node>{TRANSMIT_SERVICE_SUFFIX}"
         )
         ir.async_create_issue(
             self.hass,
@@ -514,7 +501,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         """Clear the repair issue as soon as the gateway service is back."""
         device = self._esphome_device
         if device and self.hass.services.has_service(
-            "esphome", f"{device.replace('-', '_')}_transmit_dooya"
+            "esphome", transmit_service_name(device)
         ):
             self._async_clear_gateway_issue()
         super()._handle_gateway_state_change(_event)
@@ -580,6 +567,20 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         self._schedule_progress_tick()
         self.async_write_ha_state()
 
+    @property
+    def _current_travel_time(self) -> float:
+        """Full-travel time for the direction currently being estimated.
+
+        Up and down are measured separately (a shutter falls faster than it
+        rises), so every duration computed while moving has to pick the one
+        matching `_movement_direction`.
+        """
+        return (
+            self._travel_time_up
+            if self._movement_direction > 0
+            else self._travel_time_down
+        )
+
     @callback
     def _refresh_position(self) -> None:
         """Update the estimated position from the elapsed travel time.
@@ -605,14 +606,11 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             return
 
         elapsed = monotonic() - self._movement_start_time
-        travel_time = (
-            self._travel_time_up if self._movement_direction > 0 else self._travel_time_down
-        )
         self._current_position = position_after(
             self._movement_start_position,
             self._movement_direction,
             elapsed,
-            travel_time,
+            self._current_travel_time,
             self._target_position,
         )
 
@@ -646,10 +644,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         assert self._target_position is not None
 
         distance = abs(self._target_position - self._current_position)
-        travel_time = (
-            self._travel_time_up if self._movement_direction > 0 else self._travel_time_down
-        )
-        duration = travel_duration(distance, travel_time)
+        duration = travel_duration(distance, self._current_travel_time)
 
         if duration <= 0:
             self._finalize_position(self._target_position)

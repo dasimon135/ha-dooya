@@ -17,6 +17,7 @@ from .const import (
     CONF_DOOYA_ID,
     CONF_ESPHOME_DEVICE,
     DOMAIN,
+    entry_value,
 )
 from .device_match import is_esphome_device
 
@@ -78,10 +79,7 @@ class DooyaBaseEntity(Entity):
     @property
     def _esphome_device(self) -> str:
         """Slug du device ESPHome configuré (les options priment sur data)."""
-        return self._config_entry.options.get(
-            CONF_ESPHOME_DEVICE,
-            self._config_entry.data.get(CONF_ESPHOME_DEVICE, ""),
-        )
+        return entry_value(self._config_entry, CONF_ESPHOME_DEVICE, "")
 
     @property
     def available(self) -> bool:
