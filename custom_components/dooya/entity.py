@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from homeassistant.core import callback
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
@@ -114,8 +115,16 @@ class DooyaBaseEntity(Entity):
                 )
             )
 
+    @callback
     def _handle_gateway_state_change(self, _event) -> None:
-        """Répercuter un changement d'état de la passerelle sur l'entité."""
+        """Répercuter un changement d'état de la passerelle sur l'entité.
+
+        `@callback` is load-bearing: without it Home Assistant treats this as a
+        blocking job and runs it in an executor thread, and calling
+        `async_write_ha_state` off the event loop is a thread-safety violation
+        recent versions report as an error. The cover overrides this method
+        with the decorator; the button entities use it as it stands.
+        """
         self.async_write_ha_state()
 
     def _find_gateway_device(self) -> dr.DeviceEntry | None:
