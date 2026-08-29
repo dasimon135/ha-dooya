@@ -114,9 +114,7 @@ async def test_favorite_button_appears_after_options_change(
     await _setup_entry(hass, entry)
     assert _button_id(hass, entry, "favorite") is None
 
-    hass.config_entries.async_update_entry(
-        entry, options={CONF_FAVORITE_POSITION: 40}
-    )
+    hass.config_entries.async_update_entry(entry, options={CONF_FAVORITE_POSITION: 40})
     await hass.async_block_till_done()
 
     assert _button_id(hass, entry, "favorite") is not None

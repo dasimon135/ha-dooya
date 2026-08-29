@@ -124,9 +124,7 @@ async def test_reload_applies_new_travel_times(hass: HomeAssistant) -> None:
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    hass.config_entries.async_update_entry(
-        entry, options={CONF_TRAVEL_TIME_UP: 33.0}
-    )
+    hass.config_entries.async_update_entry(entry, options={CONF_TRAVEL_TIME_UP: 33.0})
     await hass.async_block_till_done()
 
     assert entry.state is ConfigEntryState.LOADED

@@ -48,14 +48,16 @@ EVENT_DOOYA_RECEIVED: Final = "esphome.dooya_received"
 
 # Configuration keys
 CONF_ESPHOME_DEVICE: Final = "esphome_device"  # ESPHome device name (slug)
-CONF_DOOYA_ID: Final = "dooya_id"              # 24-bit remote identifier
-CONF_CHANNEL: Final = "channel"                # Shutter channel (8 bits)
-CONF_CHECK: Final = "check"                    # Check nibble (4 bits)
-CONF_COVER_NAME: Final = "cover_name"          # Shutter name
+CONF_DOOYA_ID: Final = "dooya_id"  # 24-bit remote identifier
+CONF_CHANNEL: Final = "channel"  # Shutter channel (8 bits)
+CONF_CHECK: Final = "check"  # Check nibble (4 bits)
+CONF_COVER_NAME: Final = "cover_name"  # Shutter name
 CONF_TRAVEL_TIME_UP: Final = "travel_time_up"  # Full opening time (s)
 CONF_TRAVEL_TIME_DOWN: Final = "travel_time_down"  # Full closing time (s)
-CONF_REPEAT_COUNT: Final = "repeat_count"          # RF frame repetitions (reliability)
-CONF_FAVORITE_POSITION: Final = "favorite_position"  # Favorite position (0-100, optional)
+CONF_REPEAT_COUNT: Final = "repeat_count"  # RF frame repetitions (reliability)
+CONF_FAVORITE_POSITION: Final = (
+    "favorite_position"  # Favorite position (0-100, optional)
+)
 
 # Received frames matching one of our own transmissions (same button) less
 # than this many seconds old are echoes picked up by another node, not a
