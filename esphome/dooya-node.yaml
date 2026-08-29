@@ -22,6 +22,20 @@
 # After adopting the node in Home Assistant, enable "Allow the device to
 # perform Home Assistant actions" in the ESPHome integration options,
 # otherwise the received events are silently dropped.
+#
+# Entries this file expects in your ESPHome `secrets.yaml`:
+#   wifi_ssid, wifi_password
+#   dooya_ap_password      fallback hotspot
+#   dooya_ota_password     over-the-air updates
+#   dooya_api_key          API encryption, 32 random bytes base64-encoded;
+#                          the ESPHome dashboard generates one for you, or
+#                          `openssl rand -base64 32`
+#   dooya_web_user, dooya_web_password   web server login
+#
+# Note on the API key: encrypting the API protects the link between Home
+# Assistant and this node, not the shutters. Dooya RF433 is one-way and
+# unauthenticated, so anyone with an SDR can transmit frames regardless. This
+# is consistency with the OTA and AP passwords above, not a security boundary.
 
 substitutions:
   device_name: dooya-node-1        # UNIQUE per node (e.g. dooya-node-etage)
@@ -60,6 +74,8 @@ logger:
     esp-idf: WARN
 
 api:
+  encryption:
+    key: !secret dooya_api_key
   # Service called by ha-dooya (cover.py) to transmit an RF frame.
   # HA calls esphome.<device_name>_transmit_dooya with {dooya_id, channel, btn, check}.
   services:
@@ -93,6 +109,9 @@ ota:
 
 web_server:
   port: 80
+  auth:
+    username: !secret dooya_web_user
+    password: !secret dooya_web_password
 
 # SPI bus for the CC1101
 spi:
