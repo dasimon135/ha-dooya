@@ -20,8 +20,8 @@ OUT_DIR = Path(__file__).resolve().parents[1] / "custom_components" / "dooya" / 
 
 # Sunset/terracotta gradient — evokes shutters + warmth, distinct from
 # the blue used by ha-rf-fan.
-LIGHT_GRADIENT = ((242, 165, 65), (217, 91, 67))    # amber -> coral
-DARK_GRADIENT = ((196, 120, 38), (150, 55, 38))     # deeper variant for dark theme
+LIGHT_GRADIENT = ((242, 165, 65), (217, 91, 67))  # amber -> coral
+DARK_GRADIENT = ((196, 120, 38), (150, 55, 38))  # deeper variant for dark theme
 
 SS = 4  # supersampling factor for antialiasing
 
@@ -82,7 +82,9 @@ def make_icon(size: int, gradient: tuple) -> Image.Image:
 
     # Rounded-square mask
     mask = Image.new("L", (big, big), 0)
-    ImageDraw.Draw(mask).rounded_rectangle((0, 0, big - 1, big - 1), radius=56 * s, fill=255)
+    ImageDraw.Draw(mask).rounded_rectangle(
+        (0, 0, big - 1, big - 1), radius=56 * s, fill=255
+    )
 
     icon = Image.new("RGBA", (big, big), (0, 0, 0, 0))
     icon.paste(grad, (0, 0), mask)

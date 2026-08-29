@@ -99,9 +99,7 @@ async def test_open_with_gateway_transmits_and_moves(hass: HomeAssistant) -> Non
     )
     await hass.async_block_till_done()
 
-    assert calls == [
-        {"dooya_id": 0x00D1C917, "channel": 5, "btn": 1, "check": 1}
-    ]
+    assert calls == [{"dooya_id": 0x00D1C917, "channel": 5, "btn": 1, "check": 1}]
     state = hass.states.get(ENTITY_ID)
     assert state.state == "opening"
 
@@ -139,8 +137,7 @@ async def test_open_without_gateway_raises_and_creates_issue(
     )
     await hass.async_block_till_done()
     assert (
-        issue_registry.async_get_issue(DOMAIN, gateway_issue_id(entry.entry_id))
-        is None
+        issue_registry.async_get_issue(DOMAIN, gateway_issue_id(entry.entry_id)) is None
     )
 
     assert await hass.config_entries.async_unload(entry.entry_id)
@@ -160,8 +157,7 @@ async def test_unload_clears_repair_issue(hass: HomeAssistant) -> None:
     assert await hass.config_entries.async_unload(entry.entry_id)
     issue_registry = ir.async_get(hass)
     assert (
-        issue_registry.async_get_issue(DOMAIN, gateway_issue_id(entry.entry_id))
-        is None
+        issue_registry.async_get_issue(DOMAIN, gateway_issue_id(entry.entry_id)) is None
     )
 
 

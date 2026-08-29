@@ -93,9 +93,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         # meaningless — expose plain open/close/stop only.
         self._is_broadcast = self._channel == BROADCAST_CHANNEL
         self._attr_supported_features = (
-            CoverEntityFeature.OPEN
-            | CoverEntityFeature.CLOSE
-            | CoverEntityFeature.STOP
+            CoverEntityFeature.OPEN | CoverEntityFeature.CLOSE | CoverEntityFeature.STOP
         )
         if not self._is_broadcast:
             self._attr_supported_features |= CoverEntityFeature.SET_POSITION
@@ -287,7 +285,10 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
         self._refresh_position()
         expected_start = 0 if direction > 0 else 100
-        if self._current_position is not None and self._current_position != expected_start:
+        if (
+            self._current_position is not None
+            and self._current_position != expected_start
+        ):
             self._notify(
                 f"Calibration not started for '{self._cover_name}': the shutter "
                 f"must be fully {'closed' if direction > 0 else 'open'} first "
@@ -347,9 +348,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         options = dict(self._config_entry.options)
         options[key] = measured
         # Triggers the entry update listener, which reloads with the new time.
-        self.hass.config_entries.async_update_entry(
-            self._config_entry, options=options
-        )
+        self.hass.config_entries.async_update_entry(self._config_entry, options=options)
         self._notify(
             f"Calibration done for '{self._cover_name}': full "
             f"{'opening' if direction > 0 else 'closing'} time measured at "
@@ -511,7 +510,9 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         """Resync the estimate when the physical remote is used."""
         data = event.data
         try:
-            event_id = int(data["id"], 16) if isinstance(data["id"], str) else int(data["id"])
+            event_id = (
+                int(data["id"], 16) if isinstance(data["id"], str) else int(data["id"])
+            )
             event_channel = int(data["channel"])
             button = int(data["button"])
         except (KeyError, TypeError, ValueError):
@@ -665,7 +666,9 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         """Schedule a periodic visual refresh of the position."""
         if self._movement_direction == 0:
             return
-        self._progress_unsub = async_call_later(self.hass, 1, self._handle_progress_tick)
+        self._progress_unsub = async_call_later(
+            self.hass, 1, self._handle_progress_tick
+        )
 
     @callback
     def _handle_progress_tick(self, _now: Any) -> None:

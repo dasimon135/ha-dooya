@@ -470,9 +470,9 @@ class DooyaOptionsFlow(OptionsFlow):
 
         schema: dict[Any, Any] = {}
         if devices:
-            schema[
-                vol.Required(CONF_ESPHOME_DEVICE, default=current_device)
-            ] = vol.In(devices)
+            schema[vol.Required(CONF_ESPHOME_DEVICE, default=current_device)] = vol.In(
+                devices
+            )
 
         favorite_field = (
             vol.Optional(
