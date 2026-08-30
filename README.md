@@ -319,6 +319,81 @@ The **RF transmission repeat count** option (accessible via **Settings → Integ
 
 > ⚠️ Do not exceed 3 repetitions. Some Dooya motors may interpret repeated signals as a pairing or limit-setting command.
 
+## Known limitations
+
+- **This integration does not talk to the motors.** It asks an ESPHome node with
+  a **433.92 MHz OOK** radio (typically an ESP32 + CC1101) to transmit for it, and
+  listens to what that node reports back. No such node, no integration — and no
+  other radio will do. A Zigbee coordinator, a Z-Wave stick or a Bluetooth dongle
+  cannot transmit on 433 MHz at all; this is a matter of physics, not
+  configuration. See [ESPHome Prerequisite (CC1101)](#esphome-prerequisite-cc1101).
+- **It speaks Dooya's OOK frame, not "433 MHz" in general.** The timings in
+  [Protocol](#protocol) are Dooya's. Other manufacturers' tubular motors — A-OK,
+  Somfy, Nice and the rest — use their own frames, and none of them has been
+  verified against this integration. A motor being 433 MHz is not evidence that it
+  will work here.
+- **No acknowledgement. Every position is dead reckoning.** RF433 OOK is one-way:
+  a command is transmitted and nothing comes back. The integration never learns
+  what the motor actually did, only what it was told to do.
+- **Position is an estimate, not a measurement.** It is computed from the
+  configured travel times, so it drifts — that is expected behaviour, not a bug.
+  `position_confidence` reports how far it may have drifted, and one full travel to
+  an end stop resets it. See
+  [Estimated Position And Calibration](#estimated-position-and-calibration).
+- **The broadcast channel has no position estimate.** Channel 0 moves every paired
+  shutter from one frame, and they do not travel in lockstep, so open/close/stop is
+  all it exposes.
+- **Never set the repeat count above 3.** Some Dooya motors read a long burst of
+  repeats as a pairing or limit-setting sequence. See
+  [RF Reliability (Repeat Count)](#rf-reliability-repeat-count).
+
+## Troubleshooting
+
+Almost every report is about the boundary between the two halves — Home Assistant
+and the ESPHome node — so establish which half is broken before anything else.
+
+### Nothing happens at all
+
+Work down this list in order; the first three account for most reports.
+
+1. **Is there a 433.92 MHz transmitter?** Not a Zigbee, Thread, Z-Wave or
+   Bluetooth adapter — those cannot reach the band. See
+   [Known limitations](#known-limitations).
+2. **Is the ESPHome node adopted in Home Assistant** through the ESPHome
+   integration, and online?
+3. **Does it expose `transmit_dooya`?** Developer Tools → Actions, search
+   `esphome`. A node that does not expose the action, or exposes it under another
+   name, is the single most common cause of silence.
+4. **Is the motor actually a Dooya?** A 433 MHz motor from another manufacturer
+   will not respond to these frames.
+
+### The physical remote does not update anything
+
+Home Assistant follows the remote through the `esphome.dooya_received` event.
+
+- Confirm the event fires at all: Developer Tools → **Events**, listen to
+  `esphome.dooya_received`, then press the remote.
+- If nothing fires, the node is receiving nothing — check the CC1101 wiring and
+  that `cc1101.begin_rx` runs after each transmission.
+- If it fires but no cover moves, compare the `channel` and remote id in the
+  payload against the ones the cover was set up with.
+
+### The position drifts
+
+Expected: the estimate is dead-reckoned. Check `position_confidence` on the
+entity. `low` means ten or more moves ended between the end stops since the last
+full travel — open or close the shutter fully once and it resets.
+
+If it drifts faster than that, the configured travel times are wrong. Use the
+calibration buttons on the device page rather than a stopwatch, see
+[Calibration assistant](#calibration-assistant).
+
+### The channel number is above 16
+
+That is fine. The channel is an 8-bit field and any value from 0 to 255 works;
+common remotes stop at 16 but nothing in the protocol requires it. See
+[Channel numbers above 16](#channel-numbers-above-16).
+
 ## Protocol
 
 Dooya RF433 OOK — timings (µs):
