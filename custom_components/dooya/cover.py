@@ -25,6 +25,9 @@ import voluptuous as vol
 from .const import (
     BROADCAST_CHANNEL,
     CALIBRATION_TIMEOUT_SEC,
+    CONF_CHANNEL,
+    CONF_DOOYA_ID,
+    CONF_IS_GROUP,
     CONF_REPEAT_COUNT,
     CONF_TRAVEL_TIME_DOWN,
     CONF_TRAVEL_TIME_UP,
@@ -51,6 +54,29 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 ATTR_CURRENT_POSITION = "current_position"
 ATTR_POSITION = "position"
+
+
+@callback
+def group_channel_for(hass: HomeAssistant, dooya_id: int) -> int:
+    """Return the channel that addresses every shutter of one remote.
+
+    The group role is declared by CONF_IS_GROUP on one cover rather than fixed
+    at channel 0, because some motors ignore channel 0 entirely (issue #33).
+    Falling back to BROADCAST_CHANNEL keeps installations that never set the
+    flag — every install predating it — behaving exactly as before.
+
+    Resolved per frame rather than cached at setup on purpose: a group cover
+    added after its siblings must take effect without reloading each of them.
+    Config entries are a short in-memory list, so the scan is cheaper than the
+    staleness would be.
+    """
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        channel = entry.data.get(CONF_CHANNEL)
+        if entry.data.get(CONF_DOOYA_ID) != dooya_id or channel is None:
+            continue
+        if entry_value(entry, CONF_IS_GROUP, channel == BROADCAST_CHANNEL):
+            return int(channel)
+    return BROADCAST_CHANNEL
 
 
 async def async_setup_entry(
@@ -88,10 +114,15 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         # (instead of a doubled "Name Name" with _attr_has_entity_name).
         self._attr_name = None
 
-        # Channel 0 is the Dooya broadcast channel ("all" button): every
-        # paired shutter reacts, so a per-shutter position estimate is
-        # meaningless — expose plain open/close/stop only.
-        self._is_broadcast = self._channel == BROADCAST_CHANNEL
+        # The group cover stands for the remote's common button: every paired
+        # shutter reacts, so a per-shutter position estimate is meaningless —
+        # expose plain open/close/stop only. The role is declared rather than
+        # inferred from the channel, because some motors ignore channel 0 and
+        # answer a group button of their own (issue #33); the historical rule
+        # is the default, so existing channel-0 entries need no migration.
+        self._is_broadcast = bool(
+            entry_value(config_entry, CONF_IS_GROUP, self._channel == BROADCAST_CHANNEL)
+        )
         self._attr_supported_features = (
             CoverEntityFeature.OPEN | CoverEntityFeature.CLOSE | CoverEntityFeature.STOP
         )
@@ -520,9 +551,11 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
         if event_id != self._dooya_id:
             return
-        # A broadcast frame (channel 0, remote "all" button or the HA
-        # broadcast entity) moves every shutter paired with this remote.
-        if event_channel != self._channel and event_channel != BROADCAST_CHANNEL:
+        # A group frame — the remote's common button, or the Home Assistant
+        # entity standing for it — moves every shutter paired with this remote.
+        if event_channel != self._channel and event_channel != group_channel_for(
+            self.hass, self._dooya_id
+        ):
             return
 
         if self._echo_filter.is_echo(button, monotonic()):

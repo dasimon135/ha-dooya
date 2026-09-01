@@ -28,6 +28,8 @@ from custom_components.dooya.const import (
     CONF_COVER_NAME,
     CONF_DOOYA_ID,
     CONF_ESPHOME_DEVICE,
+    CONF_IS_GROUP,
+    CONF_REPEAT_COUNT,
     CONF_TRAVEL_TIME_DOWN,
     CONF_TRAVEL_TIME_UP,
     DOMAIN,
@@ -499,3 +501,75 @@ async def test_reconfigure_accepts_channel_above_16(
     assert entry.data[CONF_CHANNEL] == 200
 
     assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+# ---- options: the remote's common button (issue #33) ---------------------
+
+OPTIONS_BASE = {
+    CONF_ESPHOME_DEVICE: GATEWAY_SLUG,
+    CONF_TRAVEL_TIME_UP: 20.0,
+    CONF_TRAVEL_TIME_DOWN: 20.0,
+    CONF_REPEAT_COUNT: 1,
+}
+
+
+async def _add_cover(
+    hass: HomeAssistant,
+    *,
+    channel: int,
+    name: str,
+    options: dict | None = None,
+) -> MockConfigEntry:
+    """Add and set up one shutter of the D1C917 remote."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=name,
+        data={
+            CONF_ESPHOME_DEVICE: GATEWAY_SLUG,
+            CONF_DOOYA_ID: 0xD1C917,
+            CONF_CHANNEL: channel,
+            CONF_CHECK: 1,
+            CONF_COVER_NAME: name,
+            CONF_TRAVEL_TIME_UP: 20.0,
+            CONF_TRAVEL_TIME_DOWN: 20.0,
+        },
+        options=options or {},
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    return entry
+
+
+async def test_options_can_mark_a_cover_as_the_common_button(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """The group role is declared here rather than inferred from channel 0."""
+    entry = await _add_cover(hass, channel=80, name="All shutters")
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {**OPTIONS_BASE, CONF_IS_GROUP: True}
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_IS_GROUP] is True
+
+
+async def test_options_refuse_a_second_common_button_on_one_remote(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """Two flagged covers would make the group channel depend on entry order."""
+    await _add_cover(
+        hass, channel=80, name="All shutters", options={CONF_IS_GROUP: True}
+    )
+    other = await _add_cover(hass, channel=5, name="Salon")
+
+    result = await hass.config_entries.options.async_init(other.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {**OPTIONS_BASE, CONF_IS_GROUP: True}
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {CONF_IS_GROUP: "duplicate_group"}

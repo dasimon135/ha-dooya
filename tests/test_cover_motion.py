@@ -35,6 +35,7 @@ from custom_components.dooya.const import (
     CONF_COVER_NAME,
     CONF_DOOYA_ID,
     CONF_ESPHOME_DEVICE,
+    CONF_IS_GROUP,
     CONF_TRAVEL_TIME_DOWN,
     CONF_TRAVEL_TIME_UP,
     DOMAIN,
@@ -427,6 +428,96 @@ async def test_broadcast_entity_exposes_no_position(
     await hass.async_block_till_done()
     assert [f["btn"] for f in frames] == [1]
     assert [f["channel"] for f in frames] == [0]
+
+
+# ---- a group channel that is not 0 (issue #33) --------------------------
+
+GROUP_CHANNEL = 80
+GROUP_ENTITY_ID = "cover.all_shutters"
+
+
+def _make_group_entry(
+    *, flagged: bool, channel: int = GROUP_CHANNEL
+) -> MockConfigEntry:
+    """A second cover of the same remote, standing for its common button."""
+    return MockConfigEntry(
+        domain=DOMAIN,
+        title="All shutters",
+        data={
+            CONF_ESPHOME_DEVICE: GATEWAY_SLUG,
+            CONF_DOOYA_ID: DOOYA_ID,
+            CONF_CHANNEL: channel,
+            CONF_CHECK: 1,
+            CONF_COVER_NAME: "All shutters",
+            CONF_TRAVEL_TIME_UP: TRAVEL,
+            CONF_TRAVEL_TIME_DOWN: TRAVEL,
+        },
+        options={CONF_IS_GROUP: True} if flagged else {},
+    )
+
+
+async def test_a_flagged_group_cover_makes_its_channel_move_the_siblings(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """The remote's common button need not be on channel 0 (issue #33)."""
+    await _setup(hass, _make_group_entry(flagged=True))
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 0
+
+    _fire_frame(hass, 1, channel=GROUP_CHANNEL)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(ENTITY_ID).state == "opening"
+
+
+async def test_an_unflagged_cover_does_not_make_its_channel_a_group_channel(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """Without the flag, channel 80 is an ordinary sibling and must not fan out."""
+    await _setup(hass, _make_group_entry(flagged=False))
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 0
+
+    _fire_frame(hass, 1, channel=GROUP_CHANNEL)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(ENTITY_ID).state != "opening"
+
+
+async def test_channel_zero_still_groups_when_no_cover_is_flagged(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """Installations predating the flag keep their channel-0 behaviour."""
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 0
+
+    _fire_frame(hass, 1, channel=0)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(ENTITY_ID).state == "opening"
+
+
+async def test_a_flagged_group_cover_exposes_no_position(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """The group role, not the channel number, is what drops the estimate."""
+    await _setup(hass, _make_group_entry(flagged=True))
+
+    state = hass.states.get(GROUP_ENTITY_ID)
+    assert state.attributes.get("current_position") is None
+    # OPEN | CLOSE | STOP, without SET_POSITION.
+    assert state.attributes["supported_features"] == 11
+
+
+async def test_an_unflagged_cover_on_the_same_channel_keeps_its_position(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """Channel 80 alone must not cost a shutter its position estimate."""
+    await _setup(hass, _make_group_entry(flagged=False))
+
+    state = hass.states.get(GROUP_ENTITY_ID)
+    # OPEN | CLOSE | STOP | SET_POSITION.
+    assert state.attributes["supported_features"] == 15
 
 
 # ---- state-write hygiene -------------------------------------------------

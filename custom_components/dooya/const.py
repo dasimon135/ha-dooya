@@ -52,6 +52,7 @@ CONF_DOOYA_ID: Final = "dooya_id"  # 24-bit remote identifier
 CONF_CHANNEL: Final = "channel"  # Shutter channel (8 bits)
 CONF_CHECK: Final = "check"  # Check nibble (4 bits)
 CONF_COVER_NAME: Final = "cover_name"  # Shutter name
+CONF_IS_GROUP: Final = "is_group"  # This cover is the remote's common button
 CONF_TRAVEL_TIME_UP: Final = "travel_time_up"  # Full opening time (s)
 CONF_TRAVEL_TIME_DOWN: Final = "travel_time_down"  # Full closing time (s)
 CONF_REPEAT_COUNT: Final = "repeat_count"  # RF frame repetitions (reliability)
@@ -69,8 +70,15 @@ ECHO_SUPPRESS_WINDOW_SEC: Final = 2.0
 # the user's STOP before the measurement is abandoned.
 CALIBRATION_TIMEOUT_SEC: Final = 240.0
 
-# Dooya broadcast channel: channel 0 frames are executed by every shutter
-# paired with the same remote (the "all" button on multi-channel remotes).
+# Dooya broadcast channel: on most remotes, channel 0 frames are executed by
+# every shutter paired with the same remote (the "all" button).
+#
+# It is only the *default*, not a rule. Some motors ignore channel 0 entirely
+# and answer a group button on a channel of its own (issue #33: a remote whose
+# "all" button transmits on channel 80). The group role is therefore declared
+# by CONF_IS_GROUP on one cover rather than inferred from the channel number,
+# and this value is what that flag defaults to — so entries created before the
+# flag existed keep behaving exactly as they did, with no migration.
 BROADCAST_CHANNEL: Final = 0
 
 # The channel occupies 8 bits of the frame (see dooya_protocol: header +
