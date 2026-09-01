@@ -15,12 +15,14 @@ from homeassistant.core import callback
 import voluptuous as vol
 
 from .const import (
+    BROADCAST_CHANNEL,
     CONF_CHANNEL,
     CONF_CHECK,
     CONF_COVER_NAME,
     CONF_DOOYA_ID,
     CONF_ESPHOME_DEVICE,
     CONF_FAVORITE_POSITION,
+    CONF_IS_GROUP,
     CONF_REPEAT_COUNT,
     CONF_TRAVEL_TIME_DOWN,
     CONF_TRAVEL_TIME_UP,
@@ -457,9 +459,24 @@ class DooyaOptionsFlow(OptionsFlow):
         current_repeat = int(
             entry_value(entry, CONF_REPEAT_COUNT, DEFAULT_REPEAT_COUNT)
         )
+        current_is_group = bool(
+            entry_value(
+                entry,
+                CONF_IS_GROUP,
+                entry.data.get(CONF_CHANNEL) == BROADCAST_CHANNEL,
+            )
+        )
+        errors: dict[str, str] = {}
 
         if user_input is not None:
-            return self.async_create_entry(data=user_input)
+            # Two covers claiming the group role on one remote would make the
+            # lookup in cover.group_channel_for depend on entry order, which is
+            # exactly the silent divergence a per-cover channel number would
+            # have caused. Refuse it instead.
+            if user_input.get(CONF_IS_GROUP) and self._other_group_entry(entry):
+                errors[CONF_IS_GROUP] = "duplicate_group"
+            else:
+                return self.async_create_entry(data=user_input)
 
         # With several TX+RX nodes in the house, a cover can be reassigned to
         # the nearest node here without re-creating the entry. Keep the
@@ -502,10 +519,26 @@ class DooyaOptionsFlow(OptionsFlow):
                     default=current_repeat,
                 ): vol.All(int, vol.Range(min=1, max=3)),
                 favorite_field: vol.All(vol.Coerce(int), vol.Range(min=0, max=100)),
+                vol.Required(CONF_IS_GROUP, default=current_is_group): bool,
             }
         )
 
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(schema),
+            errors=errors,
         )
+
+    @callback
+    def _other_group_entry(self, entry: ConfigEntry) -> ConfigEntry | None:
+        """Return another cover of this remote already flagged as the group."""
+        dooya_id = entry.data.get(CONF_DOOYA_ID)
+        for other in self.hass.config_entries.async_entries(DOMAIN):
+            if other.entry_id == entry.entry_id:
+                continue
+            if other.data.get(CONF_DOOYA_ID) != dooya_id:
+                continue
+            channel = other.data.get(CONF_CHANNEL)
+            if entry_value(other, CONF_IS_GROUP, channel == BROADCAST_CHANNEL):
+                return other
+        return None
