@@ -557,7 +557,12 @@ class DooyaCoverCard extends HTMLElement {
   }
 }
 
-customElements.define("dooya-cover-card", DooyaCoverCard);
+// Guarded: the module can be evaluated twice on one page (auto-loaded by the
+// integration AND listed as a dashboard resource, or two cache-busted URLs),
+// and a second define() throws. rf-fan-card has the same guard.
+if (!customElements.get("dooya-cover-card")) {
+  customElements.define("dooya-cover-card", DooyaCoverCard);
+}
 
 /** Visual editor: a native ha-form with a cover entity picker + options. */
 class DooyaCoverCardEditor extends HTMLElement {
@@ -622,13 +627,17 @@ class DooyaCoverCardEditor extends HTMLElement {
   }
 }
 
-customElements.define("dooya-cover-card-editor", DooyaCoverCardEditor);
+if (!customElements.get("dooya-cover-card-editor")) {
+  customElements.define("dooya-cover-card-editor", DooyaCoverCardEditor);
+}
 
 window.customCards = window.customCards || [];
-window.customCards.push({
-  type: "dooya-cover-card",
-  name: "Dooya Cover Card",
-  description: "Animated roller-shutter card for Dooya RF covers (position, presets, recalibration).",
-  preview: true,
-  documentationURL: "https://github.com/dasimon135/ha-dooya",
-});
+if (!window.customCards.some((c) => c.type === "dooya-cover-card")) {
+  window.customCards.push({
+    type: "dooya-cover-card",
+    name: "Dooya Cover Card",
+    description: "Animated roller-shutter card for Dooya RF covers (position, presets, recalibration).",
+    preview: true,
+    documentationURL: "https://github.com/dasimon135/ha-dooya",
+  });
+}
