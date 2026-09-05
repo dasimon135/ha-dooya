@@ -13,7 +13,7 @@
 // Console banner only. Cache-busting uses the integration version from
 // manifest.json (see __init__.py::_async_register_card), so this does not need
 // to be kept in sync with any Python constant.
-const VERSION = "1.3.2";
+const VERSION = "1.3.3";
 // eslint-disable-next-line no-console
 console.info(`%c DOOYA-COVER-CARD %c v${VERSION} `, "background:#e8833a;color:#fff;border-radius:3px 0 0 3px", "background:#c95d2e;color:#fff;border-radius:0 3px 3px 0");
 
