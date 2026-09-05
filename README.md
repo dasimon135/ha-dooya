@@ -228,6 +228,8 @@ The tile view is smaller still — an icon, the name, the state and three button
 
 Labels follow the Home Assistant UI language (English / French).
 
+**Theming.** The card is a real `ha-card` and follows your theme's card surface, text and accent. A theme can also set (without the leading dashes): `dooya-accent` (active buttons and chips, hover borders, the slider — falls back to `primary-color`), `dooya-star` (the favourite-position chip), `dooya-slat-color` and `dooya-slat-shadow` (the curtain slats). The window scene — sky, sun, hills, moon — is an illustration of the time of day and keeps its own colours on every theme.
+
 ## Cleaning Up Old ESPHome Buttons
 
 If you previously exposed one ESPHome button per action and per shutter, they are no longer needed.

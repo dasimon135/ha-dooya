@@ -13,7 +13,7 @@
 // Console banner only. Cache-busting uses the integration version from
 // manifest.json (see __init__.py::_async_register_card), so this does not need
 // to be kept in sync with any Python constant.
-const VERSION = "1.3.3";
+const VERSION = "1.4.0";
 // eslint-disable-next-line no-console
 console.info(`%c DOOYA-COVER-CARD %c v${VERSION} `, "background:#e8833a;color:#fff;border-radius:3px 0 0 3px", "background:#c95d2e;color:#fff;border-radius:0 3px 3px 0");
 
@@ -456,13 +456,13 @@ class DooyaCoverCard extends HTMLElement {
       .tile { display:flex; align-items:center; gap:12px; }
       .tinfo { flex:1 1 auto; min-width:0; display:flex; align-items:center; gap:12px;
                cursor:pointer; border-radius:8px; outline:none; }
-      .tinfo:focus-visible { box-shadow: 0 0 0 2px var(--primary-color); }
+      .tinfo:focus-visible { box-shadow: 0 0 0 2px var(--dooya-accent, var(--primary-color)); }
       .tdot { flex:0 0 auto; width:42px; height:42px; border-radius:50%; display:grid; place-items:center;
               background: var(--divider-color); color: var(--secondary-text-color); }
-      .tile:not(.off) .tdot { background: color-mix(in srgb, var(--primary-color) 22%, var(--card-background-color));
-              color: var(--primary-color);
-              box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary-color) 55%, transparent),
-                          0 0 14px 1px color-mix(in srgb, var(--primary-color) 45%, transparent); }
+      .tile:not(.off) .tdot { background: color-mix(in srgb, var(--dooya-accent, var(--primary-color)) 22%, var(--card-background-color));
+              color: var(--dooya-accent, var(--primary-color));
+              box-shadow: 0 0 0 2px color-mix(in srgb, var(--dooya-accent, var(--primary-color)) 55%, transparent),
+                          0 0 14px 1px color-mix(in srgb, var(--dooya-accent, var(--primary-color)) 45%, transparent); }
       .tdot ha-icon { --mdc-icon-size:24px; }
       .ttext { min-width:0; display:flex; flex-direction:column; gap:1px; }
       .tname { font-weight:600; font-size:.95rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -472,16 +472,17 @@ class DooyaCoverCard extends HTMLElement {
               background: var(--card-background-color); color: var(--primary-text-color); cursor:pointer;
               display:grid; place-items:center; transition: transform .12s, border-color .2s, background .2s; }
       .tbtn ha-icon { --mdc-icon-size:20px; }
-      .tbtn.active { background: var(--primary-color); color: var(--text-primary-color,#fff); border-color: var(--primary-color); }
-      .tbtn:hover { border-color: var(--primary-color); }
+      .tbtn.active { background: var(--dooya-accent, var(--primary-color)); color: var(--text-primary-color,#fff); border-color: var(--dooya-accent, var(--primary-color)); }
+      .tbtn:hover { border-color: var(--dooya-accent, var(--primary-color)); }
       .tbtn:active { transform: scale(.9); }
       .head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
       .title { font-size:1.15rem; font-weight:600; }
       .state { font-size:.85rem; color: var(--secondary-text-color); }
-      .state.moving { color: var(--primary-color); }
+      .state.moving { color: var(--dooya-accent, var(--primary-color)); }
       .hero { display:flex; justify-content:center; align-items:stretch; gap:18px; margin:4px 0 12px; }
       .window { position:relative; width:150px; height:170px; border-radius:10px; overflow:hidden; cursor:pointer;
                 border:3px solid var(--divider-color); box-shadow: inset 0 0 12px rgba(0,0,0,.15); }
+      /* scene: the window is an illustration of the time of day, not chrome — its colours are deliberately literal */
       .sky { position:absolute; inset:0; background:linear-gradient(#7ec3ef, #cfe9fa 70%); }
       .sun { position:absolute; top:14px; right:16px; width:26px; height:26px; border-radius:50%;
              background:#ffd75e; box-shadow:0 0 14px 4px rgba(255,215,94,.65); }
@@ -518,34 +519,35 @@ class DooyaCoverCard extends HTMLElement {
       .pos-label { position:absolute; bottom:6px; right:8px; font-size:.78rem; font-weight:600;
                    color:rgba(0,0,0,.55); background:rgba(255,255,255,.6); border-radius:8px; padding:1px 6px;
                    pointer-events:none; }
+      /* /scene */
       .btns { display:flex; flex-direction:column; justify-content:space-between; }
       .ctl { width:52px; flex:1; border:none; border-radius:12px; margin:3px 0; cursor:pointer;
              background: var(--divider-color); color: var(--primary-text-color); }
       .ctl ha-icon { --mdc-icon-size:26px; }
-      .ctl.active { background: var(--primary-color); color: var(--text-primary-color,#fff); }
+      .ctl.active { background: var(--dooya-accent, var(--primary-color)); color: var(--text-primary-color,#fff); }
       .ctl.stop ha-icon { --mdc-icon-size:22px; }
       .sliderrow { display:flex; align-items:center; gap:10px; margin:2px 0 10px; }
       .sliderrow ha-icon { color: var(--secondary-text-color); --mdc-icon-size:20px; }
-      .slider { flex:1; accent-color: var(--primary-color); }
+      .slider { flex:1; accent-color: var(--dooya-accent, var(--primary-color)); }
       .chips { display:flex; flex-wrap:wrap; gap:8px; margin:6px 0; }
       .presets .chip { flex:1; justify-content:center; }
       .chip { display:inline-flex; align-items:center; gap:6px; border:none; border-radius:18px; padding:7px 10px;
               background: var(--divider-color); color: var(--primary-text-color); cursor:pointer; font-size:.85rem; }
       .chip ha-icon { --mdc-icon-size:18px; }
-      .chip.active { background: var(--primary-color); color: var(--text-primary-color,#fff); }
+      .chip.active { background: var(--dooya-accent, var(--primary-color)); color: var(--text-primary-color,#fff); }
       .chip.small { padding:5px 10px; font-size:.8rem; }
       .calib { display:flex; align-items:center; gap:8px; margin-top:8px; }
       .calib-label { display:inline-flex; align-items:center; gap:4px; font-size:.8rem;
                      color: var(--secondary-text-color); }
       .calib-label ha-icon { --mdc-icon-size:16px; }
-      .chip.star ha-icon { color:#f5a623; }
-      .chip.star.active { background:#f5a623; }
+      .chip.star ha-icon { color:var(--dooya-star, #f5a623); }
+      .chip.star.active { background:var(--dooya-star, #f5a623); }
       .chead { margin-bottom:6px; }
       .compact { display:flex; align-items:center; gap:8px; }
       .cbar { position:relative; flex:1; height:14px; border-radius:7px; overflow:hidden;
               background: var(--divider-color); cursor:pointer; }
       .cfill { position:absolute; top:0; left:0; bottom:0; border-radius:7px;
-               background: var(--primary-color); transition:width .9s linear; }
+               background: var(--dooya-accent, var(--primary-color)); transition:width .9s linear; }
       .cfill.moving { opacity:.75; }
       .ctl.mini { width:38px; height:32px; flex:none; margin:0; border-radius:9px; }
       .ctl.mini ha-icon { --mdc-icon-size:20px; }
