@@ -7,6 +7,12 @@
 
 Control Dooya RF433 motorized covers (blinds/shutters/rollers) from Home Assistant.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/card-dark.png">
+  <img src="docs/images/card.png" width="524"
+       alt="The bundled Dooya card: an animated shutter drawn open over a daylight window, up/stop/down buttons, a position slider and Closed/25%/50%/75%/Open presets">
+</picture>
+
 ## Features
 
 - **Open / Close / Stop** via a native ESPHome service
