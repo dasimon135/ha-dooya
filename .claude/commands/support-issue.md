@@ -108,8 +108,19 @@ the report does not say, that is a case (b) and you ask for that first.
 
 ## 3. Read the real code before you answer
 
-The README carries most of the recurring answers, and it has **no Limitations
-section** — do not link one. The sections that answer real reports:
+The README carries most of the recurring answers. **Check these two first —
+most reports are documented behaviour rather than bugs:**
+
+- § *Known limitations* — `#known-limitations`. The radio requirement, the
+  Dooya-frame-not-433-in-general distinction, dead reckoning, and why position
+  drift is expected.
+- § *Troubleshooting* — `#troubleshooting`. Ordered lists for *nothing happens at
+  all*, the remote not being followed, drift, and channels above 16.
+
+Both were added on 2026-08-30; earlier versions of this file said there were none
+and told you not to link one. They exist now — link them.
+
+Then the rest:
 
 - § *ESPHome Prerequisite (CC1101)* — the node contract, by far the most cited
 - § *Estimated Position And Calibration* and § *Calibration assistant*
