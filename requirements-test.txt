@@ -7,4 +7,4 @@
 # 0.13.357 is the newest release pinning a *stable* Home Assistant (2026.8.3);
 # 0.13.358 pins the 2026.9.0b0 beta. Bump deliberately, not by accident.
 # Requires Python >= 3.14 (see .github/workflows/tests.yml).
-pytest-homeassistant-custom-component==0.13.357
+pytest-homeassistant-custom-component==0.13.362
