@@ -465,8 +465,8 @@ class DooyaCoverCard extends HTMLElement {
                           0 0 14px 1px color-mix(in srgb, var(--dooya-accent, var(--primary-color)) 45%, transparent); }
       .tdot ha-icon { --mdc-icon-size:24px; }
       .ttext { min-width:0; display:flex; flex-direction:column; gap:1px; }
-      .tname { font-weight:600; font-size:.95rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .tsub { font-size:.78rem; color: var(--secondary-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .tname { font-weight:600; font-size:14px; line-height:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .tsub { font-size:12px; line-height:16px; color: var(--secondary-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
       .tctl { flex:0 0 auto; display:flex; gap:6px; }
       .tbtn { width:36px; height:34px; border-radius:9px; border:1px solid var(--divider-color);
               background: var(--card-background-color); color: var(--primary-text-color); cursor:pointer;
