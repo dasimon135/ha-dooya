@@ -1,4 +1,10 @@
-# Dooya RF Covers — Home Assistant Integration
+# Dooya RF Covers — Home Assistant integration
+
+[![Release](https://img.shields.io/github/v/release/dasimon135/ha-dooya)](https://github.com/dasimon135/ha-dooya/releases)
+[![Tests](https://github.com/dasimon135/ha-dooya/actions/workflows/tests.yml/badge.svg)](https://github.com/dasimon135/ha-dooya/actions/workflows/tests.yml)
+[![Validate](https://github.com/dasimon135/ha-dooya/actions/workflows/validate.yml/badge.svg)](https://github.com/dasimon135/ha-dooya/actions/workflows/validate.yml)
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![License](https://img.shields.io/github/license/dasimon135/ha-dooya)](LICENSE)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="custom_components/dooya/brand/dark_logo.png">
@@ -32,7 +38,7 @@ Control Dooya RF433 motorized covers (blinds/shutters/rollers) from Home Assista
 - An ESPHome device exposing the `transmit_dooya` service
 - A 433.92 MHz OOK transmitter, typically ESP32 + CC1101
 
-## Installation (HACS)
+## Installation
 
 1. In HACS, open the menu for custom repositories
 2. Add `https://github.com/dasimon135/ha-dooya` as an `Integration` repository
@@ -42,7 +48,7 @@ Control Dooya RF433 motorized covers (blinds/shutters/rollers) from Home Assista
 
 Manual installation is also possible by copying `custom_components/dooya` into your Home Assistant configuration directory.
 
-## Installation (manual)
+## Manual installation
 
 1. Copy `custom_components/dooya` into your Home Assistant configuration directory
 2. Restart Home Assistant
