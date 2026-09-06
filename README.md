@@ -11,7 +11,8 @@
   <img src="custom_components/dooya/brand/logo.png" alt="Dooya RF" height="90">
 </picture>
 
-Control Dooya RF433 motorized covers (blinds/shutters/rollers) from Home Assistant.
+Open, close and position your **Dooya RF433 blinds, shutters and rollers**
+from Home Assistant, alongside everything else in the house.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/card-dark.png">
@@ -19,30 +20,52 @@ Control Dooya RF433 motorized covers (blinds/shutters/rollers) from Home Assista
        alt="The bundled Dooya card: an animated shutter drawn open over a daylight window, up/stop/down buttons, a position slider and Closed/25%/50%/75%/Open presets">
 </picture>
 
-## Features
+## Will this work for me?
 
-- **Open / Close / Stop** via a native ESPHome service
-- **Estimated position** based on real opening and closing travel times
-- **Set position** support for partial opening/closing directly from Home Assistant
-- **Manual recalibration services** to mark a cover as open, closed, or set a known position
-- **Recalibration & calibration buttons** on the device page — no service call needed
-- **Travel-time calibration assistant** — measures the real opening/closing times with a stopwatch instead of manual entry
-- **Favorite position** — per-shutter option + one-press button, like real Dooya remotes
-- **Broadcast channel 0** — one entity that opens/closes every shutter paired with the remote in a single RF frame
-- **Gateway-linked availability** — entities become `unavailable` when the ESPHome node is offline
-- **Diagnostics download** for easier GitHub issues
-- **Bundled Lovelace card** (`custom:dooya-cover-card`) — animated shutter with position, presets and recalibration, in normal, compact and tile views, no HACS frontend install needed
-- **Automatic detection from the remote** — press UP on the physical remote to read the shutter ID automatically
-- **Manual entry** — enter the shutter ID directly if you already know it
-- **User-friendly setup flow** — choose between manual entry and automatic detection
-- **No extra ESPHome buttons required** — one cover entity per shutter in Home Assistant
-- **OEM brands supported** : Dooya, Cherub, Raex, Zemismart, and all clones using the same protocol
+**Your motors.** Dooya RF433 tubular motors, and the many brands that rebadge
+them — Cherub, Raex, Zemismart, and other clones speaking the same protocol. If
+your blinds came with a small 433 MHz Dooya-style remote, you are very probably
+in.
 
-## Requirements
+**You will have to build a transmitter.** This is the honest part: there is no
+dongle to plug in. You need an ESP32 board with a CC1101 radio module, flashed
+with ESPHome — a handful of parts and an evening. The wiring and the
+configuration to copy are in
+[ESPHome prerequisite](#esphome-prerequisite-cc1101).
 
-- Home Assistant 2026.5+
-- An ESPHome device exposing the `transmit_dooya` service
-- A 433.92 MHz OOK transmitter, typically ESP32 + CC1101
+**Your blinds never answer back.** A Dooya motor listens; it does not report. So
+Home Assistant *estimates* where a cover is, by timing how long it has been
+running. That is accurate enough to ask for "half open", and it drifts over
+time — which is why there are one-press buttons to tell it "this one is fully
+open, now". Everything that follows from this is in
+[Known limitations](#known-limitations).
+
+**Adding a blind takes about a minute** once the gateway exists: press UP on the
+physical remote, and Home Assistant reads that blind's identifier by itself. You
+can also type it in, if you already know it.
+
+You will need **Home Assistant 2026.5** or newer.
+
+## What you get
+
+Each blind becomes one Home Assistant cover, with everything you would expect
+from one: open, close, stop, a position slider, and presets.
+
+Around that:
+
+- **A calibration assistant.** Rather than asking you to guess travel times, it
+  times the real thing with a stopwatch while the blind runs.
+- **Recalibration in one press.** Buttons on the device page to say "fully open",
+  "fully closed", or a known position, for when the estimate has drifted.
+- **A favourite position**, per blind, on a single button — the same idea as the
+  one on a real Dooya remote.
+- **One control for all of them.** A single entity that opens or closes every
+  blind paired with the remote, in one radio frame rather than one per blind.
+- **A card, already included.** An animated shutter with position, presets and
+  recalibration, in full, compact and tile sizes. Nothing extra to install.
+- **Honest availability.** When the ESPHome gateway goes offline, the covers say
+  `unavailable` instead of pretending to work.
+- **A diagnostics download**, so a bug report can be answered on the first reply.
 
 ## Installation
 
