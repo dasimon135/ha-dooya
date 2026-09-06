@@ -13,7 +13,7 @@
 // Console banner only. Cache-busting uses the integration version from
 // manifest.json (see __init__.py::_async_register_card), so this does not need
 // to be kept in sync with any Python constant.
-const VERSION = "1.4.0";
+const VERSION = "1.4.1";
 // eslint-disable-next-line no-console
 console.info(`%c DOOYA-COVER-CARD %c v${VERSION} `, "background:#e8833a;color:#fff;border-radius:3px 0 0 3px", "background:#c95d2e;color:#fff;border-radius:0 3px 3px 0");
 
@@ -457,7 +457,7 @@ class DooyaCoverCard extends HTMLElement {
       .tinfo { flex:1 1 auto; min-width:0; display:flex; align-items:center; gap:12px;
                cursor:pointer; border-radius:8px; outline:none; }
       .tinfo:focus-visible { box-shadow: 0 0 0 2px var(--dooya-accent, var(--primary-color)); }
-      .tdot { flex:0 0 auto; width:42px; height:42px; border-radius:50%; display:grid; place-items:center;
+      .tdot { flex:0 0 auto; width:36px; height:36px; border-radius:50%; display:grid; place-items:center;
               background: var(--divider-color); color: var(--secondary-text-color); }
       .tile:not(.off) .tdot { background: color-mix(in srgb, var(--dooya-accent, var(--primary-color)) 22%, var(--card-background-color));
               color: var(--dooya-accent, var(--primary-color));
