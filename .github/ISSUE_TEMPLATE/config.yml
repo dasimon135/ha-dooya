@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Known limitations - read this first
+    url: https://github.com/dasimon135/ha-dooya#known-limitations
+    about: A cover reports nothing back, so every position you see is dead-reckoned. Several reported problems are that, documented.
+  - name: English discussion thread (Home Assistant Community)
+    url: https://community.home-assistant.io/t/984671
+    about: User-to-user help. Not tracked - open an issue for anything that needs a fix.
+  - name: French discussion thread (HACF)
+    url: https://forum.hacf.fr/t/79541
+    about: User-to-user help, in French. Not tracked - open an issue for anything that needs a fix.

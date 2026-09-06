@@ -1,4 +1,10 @@
-# Dooya RF Covers — Home Assistant Integration
+# Dooya RF Covers — Home Assistant integration
+
+[![Release](https://img.shields.io/github/v/release/dasimon135/ha-dooya)](https://github.com/dasimon135/ha-dooya/releases)
+[![Tests](https://github.com/dasimon135/ha-dooya/actions/workflows/tests.yml/badge.svg)](https://github.com/dasimon135/ha-dooya/actions/workflows/tests.yml)
+[![Validate](https://github.com/dasimon135/ha-dooya/actions/workflows/validate.yml/badge.svg)](https://github.com/dasimon135/ha-dooya/actions/workflows/validate.yml)
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![License](https://img.shields.io/github/license/dasimon135/ha-dooya)](LICENSE)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="custom_components/dooya/brand/dark_logo.png">
@@ -38,7 +44,7 @@ Control Dooya RF433 motorized covers (blinds/shutters/rollers) from Home Assista
 - An ESPHome device exposing the `transmit_dooya` service
 - A 433.92 MHz OOK transmitter, typically ESP32 + CC1101
 
-## Installation (HACS)
+## Installation
 
 1. In HACS, open the menu for custom repositories
 2. Add `https://github.com/dasimon135/ha-dooya` as an `Integration` repository
@@ -48,16 +54,7 @@ Control Dooya RF433 motorized covers (blinds/shutters/rollers) from Home Assista
 
 Manual installation is also possible by copying `custom_components/dooya` into your Home Assistant configuration directory.
 
-## Support
-
-When opening an issue, please attach the **diagnostics download** (device page → three-dot menu → *Download diagnostics*): it contains the entry configuration (remote id redacted) and the current cover state.
-
-- Bug reports and feature requests: https://github.com/dasimon135/ha-dooya/issues
-- Repository: https://github.com/dasimon135/ha-dooya
-- Step-by-step French tutorial: docs/tuto-hacf.md
-- HACF forum post template: docs/post-hacf.md
-
-## Installation (manual)
+## Manual installation
 
 1. Copy `custom_components/dooya` into your Home Assistant configuration directory
 2. Restart Home Assistant
@@ -401,6 +398,36 @@ calibration buttons on the device page rather than a stopwatch, see
 That is fine. The channel is an 8-bit field and any value from 0 to 255 works;
 common remotes stop at 16 but nothing in the protocol requires it. See
 [Channel numbers above 16](#channel-numbers-above-16).
+
+## Support
+
+Open an issue here for anything about this integration — a bug, a question, or a
+feature request. Forum threads are for general discussion and user-to-user help;
+nothing raised there is tracked, and it can be lost. An issue cannot.
+
+Before you open one, read [Known limitations](#known-limitations) and
+[Troubleshooting](#troubleshooting).
+
+To get a useful answer on the first exchange, include:
+
+- your Home Assistant version and the version of this integration;
+- the gateway — board and CC1101 module, with its ESPHome version — and the
+  motor or remote model;
+- the diagnostics download (device page → **⋮** → *Download diagnostics*): it
+  carries the entry configuration, remote id redacted, and the current cover
+  state;
+- a debug log, plus what you did, what you expected, and what happened instead.
+
+A step-by-step French walkthrough is in [docs/tuto-hacf.md](docs/tuto-hacf.md).
+
+### Staying informed
+
+New versions are announced here and nowhere else. To hear about one:
+
+- **HACS already offers you the update**, release notes included — nothing to do;
+- subscribe to `https://github.com/dasimon135/ha-dooya/releases.atom` in any RSS
+  reader, or inside Home Assistant through the `feedreader` integration;
+- or use **Watch → Custom → Releases** on this repository.
 
 ## Protocol
 
