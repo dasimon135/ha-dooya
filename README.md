@@ -224,7 +224,7 @@ The window scenery follows the sun (`sun.sun`): sunrise and sunset tints, bright
 
 The compact view fits dashboards with many shutters: a clickable position bar (left = closed, right = open), the up/stop/down buttons and the favorite button when one is configured. A star chip also appears in the normal view when a favorite position is set in the integration options.
 
-The tile view is smaller still — an icon, the name, the state and three buttons, aligned with Home Assistant's own tile cards. Tapping the icon or the name opens the full animated card in a popup, so a dense dashboard keeps the detailed view one tap away; set `tile_tap: more-info` if you would rather get the standard Home Assistant dialog. Its icon takes on the accent colour with a soft glow while the cover is open, the way Mushroom's own cover card tints its icon by state — a plain grey dot next to Mushroom cards in the same column read as more prominent than it should, for no reason tied to its actual size.
+The tile view is smaller still — an icon, the name, the state and three buttons, aligned with Home Assistant's own tile cards. Tapping the icon or the name opens the full animated card in a popup, so a dense dashboard keeps the detailed view one tap away; set `tile_tap: more-info` if you would rather get the standard Home Assistant dialog. Its icon takes on a soft accent tint while the cover is open, the same way Mushroom's own cover card tints its icon by state — a plain grey dot next to Mushroom cards in the same column read as more prominent than it should, for no reason tied to its actual size.
 
 Labels follow the Home Assistant UI language (English / French).
 
