@@ -300,9 +300,15 @@ Set a **favorite position** (for example 30 %) in the integration options. A *Fa
 
 ## Broadcast Channel (All Shutters)
 
-Dooya multi-channel remotes have an "all" button that transmits on **channel 0**: every shutter paired with the remote executes the command from a single RF frame.
+Dooya multi-channel remotes have an "all" button that moves every shutter paired with the remote from a single RF frame. On most remotes it transmits on **channel 0**.
 
 You can create such an entity with manual entry by setting the channel to `0`. It exposes open/close/stop only (no position estimate, since each shutter moves independently), and is ideal for "close everything" automations — one RF frame instead of one per shutter.
+
+### When the common button is not on channel 0
+
+Some motors ignore channel 0 entirely and answer a common button of their own — channel 80, for instance ([#33](https://github.com/dasimon135/ha-dooya/issues/33)). Create that cover on the channel the remote actually sends, then tick **This cover is the remote's common button** in its *Configure* dialog. Its siblings resolve the group channel from it, and the flagged cover drops its position slider and calibration the way a channel-0 entity does.
+
+Only one cover per remote can hold the flag, and channel 0 keeps the role automatically when no cover is flagged — installations predating the checkbox need no change.
 
 ### Channel numbers above 16
 
@@ -312,7 +318,14 @@ installations do use higher channels — the integration was capped at 16 until 
 user reported 19 shutters starting at channel 81 ([#18](https://github.com/dasimon135/ha-dooya/issues/18)).
 Automatic detection reads whatever the remote sends and was never affected.
 
-Broadcast frames are also understood the other way around: when the remote's "all" button is pressed (or the HA broadcast entity is used), the position estimate of every per-channel cover with the same remote id is updated accordingly.
+### Position sync
+
+Group commands drive the position estimate of every per-channel cover that shares the remote id, whichever side the command came from:
+
+- **the physical common button** — the node hears the frame and republishes it, and each cover resyncs on the event;
+- **the group entity in Home Assistant** — the node is transmitting, so it cannot hear its own frame; the covers are driven directly instead.
+
+The second half was only implemented in v0.11.0. Before that, a group command sent from Home Assistant moved the shutters but left every sibling's position estimate untouched.
 
 ## Position Confidence
 

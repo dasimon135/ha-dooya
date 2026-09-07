@@ -594,3 +594,131 @@ async def test_reading_position_does_not_drop_a_pending_stop(
 
     assert [f["btn"] for f in frames] == [1, 5], "the STOP frame was lost"
     assert hass.states.get(ENTITY_ID).attributes["current_position"] == 50
+
+
+# ---- a group command sent from Home Assistant (issue #33, second defect) ---
+
+OTHER_ID = 0xB032B9
+
+
+def _make_sibling_entry(channel: int, name: str, dooya_id: int = DOOYA_ID):
+    """A second per-channel cover of the same remote."""
+    return MockConfigEntry(
+        domain=DOMAIN,
+        title=name,
+        data={
+            CONF_ESPHOME_DEVICE: GATEWAY_SLUG,
+            CONF_DOOYA_ID: dooya_id,
+            CONF_CHANNEL: channel,
+            CONF_CHECK: 1,
+            CONF_COVER_NAME: name,
+            CONF_TRAVEL_TIME_UP: TRAVEL,
+            CONF_TRAVEL_TIME_DOWN: TRAVEL,
+        },
+    )
+
+
+async def test_opening_the_group_entity_moves_the_siblings(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """The node never hears its own frame, so the fan-out has to be explicit."""
+    await _setup(hass, _make_group_entry(flagged=True))
+    sibling = await _setup(hass, _make_entry())
+    sibling.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover", "open_cover", {"entity_id": GROUP_ENTITY_ID}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    assert hass.states.get(ENTITY_ID).state == "opening"
+    # One frame, on the group channel: the siblings are driven in Home
+    # Assistant, not by 19 extra transmissions.
+    assert [f["channel"] for f in frames] == [GROUP_CHANNEL]
+
+
+async def test_closing_the_group_entity_moves_the_siblings(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """DOWN fans out the same way as UP."""
+    await _setup(hass, _make_group_entry(flagged=True))
+    sibling = await _setup(hass, _make_entry())
+    sibling.runtime_data.cover._current_position = 100
+
+    await hass.services.async_call(
+        "cover", "close_cover", {"entity_id": GROUP_ENTITY_ID}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    assert hass.states.get(ENTITY_ID).state == "closing"
+
+
+async def test_stopping_the_group_entity_freezes_the_siblings(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """A group STOP settles each sibling on its own estimated position."""
+    await _setup(hass, _make_group_entry(flagged=True))
+    sibling = await _setup(hass, _make_entry())
+    sibling.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover", "open_cover", {"entity_id": GROUP_ENTITY_ID}, blocking=True
+    )
+    await asyncio.sleep(TRAVEL * 0.5)
+    await hass.services.async_call(
+        "cover", "stop_cover", {"entity_id": GROUP_ENTITY_ID}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    state = hass.states.get(ENTITY_ID)
+    assert state.state == "open"
+    assert 35 <= state.attributes["current_position"] <= 65, state.attributes
+
+
+async def test_the_group_entity_leaves_another_remote_alone(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """The fan-out is scoped to the remote id, never to every Dooya cover."""
+    await _setup(hass, _make_group_entry(flagged=True))
+    stranger = await _setup(
+        hass, _make_sibling_entry(CHANNEL, "Chambre", dooya_id=OTHER_ID)
+    )
+    stranger.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover", "open_cover", {"entity_id": GROUP_ENTITY_ID}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    assert hass.states.get("cover.chambre").state != "opening"
+
+
+async def test_a_group_command_arms_the_siblings_echo_filter(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """A second node echoing our group frame must not revive a stopped sibling.
+
+    With more than one node in the house, the frame this entity transmits is
+    heard and republished by the others. The sibling has already acted on it
+    locally, so the late echo is its own transmission — exactly what
+    `TxEchoFilter` is for.
+    """
+    await _setup(hass, _make_group_entry(flagged=True))
+    sibling = await _setup(hass, _make_entry())
+    sibling.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover", "open_cover", {"entity_id": GROUP_ENTITY_ID}, blocking=True
+    )
+    await asyncio.sleep(TRAVEL * 0.3)
+    await hass.services.async_call(
+        "cover", "stop_cover", {"entity_id": GROUP_ENTITY_ID}, blocking=True
+    )
+    await hass.async_block_till_done()
+    assert hass.states.get(ENTITY_ID).state == "open"
+
+    # The other node's delayed echo of the UP we just sent.
+    _fire_frame(hass, 1, channel=GROUP_CHANNEL)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(ENTITY_ID).state != "opening"

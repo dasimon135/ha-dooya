@@ -240,11 +240,13 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         """Open the shutter (UP command, button=1)."""
         await self._async_transmit(BUTTON_UP)
         self._start_estimated_motion(direction=1, target_position=100)
+        self._async_drive_siblings(BUTTON_UP)
 
     async def async_close_cover(self, **kwargs: Any) -> None:
         """Close the shutter (DOWN command, button=3)."""
         await self._async_transmit(BUTTON_DOWN)
         self._start_estimated_motion(direction=-1, target_position=0)
+        self._async_drive_siblings(BUTTON_DOWN)
 
     async def async_stop_cover(self, **kwargs: Any) -> None:
         """Stop the shutter (STOP command, button=5)."""
@@ -252,6 +254,59 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         await self._async_transmit(BUTTON_STOP)
         self._finish_calibration()
         self._stop_estimated_motion()
+        self._async_drive_siblings(BUTTON_STOP)
+
+    @callback
+    def _async_group_siblings(self) -> list[DooyaCover]:
+        """Return the loaded per-shutter covers this group entity stands for.
+
+        Same remote id, excluding this entity and any other group cover: a
+        group cover carries no position estimate to drive.
+        """
+        siblings: list[DooyaCover] = []
+        for entry in self.hass.config_entries.async_entries(DOMAIN):
+            if entry.entry_id == self._config_entry.entry_id:
+                continue
+            if entry.data.get(CONF_DOOYA_ID) != self._dooya_id:
+                continue
+            runtime_data = getattr(entry, "runtime_data", None)
+            cover = getattr(runtime_data, "cover", None)
+            if cover is not None and not cover._is_broadcast:
+                siblings.append(cover)
+        return siblings
+
+    @callback
+    def _async_drive_siblings(self, button: int) -> None:
+        """Apply a group command to every shutter of this remote.
+
+        The resync path in `_handle_dooya_event` only ever fires for a frame
+        the node *received*. A node cannot hear itself: `remote_transmitter`
+        switches the CC1101 to TX for the whole transmission
+        (`esphome/dooya-node.yaml`, `on_transmit`/`on_complete`), so a frame
+        Home Assistant sends produces no `dooya_received` event on the node
+        that sent it. Hence the fan-out here — the physical common button
+        worked all along precisely because the node *does* hear that one
+        (issue #33).
+
+        The siblings also record the transmission in their own echo filter.
+        With more than one node in the house, the others hear this frame and
+        republish it; each sibling has already acted on it locally, so that
+        late echo is its own transmission — reviving a stopped shutter's
+        estimate is exactly what `TxEchoFilter` exists to prevent.
+        """
+        if not self._is_broadcast:
+            return
+        now = monotonic()
+        for cover in self._async_group_siblings():
+            cover._echo_filter.record_tx(button, now)
+            if button == BUTTON_UP:
+                cover._start_estimated_motion(direction=1, target_position=100)
+            elif button == BUTTON_DOWN:
+                cover._start_estimated_motion(direction=-1, target_position=0)
+            elif button == BUTTON_STOP:
+                cover._refresh_position()
+                cover._finish_calibration()
+                cover._stop_estimated_motion()
 
     async def async_set_cover_position(self, **kwargs: Any) -> None:
         """Move the shutter towards an estimated target position."""
