@@ -91,7 +91,6 @@ Your ESPHome node must:
 
 - expose an action/service named `transmit_dooya`
 - be integrated in Home Assistant through the ESPHome integration
-- have **Allow service calls** enabled in the ESPHome integration options
 - optionally expose a `remote_receiver` with `dump: dooya` if you want automatic detection from the remote
 
 The complete, maintained node configuration is
@@ -188,7 +187,7 @@ remote_receiver:
                 level: WARN
 ```
 
-Note: if you use `homeassistant.event`, Home Assistant must allow the ESPHome device to perform Home Assistant actions.
+Note: *Allow the device to perform Home Assistant actions* has no bearing on this. That option gates the other direction — a device calling into Home Assistant's own services — and `homeassistant.event` is dispatched before it is consulted. If the events do not arrive, read the node's log: a frame that was never decoded is never published.
 
 ## Home Assistant Setup
 
@@ -401,8 +400,14 @@ Home Assistant follows the remote through the `esphome.dooya_received` event.
 
 - Confirm the event fires at all: Developer Tools → **Events**, listen to
   `esphome.dooya_received`, then press the remote.
-- If nothing fires, the node is receiving nothing — check the CC1101 wiring and
-  that `cc1101.begin_rx` runs after each transmission.
+- If nothing fires, read the node's own log (ESPHome dashboard → **Logs**, or
+  `esphome logs your-node.yaml`) and press the remote again. A decoded frame is
+  logged there before it is published, so the log says which of the two halves
+  is silent. Nothing in the log means the node is receiving nothing — check the
+  CC1101 wiring and that `cc1101.begin_rx` runs after each transmission.
+- It is **not** the *Allow the device to perform Home Assistant actions* option.
+  That gates a device calling into Home Assistant's services; `dooya_received`
+  is a bus event and is dispatched before that check.
 - If it fires but no cover moves, compare the `channel` and remote id in the
   payload against the ones the cover was set up with.
 

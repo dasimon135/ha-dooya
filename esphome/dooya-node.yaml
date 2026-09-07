@@ -19,9 +19,10 @@
 # RF range tip: replace the coil antenna with a straight 17.3 cm wire
 # (433 MHz quarter wave), keep the node high up and away from concrete.
 #
-# After adopting the node in Home Assistant, enable "Allow the device to
-# perform Home Assistant actions" in the ESPHome integration options,
-# otherwise the received events are silently dropped.
+# Nothing to enable in the ESPHome integration options: the events below are
+# bus events, not Home Assistant service calls, and reach the bus whatever
+# "Allow the device to perform Home Assistant actions" is set to. If they do
+# not arrive, look at this node's log — an undecoded frame is never published.
 #
 # Entries this file expects in your ESPHome `secrets.yaml`:
 #   wifi_ssid, wifi_password
