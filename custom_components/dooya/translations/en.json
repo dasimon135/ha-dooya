@@ -102,7 +102,7 @@
   "issues": {
     "esphome_service_missing": {
       "title": "Dooya gateway service unavailable",
-      "description": "The ESPHome service {service} used by the shutter {name} to transmit RF commands is not available. Commands to this shutter will fail until it is restored.\n\nCheck that the ESPHome node {device} is online, that its firmware still exposes the transmit_dooya service, and that the option 'Allow the device to perform Home Assistant actions' is enabled for it in the ESPHome integration. You can also select another gateway node in the Dooya entry options."
+      "description": "The ESPHome service {service} used by the shutter {name} to transmit RF commands is not available. Commands to this shutter will fail until it is restored.\n\nCheck that the ESPHome node {device} is online and that its firmware still exposes the transmit_dooya action. You can also select another gateway node in the Dooya entry options."
     }
   },
   "exceptions": {
@@ -110,7 +110,7 @@
       "message": "No ESPHome gateway is configured for {name}. Reconfigure the Dooya entry and select the ESPHome device that transmits the RF commands."
     },
     "esphome_service_missing": {
-      "message": "The ESPHome service {service} required by {name} is not available. Check that the ESPHome node is online and allowed to perform Home Assistant actions."
+      "message": "The ESPHome service {service} required by {name} is not available. Check that the ESPHome node is online and still exposes the transmit_dooya action."
     }
   },
   "entity": {

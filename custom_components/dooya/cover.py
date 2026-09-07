@@ -539,7 +539,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
         _LOGGER.error(
             "ESPHome service not found: esphome.%s. Check that the node is "
-            "online and allowed to expose Home Assistant actions",
+            "online and that its firmware still exposes transmit_dooya",
             service_name,
         )
         raise HomeAssistantError(
