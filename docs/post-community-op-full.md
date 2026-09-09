@@ -41,25 +41,25 @@ Dooya blinds (and rebrands like Zemismart, AM43, etc.) use RF 433 MHz remotes wi
 
 ### Identify your CC1101 module
 
-There are two common versions of the 8-pin CC1101 module. Check **pin 2**:
+⚠️ **The PCB colour is not a reliable indicator** — some blue boards carry the green pinout and the other way round, depending on the manufacturer. The only dependable test is to look at pin 2 on your own module:
 
-- **GREEN module (E07)**: Pin 2 = **VCC** (3.3V)
-- **BLUE module (Standard)**: Pin 2 = **GND**
+- **Pin 2 = VCC** → use *Pinout A* below
+- **Pin 2 = GND** → use *Pinout B* below
 
-### Wiring for GREEN module (E07) — most common on AliExpress
+### Pinout A — pin 2 = VCC (often the green E07, but not always)
 
 | CC1101 Pin | Name | ESP32 GPIO | Function |
 |:---:|:---|:---|:---|
 | 1 | GND | GND | Ground |
 | 2 | VCC | 3V3 | 3.3V Power |
-| 3 | GDO0 | GPIO 4 | RX/TX (RF data) |
+| 3 | GDO0 | GPIO 4 | RF data — TX on the unified node, RX on the sniffer |
 | 4 | CSN | GPIO 5 | SPI Chip Select |
 | 5 | SCK | GPIO 18 | SPI Clock |
 | 6 | MOSI | GPIO 23 | SPI MOSI |
 | 7 | MISO | GPIO 19 | SPI MISO |
-| 8 | GDO2 | *(not used)* | - |
+| 8 | GDO2 | GPIO 16 | RF data in — unified node only |
 
-### Wiring for BLUE module (Standard)
+### Pinout B — pin 2 = GND
 
 | CC1101 Pin | Name | ESP32 GPIO | Function |
 |:---:|:---|:---|:---|
@@ -68,9 +68,11 @@ There are two common versions of the 8-pin CC1101 module. Check **pin 2**:
 | 3 | MOSI | GPIO 23 | SPI MOSI |
 | 4 | SCLK | GPIO 18 | SPI Clock |
 | 5 | MISO | GPIO 19 | SPI MISO |
-| 6 | GDO2 | *(not used)* | - |
-| 7 | GDO0 | GPIO 4 | RX/TX |
+| 6 | GDO2 | GPIO 16 | RF data in — unified node only |
+| 7 | GDO0 | GPIO 4 | RF data — TX on the unified node, RX on the sniffer |
 | 8 | CSN | GPIO 5 | SPI Chip Select |
+
+> **The GDO2 wire is only needed for the unified node** (`esphome/dooya-node.yaml`), which transmits on GDO0 and receives on GDO2. The original sniffer further down this post receives on GDO0/GPIO 4 and leaves GDO2 unconnected — if that is the one you flashed, skip that wire. Wiring the unified node from a table that says *not used* gives you a node that transmits perfectly and hears nothing.
 
 > ⚠️ **Warning**: The CC1101 runs on **3.3V only**. Do NOT connect it to 5V or you'll fry it.
 
@@ -403,7 +405,7 @@ Still from post #7: Naterial-branded remotes send two distinct RF frames for eac
 
 Since ESPHome 2025.12 there is a native [`cc1101` component](https://esphome.io/components/cc1101.html) in ESPHome core. It replaces the external `radiolib_cc1101` component, and because you no longer share one GPIO between RX and TX, **a single YAML does both jobs**.
 
-Wiring changes: keep SPI as described above (CS → GPIO5, SCK → GPIO18, MOSI → GPIO23, MISO → GPIO19), then wire **GDO0 → GPIO4** for transmission and **GDO2 → GPIO16** for reception. Pin 8 of the module, listed as "not used" in the wiring table near the top, is the one you now need.
+Wiring changes: keep SPI as described above (CS → GPIO5, SCK → GPIO18, MOSI → GPIO23, MISO → GPIO19), then wire **GDO0 → GPIO4** for transmission and **GDO2 → GPIO16** for reception. Pin 8 of the module is the one you now need — the wiring tables near the top give it as GDO2 → GPIO 16 for exactly this reason.
 
 A complete, commented node config using this — TX + RX, permanent listening, one node per RF zone — is here:
 https://github.com/dasimon135/ha-dooya/blob/main/esphome/dooya-node.yaml
