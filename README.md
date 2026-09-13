@@ -241,13 +241,15 @@ Options:
 
 The window scenery follows the sun (`sun.sun`): sunrise and sunset tints, bright day, and a starry night with the moon. 🌙
 
+An awning (see [Awnings](#awnings)) is drawn as a striped canopy hanging from its cassette over a bay window instead of a roller shutter. Its buttons use the same deploy and retract icons as Home Assistant's own tile card, the presets and recalibration shortcuts say *Retracted* and *Deployed*, and a click low in the picture deploys it further.
+
 The compact view fits dashboards with many shutters: a clickable position bar (left = closed, right = open), the up/stop/down buttons and the favorite button when one is configured. A star chip also appears in the normal view when a favorite position is set in the integration options.
 
 The tile view is smaller still — an icon, the name, the state and three buttons, aligned with Home Assistant's own tile cards. Tapping the icon or the name opens the full animated card in a popup, so a dense dashboard keeps the detailed view one tap away; set `tile_tap: more-info` if you would rather get the standard Home Assistant dialog. Its icon takes on a soft accent tint while the cover is open, the same way Mushroom's own cover card tints its icon by state — a plain grey dot next to Mushroom cards in the same column read as more prominent than it should, for no reason tied to its actual size.
 
 Labels follow the Home Assistant UI language (English / French).
 
-**Theming.** The card is a real `ha-card` and follows your theme's card surface, text and accent. A theme can also set (without the leading dashes): `dooya-accent` (active buttons and chips, hover borders, the slider — falls back to `primary-color`), `dooya-star` (the favourite-position chip), `dooya-slat-color` and `dooya-slat-shadow` (the curtain slats). The window scene — sky, sun, hills, moon — is an illustration of the time of day and keeps its own colours on every theme.
+**Theming.** The card is a real `ha-card` and follows your theme's card surface, text and accent. A theme can also set (without the leading dashes): `dooya-accent` (active buttons and chips, hover borders, the slider — falls back to `primary-color`), `dooya-star` (the favourite-position chip), `dooya-slat-color` and `dooya-slat-shadow` (the curtain slats), `dooya-awning-fabric` and `dooya-awning-stripe` (the two colours of an awning's fabric). The window scene — sky, sun, hills, moon — is an illustration of the time of day and keeps its own colours on every theme.
 
 ## Cleaning Up Old ESPHome Buttons
 
