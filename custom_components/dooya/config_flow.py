@@ -22,6 +22,7 @@ from .const import (
     CONF_DOOYA_ID,
     CONF_ESPHOME_DEVICE,
     CONF_FAVORITE_POSITION,
+    CONF_IS_AWNING,
     CONF_IS_GROUP,
     CONF_REPEAT_COUNT,
     CONF_TRAVEL_TIME_DOWN,
@@ -260,6 +261,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                 check=self._learned_data.check,
                 travel_time_up=user_input[CONF_TRAVEL_TIME_UP],
                 travel_time_down=user_input[CONF_TRAVEL_TIME_DOWN],
+                is_awning=user_input.get(CONF_IS_AWNING, False),
             )
 
         return self.async_show_form(
@@ -275,6 +277,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_TRAVEL_TIME_DOWN,
                         default=DEFAULT_TRAVEL_TIME_DOWN,
                     ): vol.All(vol.Coerce(float), vol.Range(min=1, max=240)),
+                    vol.Optional(CONF_IS_AWNING, default=False): bool,
                 }
             ),
             description_placeholders={
@@ -304,6 +307,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                     check=check_for_button(BUTTON_UP),
                     travel_time_up=user_input[CONF_TRAVEL_TIME_UP],
                     travel_time_down=user_input[CONF_TRAVEL_TIME_DOWN],
+                    is_awning=user_input.get(CONF_IS_AWNING, False),
                 )
 
         return self.async_show_form(
@@ -323,6 +327,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_TRAVEL_TIME_DOWN,
                         default=DEFAULT_TRAVEL_TIME_DOWN,
                     ): vol.All(vol.Coerce(float), vol.Range(min=1, max=240)),
+                    vol.Optional(CONF_IS_AWNING, default=False): bool,
                 }
             ),
             errors=errors,
@@ -412,6 +417,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
         check: int,
         travel_time_up: float,
         travel_time_down: float,
+        is_awning: bool = False,
     ) -> ConfigFlowResult:
         """Create the config entry, refusing to drive the same shutter twice.
 
@@ -435,6 +441,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_COVER_NAME: name,
                 CONF_TRAVEL_TIME_UP: travel_time_up,
                 CONF_TRAVEL_TIME_DOWN: travel_time_down,
+                CONF_IS_AWNING: is_awning,
             },
         )
 
@@ -466,6 +473,7 @@ class DooyaOptionsFlow(OptionsFlow):
                 entry.data.get(CONF_CHANNEL) == BROADCAST_CHANNEL,
             )
         )
+        current_is_awning = bool(entry_value(entry, CONF_IS_AWNING, False))
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -520,6 +528,7 @@ class DooyaOptionsFlow(OptionsFlow):
                 ): vol.All(int, vol.Range(min=1, max=3)),
                 favorite_field: vol.All(vol.Coerce(int), vol.Range(min=0, max=100)),
                 vol.Required(CONF_IS_GROUP, default=current_is_group): bool,
+                vol.Required(CONF_IS_AWNING, default=current_is_awning): bool,
             }
         )
 

@@ -53,6 +53,7 @@ CONF_CHANNEL: Final = "channel"  # Shutter channel (8 bits)
 CONF_CHECK: Final = "check"  # Check nibble (4 bits)
 CONF_COVER_NAME: Final = "cover_name"  # Shutter name
 CONF_IS_GROUP: Final = "is_group"  # This cover is the remote's common button
+CONF_IS_AWNING: Final = "is_awning"  # DOWN deploys it, and deployed is open
 CONF_TRAVEL_TIME_UP: Final = "travel_time_up"  # Full opening time (s)
 CONF_TRAVEL_TIME_DOWN: Final = "travel_time_down"  # Full closing time (s)
 CONF_REPEAT_COUNT: Final = "repeat_count"  # RF frame repetitions (reliability)

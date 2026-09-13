@@ -28,6 +28,7 @@ from custom_components.dooya.const import (
     CONF_COVER_NAME,
     CONF_DOOYA_ID,
     CONF_ESPHOME_DEVICE,
+    CONF_IS_AWNING,
     CONF_IS_GROUP,
     CONF_REPEAT_COUNT,
     CONF_TRAVEL_TIME_DOWN,
@@ -102,6 +103,7 @@ async def test_user_flow_manual_happy_path(
         CONF_COVER_NAME: "Salon",
         CONF_TRAVEL_TIME_UP: 20.0,
         CONF_TRAVEL_TIME_DOWN: 18.0,
+        CONF_IS_AWNING: False,
     }
 
 

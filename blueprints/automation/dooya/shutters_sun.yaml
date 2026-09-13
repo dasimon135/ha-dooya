@@ -7,6 +7,9 @@ blueprint:
     threshold (to keep the house cool).
 
     Designed for Dooya RF covers but works with any cover entity.
+
+    Written for shutters: do not select an awning, whose "closed" on a hot
+    day means retracted.
   domain: automation
   author: dasimon135
   source_url: https://github.com/dasimon135/ha-dooya/blob/main/blueprints/automation/dooya/shutters_sun.yaml
