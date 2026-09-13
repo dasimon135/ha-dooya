@@ -55,8 +55,9 @@ Around that:
 
 - **A calibration assistant.** Rather than asking you to guess travel times, it
   times the real thing with a stopwatch while the blind runs.
-- **Recalibration in one press.** Buttons on the device page to say "fully open",
-  "fully closed", or a known position, for when the estimate has drifted.
+- **Recalibration in one press.** Buttons on the device page to say "fully open"
+  or "fully closed" when the estimate has drifted, and an action to set any other
+  position you know.
 - **A favourite position**, per blind, on a single button — the same idea as the
   one on a real Dooya remote.
 - **One control for all of them.** A single entity that opens or closes every
@@ -73,19 +74,17 @@ Around that:
 2. Add `https://github.com/dasimon135/ha-dooya` as an `Integration` repository
 3. Install "Dooya RF Covers"
 4. Restart Home Assistant
-5. **Settings → Integrations → Add → Dooya RF Covers**
-
-Manual installation is also possible by copying `custom_components/dooya` into your Home Assistant configuration directory.
+5. **Settings → Devices & services → Add integration → Dooya RF Covers**
 
 ## Manual installation
 
 1. Copy `custom_components/dooya` into your Home Assistant configuration directory
 2. Restart Home Assistant
-3. **Settings → Integrations → Add → Dooya RF Covers**
+3. **Settings → Devices & services → Add integration → Dooya RF Covers**
 
 ## ESPHome Prerequisite (CC1101)
 
-This integration now relies on a native ESPHome service.
+This integration drives the motors through an action exposed by your ESPHome node.
 
 Your ESPHome node must:
 
@@ -187,6 +186,8 @@ remote_receiver:
                 level: WARN
 ```
 
+Coming from a node that exposed one ESPHome `button:` per shutter and per action? Those buttons are no longer needed: remove the `button:` section, update the node, and reload the ESPHome integration.
+
 Note: *Allow the device to perform Home Assistant actions* has no bearing on this. That option gates the other direction — a device calling into Home Assistant's own services — and `homeassistant.event` is dispatched before it is consulted. If the events do not arrive, read the node's log: a frame that was never decoded is never published.
 
 ## Home Assistant Setup
@@ -250,18 +251,6 @@ The tile view is smaller still — an icon, the name, the state and three button
 Labels follow the Home Assistant UI language (English / French).
 
 **Theming.** The card is a real `ha-card` and follows your theme's card surface, text and accent. A theme can also set (without the leading dashes): `dooya-accent` (active buttons and chips, hover borders, the slider — falls back to `primary-color`), `dooya-star` (the favourite-position chip), `dooya-slat-color` and `dooya-slat-shadow` (the curtain slats), `dooya-awning-fabric` and `dooya-awning-stripe` (the two colours of an awning's fabric). The window scene — sky, sun, hills, moon — is an illustration of the time of day and keeps its own colours on every theme.
-
-## Cleaning Up Old ESPHome Buttons
-
-If you previously exposed one ESPHome button per action and per shutter, they are no longer needed.
-
-Recommended cleanup:
-
-1. Remove the old `button:` section from your ESPHome YAML
-2. Reflash or OTA-update the ESPHome node
-3. Reload the ESPHome integration in Home Assistant
-
-After that, keep only the Dooya cover entities.
 
 ## Estimated Position And Calibration
 
@@ -359,13 +348,15 @@ It is written for shutters. Do not add an awning to it: closing an awning on a h
 
 RF433 OOK is a one-way protocol with no acknowledgement. In environments with RF interference (other 433 MHz devices, Wi-Fi, etc.), a command may occasionally be lost.
 
-The **RF transmission repeat count** option (accessible via **Settings → Integrations → Dooya → Configure**) controls how many times each command is sent:
+The **RF transmission repeat count** option (in the cover's **Configure** dialog: **Settings → Devices & services → Dooya RF Covers**, then the cover) controls how many times each command is sent:
 
 | Value | Behaviour |
 |-------|-----------|
 | 1 | Single transmission — default, suitable for most environments |
 | 2 | Two transmissions, 100 ms apart — recommended if commands are occasionally missed |
 | 3 | Three transmissions — for very noisy RF environments |
+
+Each of those transmissions is already a burst: the reference node sends every frame five times (`set_send_times(5)` in [`esphome/dooya-node.yaml`](esphome/dooya-node.yaml)), so a repeat count of 2 puts ten frames on the air.
 
 > ⚠️ Do not exceed 3 repetitions. Some Dooya motors may interpret repeated signals as a pairing or limit-setting command.
 
@@ -494,23 +485,16 @@ Frame: `header + 24-bit ID + 8-bit channel + 4-bit button + 4-bit check`
 
 Buttons: `UP=1`, `DOWN=3`, `STOP=5`
 
-The 4-bit check nibble repeats the button code, so it is derived from the
-button at transmit time rather than configured per shutter. A single stored
-value cannot be correct for UP, DOWN and STOP at once.
+On UP, DOWN and STOP the 4-bit check nibble repeats the button code, so it is
+derived from the button at transmit time rather than configured per shutter. A
+single stored value cannot be correct for all three at once. Other keys do not
+follow that rule: the LED key of the DC1600A remote sends button 0 with check 15
+([#14](https://github.com/dasimon135/ha-dooya/issues/14)).
 
 Frames are encoded on the ESP32 by ESPHome's own `DooyaProtocol`. The
 `dooya_protocol.py` module in this repository is a reference implementation
 used by the unit tests to pin the timing table above — it is not the transmit
 path.
-
-## Release Status
-
-Current architecture:
-
-- Home Assistant custom integration with config flow
-- ESPHome RF433 sender/receiver using a native `transmit_dooya` action/service
-- Automatic learning based on the `esphome.dooya_received` event sent by the ESPHome node
-- Estimated position based on configured travel times, with manual recalibration services
 
 ## License
 
