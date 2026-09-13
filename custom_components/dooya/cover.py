@@ -27,6 +27,7 @@ from .const import (
     CALIBRATION_TIMEOUT_SEC,
     CONF_CHANNEL,
     CONF_DOOYA_ID,
+    CONF_IS_AWNING,
     CONF_IS_GROUP,
     CONF_REPEAT_COUNT,
     CONF_TRAVEL_TIME_DOWN,
@@ -103,7 +104,6 @@ async def async_setup_entry(
 class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     """Dooya RF433 shutter whose position is estimated from travel time."""
 
-    _attr_device_class = CoverDeviceClass.SHUTTER
     _attr_assumed_state = True
 
     def __init__(self, config_entry: DooyaConfigEntry) -> None:
@@ -128,6 +128,16 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         )
         if not self._is_broadcast:
             self._attr_supported_features |= CoverEntityFeature.SET_POSITION
+
+        # An awning deploys with DOWN, and Home Assistant calls a deployed
+        # awning open (the core Overkiz integration maps open_cover to DEPLOY).
+        # Every translation between a button and a direction of travel goes
+        # through _button_for / _direction_for: buttons stay physical,
+        # directions and positions stay semantic (issue #50).
+        self._is_awning = bool(entry_value(config_entry, CONF_IS_AWNING, False))
+        self._attr_device_class = (
+            CoverDeviceClass.AWNING if self._is_awning else CoverDeviceClass.SHUTTER
+        )
 
         self._travel_time_up = float(
             entry_value(config_entry, CONF_TRAVEL_TIME_UP, DEFAULT_TRAVEL_TIME_UP)
@@ -237,16 +247,18 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         self._config_entry.runtime_data.cover = None
 
     async def async_open_cover(self, **kwargs: Any) -> None:
-        """Open the shutter (UP command, button=1)."""
-        await self._async_transmit(BUTTON_UP)
+        """Open the cover: UP on a shutter, DOWN on an awning."""
+        button = self._button_for(1)
+        await self._async_transmit(button)
         self._start_estimated_motion(direction=1, target_position=100)
-        self._async_drive_siblings(BUTTON_UP)
+        self._async_drive_siblings(button)
 
     async def async_close_cover(self, **kwargs: Any) -> None:
-        """Close the shutter (DOWN command, button=3)."""
-        await self._async_transmit(BUTTON_DOWN)
+        """Close the cover: DOWN on a shutter, UP on an awning."""
+        button = self._button_for(-1)
+        await self._async_transmit(button)
         self._start_estimated_motion(direction=-1, target_position=0)
-        self._async_drive_siblings(BUTTON_DOWN)
+        self._async_drive_siblings(button)
 
     async def async_stop_cover(self, **kwargs: Any) -> None:
         """Stop the shutter (STOP command, button=5)."""
@@ -299,9 +311,12 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         now = monotonic()
         for cover in self._async_group_siblings():
             cover._echo_filter.record_tx(button, now)
-            if button == BUTTON_UP:
+            # The button is the physical frame that went out; each sibling
+            # reads it through its own mapping, so a remote driving shutters
+            # and an awning moves each of them the way the motor does.
+            if (direction := cover._direction_for(button)) > 0:
                 cover._start_estimated_motion(direction=1, target_position=100)
-            elif button == BUTTON_DOWN:
+            elif direction < 0:
                 cover._start_estimated_motion(direction=-1, target_position=0)
             elif button == BUTTON_STOP:
                 cover._refresh_position()
@@ -327,11 +342,11 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             return
 
         if position > current_position:
-            await self._async_transmit(BUTTON_UP)
+            await self._async_transmit(self._button_for(1))
             self._start_estimated_motion(direction=1, target_position=position)
             return
 
-        await self._async_transmit(BUTTON_DOWN)
+        await self._async_transmit(self._button_for(-1))
         self._start_estimated_motion(direction=-1, target_position=position)
 
     @callback
@@ -386,10 +401,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
         # Transmit before arming the calibration state: a failed transmit
         # (raising HomeAssistantError) must leave no calibration pending.
-        if direction > 0:
-            await self._async_transmit(BUTTON_UP)
-        else:
-            await self._async_transmit(BUTTON_DOWN)
+        await self._async_transmit(self._button_for(direction))
 
         self._calibrating = direction
         self._calibration_start = monotonic()
@@ -621,14 +633,31 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             )
             return
 
-        if button == BUTTON_UP:
+        if (direction := self._direction_for(button)) > 0:
             self._start_estimated_motion(direction=1, target_position=100)
-        elif button == BUTTON_DOWN:
+        elif direction < 0:
             self._start_estimated_motion(direction=-1, target_position=0)
         elif button == BUTTON_STOP:
             self._refresh_position()
             self._finish_calibration()
             self._stop_estimated_motion()
+
+    def _button_for(self, direction: int) -> int:
+        """Return the button that moves this cover in `direction` (+1 opens)."""
+        opens = direction > 0
+        if self._is_awning:
+            opens = not opens
+        return BUTTON_UP if opens else BUTTON_DOWN
+
+    def _direction_for(self, button: int) -> int:
+        """Return the direction `button` moves this cover: +1, -1, or 0."""
+        if button == BUTTON_UP:
+            direction = 1
+        elif button == BUTTON_DOWN:
+            direction = -1
+        else:
+            return 0
+        return -direction if self._is_awning else direction
 
     @callback
     def _start_estimated_motion(self, direction: int, target_position: int) -> None:

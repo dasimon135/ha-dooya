@@ -297,6 +297,12 @@ Persistent notifications guide each step; the measurement is cancelled automatic
 
 Set a **favorite position** (for example 30 %) in the integration options. A *Favorite position* button then appears on the device page (and a star chip on the bundled card) that sends the shutter there in one press — like the favorite button of real Dooya remotes.
 
+### Awnings
+
+A Dooya remote rolls an awning out with **DOWN**, while Home Assistant calls a deployed awning *open*. Tick **This cover is an awning (DOWN deploys it)** when you name the cover, or later in its options, and the cover becomes an awning: *Open* sends DOWN, *Close* sends UP, a press on the physical remote is read the same way, and 100 % means fully deployed. The opening time is then the time to deploy it, and the calibration buttons measure it that way. Existing covers are not affected.
+
+A remote whose common button drives both shutters and an awning moves each of them the way its motor does: one UP opens the shutters and retracts the awning. The group cover itself follows its own setting.
+
 ## Broadcast Channel (All Shutters)
 
 Dooya multi-channel remotes have an "all" button that moves every shutter paired with the remote from a single RF frame. On most remotes it transmits on **channel 0**.
@@ -342,6 +348,8 @@ The repo ships a ready-to-import blueprint ([blueprints/automation/dooya/shutter
 - closes the shutters when the sun drops below a configurable elevation
 - opens them in the morning above a configurable elevation (never before a chosen time)
 - optionally closes them during hot days (outdoor temperature sensor + threshold) and reopens once it cools down
+
+It is written for shutters. Do not add an awning to it: closing an awning on a hot day retracts it, the opposite of what you want.
 
 [![Import blueprint](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Fdasimon135%2Fha-dooya%2Fblob%2Fmain%2Fblueprints%2Fautomation%2Fdooya%2Fshutters_sun.yaml)
 
