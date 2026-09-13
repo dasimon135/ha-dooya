@@ -8,12 +8,16 @@
  * Shows an animated roller shutter that tracks the estimated position,
  * up/stop/down controls, a position slider, preset chips and (for dooya
  * entities) the manual recalibration actions mark_open / mark_closed.
+ *
+ * A cover whose device class is `awning` is drawn as a striped canopy on a
+ * facade instead, with Home Assistant's awning control icons and labels that
+ * say deployed / retracted (issue #50).
  */
 
-// Console banner only. Cache-busting uses the integration version from
-// manifest.json (see __init__.py::_async_register_card), so this does not need
-// to be kept in sync with any Python constant.
-const VERSION = "1.4.3";
+// Console banner only. Cache-busting uses a digest of this file (see
+// __init__.py::_async_register_card), so this does not need to be kept in sync
+// with any Python constant.
+const VERSION = "1.5.0";
 // eslint-disable-next-line no-console
 console.info(`%c DOOYA-COVER-CARD %c v${VERSION} `, "background:#e8833a;color:#fff;border-radius:3px 0 0 3px", "background:#c95d2e;color:#fff;border-radius:0 3px 3px 0");
 
@@ -35,6 +39,17 @@ const STRINGS = {
     favorite: "Favorite",
     notFound: (e) => `Entity ${e} not found`,
     closeDialog: "Close",
+    awning: {
+      opening: "Deploying…",
+      closing: "Retracting…",
+      up: "Deploy",
+      down: "Retract",
+      open: "Deployed",
+      closed: "Retracted",
+      presets: { 0: "Retracted", 100: "Deployed" },
+      markOpen: "Set as deployed",
+      markClosed: "Set as retracted",
+    },
   },
   fr: {
     open: "Ouvert",
@@ -53,7 +68,27 @@ const STRINGS = {
     favorite: "Favori",
     notFound: (e) => `Entité ${e} introuvable`,
     closeDialog: "Fermer",
+    awning: {
+      opening: "Déploiement…",
+      closing: "Repli…",
+      up: "Déployer",
+      down: "Replier",
+      open: "Déployé",
+      closed: "Replié",
+      presets: { 0: "Replié", 100: "Déployé" },
+      markOpen: "Marquer déployé",
+      markClosed: "Marquer replié",
+    },
   },
+};
+
+// Awning glyphs drawn in currentColor, so they follow the theme like ha-icon.
+const AWNING_GLYPH = {
+  retracted:
+    '<svg class="aw-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="20" height="4" rx="2"/></svg>',
+  deployed:
+    '<svg class="aw-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="3" rx="1.5"/>' +
+    '<path d="M4 7H20L22 16H2Z"/><path d="M2 17H22V19Q20 21 18 19Q16 21 14 19Q12 21 10 19Q8 21 6 19Q4 21 2 19Z"/></svg>',
 };
 
 class DooyaCoverCard extends HTMLElement {
@@ -97,6 +132,56 @@ class DooyaCoverCard extends HTMLElement {
   _t() {
     const lang = (this._hass && this._hass.language) || "en";
     return lang.startsWith("fr") ? STRINGS.fr : STRINGS.en;
+  }
+
+  _isAwning(st) {
+    return !!(st && st.attributes && st.attributes.device_class === "awning");
+  }
+
+  // Facade with a striped canopy hanging from its cassette. `pos` is the
+  // Home Assistant position: 0 retracted, 100 fully deployed. Colours live in
+  // the stylesheet's scene fence, so every element here only carries a class.
+  _awningScene(pos) {
+    const k = Math.max(0, Math.min(100, pos == null ? 0 : pos)) / 100;
+    const cx0 = 34, cx1 = 156, cy = 38, ground = 142;
+    const drop = 62 * k, spread = 12 * k;
+    const bx0 = cx0 - spread, bx1 = cx1 + spread, by = cy + 6 + drop;
+    const stripes = 9;
+    const r = (v) => Math.round(v * 10) / 10;
+    let fabric = "";
+    if (k > 0.01) {
+      const vh = 9 * Math.min(k * 3, 1), sag = 4 * Math.min(k * 3, 1);
+      for (let i = 0; i < stripes; i++) {
+        const t0 = i / stripes, t1 = (i + 1) / stripes;
+        const tx0 = cx0 + (cx1 - cx0) * t0, tx1 = cx0 + (cx1 - cx0) * t1;
+        const fx0 = bx0 + (bx1 - bx0) * t0, fx1 = bx0 + (bx1 - bx0) * t1;
+        const tone = i % 2 ? "b" : "a";
+        fabric +=
+          `<polygon class="aw-stripe ${tone}" points="${r(tx0)},${cy + 5} ${r(tx1)},${cy + 5} ${r(fx1)},${r(by)} ${r(fx0)},${r(by)}"/>` +
+          // the valance under this stripe, one scallop wide
+          `<path class="aw-stripe ${tone}" d="M${r(fx0)} ${r(by + 2)}H${r(fx1)}V${r(by + vh)}Q${r((fx0 + fx1) / 2)} ${r(by + vh + sag)} ${r(fx0)} ${r(by + vh)}Z"/>`;
+      }
+      fabric +=
+        `<line class="aw-arm" x1="${cx0 + 6}" y1="${cy + 30}" x2="${r(bx0 + 4)}" y2="${r(by)}"/>` +
+        `<line class="aw-arm" x1="${cx1 - 6}" y1="${cy + 30}" x2="${r(bx1 - 4)}" y2="${r(by)}"/>` +
+        `<rect class="aw-bar" x="${r(bx0 - 1)}" y="${r(by - 1)}" width="${r(bx1 - bx0 + 2)}" height="4" rx="2"/>`;
+    }
+    const half = (cx1 - cx0) / 2 + spread, shadeH = r(26 * k);
+    return `
+      <svg class="awning-scene" viewBox="0 0 190 170" preserveAspectRatio="none" aria-hidden="true">
+        <rect class="aw-sky" width="190" height="24"/>
+        <circle class="aw-sun" cx="170" cy="12" r="7"/>
+        <rect class="aw-roof" y="20" width="190" height="6"/>
+        <rect class="aw-wall" y="26" width="190" height="${ground - 26}"/>
+        <rect class="aw-glass" x="52" y="62" width="86" height="${ground - 62}"/>
+        <line class="aw-frame" x1="95" y1="62" x2="95" y2="${ground}"/>
+        <rect class="aw-terrace" y="${ground}" width="190" height="${170 - ground}"/>
+        <path class="aw-joint" d="M0 ${ground + 12}H190M30 ${ground}l-12 28M75 ${ground}l-4 28M115 ${ground}l4 28M160 ${ground}l12 28"/>
+        <polygon class="aw-shade" style="opacity:${r(0.2 * Math.min(k * 2, 1))}"
+          points="${r(95 - half)},${ground} ${r(95 + half)},${ground} ${r(95 + half + 10)},${ground + shadeH} ${r(95 - half - 10)},${ground + shadeH}"/>
+        <rect class="aw-box" x="${cx0 - 3}" y="${cy - 4}" width="${cx1 - cx0 + 6}" height="10" rx="4"/>
+        ${fabric}
+      </svg>`;
   }
 
   _isDooya() {
@@ -191,10 +276,16 @@ class DooyaCoverCard extends HTMLElement {
     const name = this._esc(
       this._config.name || st.attributes.friendly_name || "Cover"
     );
+    const awning = this._isAwning(st);
+    // An awning keeps Home Assistant's open / closed state words, and says
+    // deploying / retracting for everything that describes the fabric moving.
+    const ta = awning ? { ...t, ...t.awning } : t;
+    const openIcon = awning ? "mdi:arrow-expand-horizontal" : "mdi:chevron-up";
+    const closeIcon = awning ? "mdi:arrow-collapse-horizontal" : "mdi:chevron-down";
 
     let stateLabel;
-    if (opening) stateLabel = t.opening;
-    else if (closing) stateLabel = t.closing;
+    if (opening) stateLabel = ta.opening;
+    else if (closing) stateLabel = ta.closing;
     else if (pos == null) stateLabel = closed ? t.closed : t.open;
     else if (pos <= 0) stateLabel = t.closed;
     else if (pos >= 100) stateLabel = t.open;
@@ -209,19 +300,22 @@ class DooyaCoverCard extends HTMLElement {
     // the icon/name opens the full card in a popup (see _openCardDialog).
     if (this._config.view === "tile") {
       const icon = closed ? "mdi:window-shutter" : "mdi:window-shutter-open";
+      const dot = awning
+        ? AWNING_GLYPH[closed ? "retracted" : "deployed"]
+        : `<ha-icon icon="${icon}"></ha-icon>`;
       this._body.innerHTML = `
         <div class="tile ${closed ? "off" : ""}">
           <div class="tinfo" data-act="tileinfo" role="button" tabindex="0" aria-label="${name}">
-            <div class="tdot"><ha-icon icon="${icon}"></ha-icon></div>
+            <div class="tdot">${dot}</div>
             <div class="ttext">
               <span class="tname">${name}</span>
               <span class="tsub">${stateLabel}</span>
             </div>
           </div>
           <div class="tctl">
-            <button class="tbtn ${opening ? "active" : ""}" data-act="open" aria-label="${t.up}"><ha-icon icon="mdi:chevron-up"></ha-icon></button>
+            <button class="tbtn ${opening ? "active" : ""}" data-act="open" aria-label="${ta.up}"><ha-icon icon="${openIcon}"></ha-icon></button>
             <button class="tbtn" data-act="stop" aria-label="${t.stop}"><ha-icon icon="mdi:stop"></ha-icon></button>
-            <button class="tbtn ${closing ? "active" : ""}" data-act="close" aria-label="${t.down}"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
+            <button class="tbtn ${closing ? "active" : ""}" data-act="close" aria-label="${ta.down}"><ha-icon icon="${closeIcon}"></ha-icon></button>
           </div>
         </div>`;
       return;
@@ -239,9 +333,9 @@ class DooyaCoverCard extends HTMLElement {
             <div class="cfill ${moving ? "moving" : ""}" style="width:${fillPct}%"></div>
           </div>
           ${favBtn ? `<button class="ctl mini" data-fav="${this._esc(favBtn)}" title="${t.favorite}"><ha-icon icon="mdi:star"></ha-icon></button>` : ""}
-          <button class="ctl mini ${opening ? "active" : ""}" data-act="open" title="${t.up}"><ha-icon icon="mdi:chevron-up"></ha-icon></button>
+          <button class="ctl mini ${opening ? "active" : ""}" data-act="open" title="${ta.up}"><ha-icon icon="${openIcon}"></ha-icon></button>
           <button class="ctl mini" data-act="stop" title="${t.stop}"><ha-icon icon="mdi:stop"></ha-icon></button>
-          <button class="ctl mini ${closing ? "active" : ""}" data-act="close" title="${t.down}"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
+          <button class="ctl mini ${closing ? "active" : ""}" data-act="close" title="${ta.down}"><ha-icon icon="${closeIcon}"></ha-icon></button>
         </div>
       `;
       return;
@@ -256,7 +350,7 @@ class DooyaCoverCard extends HTMLElement {
         `<div class="chips presets">` +
         [0, 25, 50, 75, 100]
           .map((p) => {
-            const label = t.presets[p] || `${p}%`;
+            const label = ta.presets[p] || `${p}%`;
             const active = pos != null && pos === p;
             return `<button class="chip ${active ? "active" : ""}" data-pos="${p}">${label}</button>`;
           })
@@ -272,8 +366,8 @@ class DooyaCoverCard extends HTMLElement {
       calibHtml = `
         <div class="calib">
           <span class="calib-label" title="${t.estimated}"><ha-icon icon="mdi:crosshairs-gps"></ha-icon>${t.calibrate}</span>
-          <button class="chip small" data-act="mark_closed" title="${t.markClosed}"><ha-icon icon="mdi:arrow-collapse-down"></ha-icon><span>${t.closed}</span></button>
-          <button class="chip small" data-act="mark_open" title="${t.markOpen}"><ha-icon icon="mdi:arrow-collapse-up"></ha-icon><span>${t.open}</span></button>
+          <button class="chip small" data-act="mark_closed" title="${ta.markClosed}"><ha-icon icon="${awning ? closeIcon : "mdi:arrow-collapse-down"}"></ha-icon><span>${ta.closed}</span></button>
+          <button class="chip small" data-act="mark_open" title="${ta.markOpen}"><ha-icon icon="${awning ? openIcon : "mdi:arrow-collapse-up"}"></ha-icon><span>${ta.open}</span></button>
         </div>`;
     }
 
@@ -283,7 +377,8 @@ class DooyaCoverCard extends HTMLElement {
         <div class="state ${moving ? "moving" : ""}" title="${t.estimated}">${stateLabel}</div>
       </div>
       <div class="hero">
-        <div class="window sc-${this._scene()}" data-window title="${t.estimated}">
+        <div class="window ${awning ? "awning" : ""} sc-${this._scene()}" data-window title="${t.estimated}">
+          ${awning ? this._awningScene(pos) : `
           <div class="sky">
             <div class="stars"></div>
             <div class="sun"></div>
@@ -293,19 +388,19 @@ class DooyaCoverCard extends HTMLElement {
           </div>
           <div class="curtain ${moving ? "moving" : ""}" style="height:${curtainPct}%">
             <div class="bar"></div>
-          </div>
+          </div>`}
           <div class="pos-label">${pos != null ? pos + "%" : "?"}</div>
         </div>
         <div class="btns">
-          <button class="ctl ${opening ? "active" : ""}" data-act="open" title="${t.up}"><ha-icon icon="mdi:chevron-up"></ha-icon></button>
+          <button class="ctl ${opening ? "active" : ""}" data-act="open" title="${ta.up}"><ha-icon icon="${openIcon}"></ha-icon></button>
           <button class="ctl stop" data-act="stop" title="${t.stop}"><ha-icon icon="mdi:stop"></ha-icon></button>
-          <button class="ctl ${closing ? "active" : ""}" data-act="close" title="${t.down}"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
+          <button class="ctl ${closing ? "active" : ""}" data-act="close" title="${ta.down}"><ha-icon icon="${closeIcon}"></ha-icon></button>
         </div>
       </div>
       <div class="sliderrow">
-        <ha-icon icon="mdi:window-shutter"></ha-icon>
+        ${awning ? AWNING_GLYPH.retracted : `<ha-icon icon="mdi:window-shutter"></ha-icon>`}
         <input class="slider" type="range" min="0" max="100" step="1" value="${pos != null ? pos : 0}" data-slider/>
-        <ha-icon icon="mdi:window-shutter-open"></ha-icon>
+        ${awning ? AWNING_GLYPH.deployed : `<ha-icon icon="mdi:window-shutter-open"></ha-icon>`}
       </div>
       ${presetHtml}
       ${calibHtml}
@@ -415,10 +510,13 @@ class DooyaCoverCard extends HTMLElement {
     const w = e.target.closest("[data-window]");
     if (w && !e.target.closest("[data-slider]")) {
       // Click inside the window sets the position: top = closed curtain fully
-      // raised (100 = open), bottom = fully lowered (0 = closed).
+      // raised (100 = open), bottom = fully lowered (0 = closed). An awning
+      // hangs down as it deploys, so there low in the picture is more open.
       const r = w.getBoundingClientRect();
       const frac = (e.clientY - r.top) / r.height;
-      const target = Math.max(0, Math.min(100, Math.round((1 - frac) * 100)));
+      const awning = this._isAwning(this._hass.states[entity_id]);
+      const share = awning ? frac : 1 - frac;
+      const target = Math.max(0, Math.min(100, Math.round(share * 100)));
       this._call("cover", "set_cover_position", { entity_id, position: target });
       return;
     }
@@ -517,7 +615,29 @@ class DooyaCoverCard extends HTMLElement {
       .pos-label { position:absolute; bottom:6px; right:8px; font-size:.78rem; font-weight:600;
                    color:rgba(0,0,0,.55); background:rgba(255,255,255,.6); border-radius:8px; padding:1px 6px;
                    pointer-events:none; }
+      .window.awning { width:190px; }
+      .awning-scene { position:absolute; inset:0; width:100%; height:100%; display:block; }
+      .aw-sky { fill:#8fcaf0; }
+      .aw-sun { fill:#ffd75e; }
+      .aw-roof { fill:#8a5a44; }
+      .aw-wall { fill:#e8dcc6; }
+      .aw-glass { fill:#6f8fae; stroke:#f6f1e8; stroke-width:3; }
+      .aw-frame { stroke:#f6f1e8; stroke-width:2.5; }
+      .aw-terrace { fill:#cdbb9f; }
+      .aw-joint { stroke:#b9a684; stroke-width:1; fill:none; }
+      .aw-shade { fill:#000; }
+      .aw-box { fill:#5d5d5d; }
+      .aw-arm { stroke:#6b6b6b; stroke-width:2; }
+      .aw-bar { fill:#5f5f5f; }
+      .aw-stripe.a { fill: var(--dooya-awning-fabric, #efe7d8); }
+      .aw-stripe.b { fill: var(--dooya-awning-stripe, #c4553b); }
+      .window.sc-night .awning-scene { filter:brightness(.5) saturate(.8); }
+      .window.sc-dawn .aw-sky { fill:#ffb26b; }
+      .window.sc-dusk .aw-sky { fill:#ff8e63; }
+      .window.sc-night .aw-sky { fill:#101c33; }
       /* /scene */
+      .aw-ico { width:20px; height:20px; fill:currentColor; flex:none; }
+      .tdot .aw-ico { width:24px; height:24px; }
       .btns { display:flex; flex-direction:column; justify-content:space-between; }
       .ctl { width:52px; flex:1; border:none; border-radius:12px; margin:3px 0; cursor:pointer;
              background: var(--divider-color); color: var(--primary-text-color); }
@@ -636,7 +756,7 @@ if (!window.customCards.some((c) => c.type === "dooya-cover-card")) {
   window.customCards.push({
     type: "dooya-cover-card",
     name: "Dooya Cover Card",
-    description: "Animated roller-shutter card for Dooya RF covers (position, presets, recalibration).",
+    description: "Animated card for Dooya RF shutters and awnings (position, presets, recalibration).",
     preview: true,
     documentationURL: "https://github.com/dasimon135/ha-dooya",
   });
