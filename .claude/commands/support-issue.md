@@ -189,7 +189,9 @@ source that it is still accurate.
 
 You cannot tell what is happening without data the user has not supplied.
 
-Ask for exactly what you need. Drop the lines you do not need; add none.
+The list below is a menu, not a form. Ask for the fewest items that let you
+tell what is going on, usually two or three, and say what each will tell you.
+Drop every line you do not need; add none.
 
 > I need a few things before I can tell what is going on.
 >
@@ -282,6 +284,14 @@ Do not remove a label a human already set.
 - **No emoji.** None, anywhere.
 - No apologising for the integration, no promises about timelines, no speaking
   for the maintainer's plans.
+- **Shape, not vocabulary, is what gives a generated comment away.** So:
+  no em dash, use a comma or a full stop; no heading, no table, no bold in a
+  comment (bullets only for ordered steps or the list in case (b)); one
+  "not X, Y" at most; no "Two things worth knowing" opener; no adjective about
+  the reporter or the report, no staged self-blame, no "no rush", "no
+  obligation", "let me know" closer; 300 words at most, a diff or a YAML block
+  excluded. First sentence: the answer. Last sentence: what you need from them,
+  or nothing.
 - Say plainly when something is a known constraint — the one-way protocol, the
   estimated position, the ESPHome prerequisite — rather than implying it will be
   fixed.
