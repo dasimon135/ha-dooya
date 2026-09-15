@@ -172,13 +172,23 @@ remote_receiver:
             api.connected:
               state_subscription_only: true
           then:
+            # `data_template` is rendered by Home Assistant's own template
+            # engine, not by ESPHome (see the api component docs). A bare
+            # "{{ variable }}" lets HA's native-type detection decide
+            # whether the value comes out as a string or a number, and that
+            # choice is not guaranteed to be consistent from one frame to
+            # the next. `| int` on the numeric fields makes the type
+            # deterministic instead of leaving every consumer of this event
+            # (this integration included, see cover.py/config_flow.py) to
+            # guess and defensively re-cast it. `id` stays untouched: it is
+            # rendered as hex, never mistaken for a number.
             - homeassistant.event:
                 event: esphome.dooya_received
                 data_template:
                   id: "{{ dooya_id }}"
-                  channel: "{{ dooya_channel }}"
-                  button: "{{ dooya_button }}"
-                  check: "{{ dooya_check }}"
+                  channel: "{{ dooya_channel | int }}"
+                  button: "{{ dooya_button | int }}"
+                  check: "{{ dooya_check | int }}"
                 variables:
                   dooya_id: !lambda |-
                     char buf[9];
