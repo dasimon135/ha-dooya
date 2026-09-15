@@ -166,9 +166,9 @@ remote_receiver:
                 event: esphome.dooya_received
                 data_template:
                   id: "{{ dooya_id }}"
-                  channel: "{{ dooya_channel }}"
-                  button: "{{ dooya_button }}"
-                  check: "{{ dooya_check }}"
+                  channel: "{{ dooya_channel | int }}"
+                  button: "{{ dooya_button | int }}"
+                  check: "{{ dooya_check | int }}"
                 variables:
                   dooya_id: !lambda |-
                     char buf[9];
