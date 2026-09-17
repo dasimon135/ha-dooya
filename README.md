@@ -235,18 +235,24 @@ Options:
 |--------|---------|-------------|
 | `entity` | — | Cover entity (required) |
 | `name` | entity name | Card title |
-| `view` | `normal` | `normal` (full animated window), `compact` (one-line bar with up/stop/down) or `tile` (icon + name + three buttons) |
-| `tile_tap` | popup | `tile` view only: what tapping the icon/name does — the default opens the full card in a popup, `more-info` opens the standard Home Assistant dialog |
+| `layout` | `full` | `full` (full animated window), `compact` (one-line bar with up/stop/down) or `tile` (icon + name + three buttons) |
+| `tile_tap` | popup | `tile` layout only: what tapping the icon/name does — the default opens the full card in a popup, `more-info` opens the standard Home Assistant dialog |
 | `show_presets` | `true` | Show the preset position chips |
 | `show_calibration` | `true` | Show the recalibration shortcuts |
+
+> **`view` still works.** This option used to be called `view`, with `normal`
+> where it now says `full`. Every dashboard written against those names keeps
+> working, and nothing needs editing. `layout` is the name to write today: it is
+> what the other cards from this author use, and what the visual editor now
+> offers — opening a card there rewrites `view` as `layout` for you.
 
 The window scenery follows the sun (`sun.sun`): sunrise and sunset tints, bright day, and a starry night with the moon. 🌙
 
 An awning (see [Awnings](#awnings)) is drawn as a striped canopy hanging from its cassette over a bay window instead of a roller shutter. Its buttons use the same deploy and retract icons as Home Assistant's own tile card, the presets and recalibration shortcuts say *Retracted* and *Deployed*, and a click low in the picture deploys it further.
 
-The compact view fits dashboards with many shutters: a clickable position bar (left = closed, right = open), the up/stop/down buttons and the favorite button when one is configured. A star chip also appears in the normal view when a favorite position is set in the integration options.
+The compact layout fits dashboards with many shutters: a clickable position bar (left = closed, right = open), the up/stop/down buttons and the favorite button when one is configured. A star chip also appears in the full layout when a favorite position is set in the integration options.
 
-The tile view is smaller still — an icon, the name, the state and three buttons, aligned with Home Assistant's own tile cards. Tapping the icon or the name opens the full animated card in a popup, so a dense dashboard keeps the detailed view one tap away; set `tile_tap: more-info` if you would rather get the standard Home Assistant dialog. Its icon takes on a soft accent tint while the cover is open, the same way Mushroom's own cover card tints its icon by state — a plain grey dot next to Mushroom cards in the same column read as more prominent than it should, for no reason tied to its actual size.
+The tile layout is smaller still — an icon, the name, the state and three buttons, aligned with Home Assistant's own tile cards. Tapping the icon or the name opens the full animated card in a popup, so a dense dashboard keeps the detailed view one tap away; set `tile_tap: more-info` if you would rather get the standard Home Assistant dialog. Its icon takes on a soft accent tint while the cover is open, the same way Mushroom's own cover card tints its icon by state — a plain grey dot next to Mushroom cards in the same column read as more prominent than it should, for no reason tied to its actual size.
 
 Labels follow the Home Assistant UI language (English / French).
 

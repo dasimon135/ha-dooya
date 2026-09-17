@@ -112,8 +112,28 @@ class DooyaCoverCard extends HTMLElement {
   }
 
   getCardSize() {
-    if (this._config && this._config.view === "tile") return 1;
-    return this._config && this._config.view === "compact" ? 2 : 5;
+    const layout = this._layout();
+    if (layout === "tile") return 1;
+    return layout === "compact" ? 2 : 5;
+  }
+
+  /**
+   * Which of the three sizes to draw: `full`, `compact` or `tile`.
+   *
+   * `layout` is the option, and the name the other cards in this family use.
+   * `view` was this card's own spelling of it, with `normal` where the others
+   * say `full`; both are still read so a dashboard written against the old
+   * names keeps working. A config carrying both is not a config anyone wrote
+   * on purpose -- the editor never emits one -- so `layout`, the current name,
+   * decides.
+   *
+   * Safe before `setConfig`: `getCardSize` can be called first.
+   */
+  _layout() {
+    const config = this._config || {};
+    if (config.layout) return config.layout;
+    if (config.view) return config.view === "normal" ? "full" : config.view;
+    return "full";
   }
 
   static getStubConfig(hass) {
@@ -262,7 +282,7 @@ class DooyaCoverCard extends HTMLElement {
     const t = this._t();
     const st = this._hass.states[this._config.entity];
     this._ensureRoot();
-    this._root.classList.toggle("tilecard", this._config.view === "tile");
+    this._root.classList.toggle("tilecard", this._layout() === "tile");
     if (!st) {
       this._body.innerHTML = `<div class="warn">${this._esc(t.notFound(this._config.entity))}</div>`;
       return;
@@ -298,7 +318,7 @@ class DooyaCoverCard extends HTMLElement {
 
     // Tile: an ultra-compact row aligned with HA's native tile cards. Tapping
     // the icon/name opens the full card in a popup (see _openCardDialog).
-    if (this._config.view === "tile") {
+    if (this._layout() === "tile") {
       const icon = closed ? "mdi:window-shutter" : "mdi:window-shutter-open";
       const dot = awning
         ? AWNING_GLYPH[closed ? "retracted" : "deployed"]
@@ -321,7 +341,7 @@ class DooyaCoverCard extends HTMLElement {
       return;
     }
 
-    if (this._config.view === "compact") {
+    if (this._layout() === "compact") {
       const fillPct = pos != null ? pos : closed ? 0 : 100;
       this._body.innerHTML = `
         <div class="head chead">
@@ -471,7 +491,7 @@ class DooyaCoverCard extends HTMLElement {
     </style>
     <div class="scrim"><div class="wrap"><button class="x" aria-label="${this._t().closeDialog}">✕</button></div></div>`;
     const card = document.createElement("dooya-cover-card");
-    card.setConfig({ ...this._config, view: "normal" });
+    card.setConfig({ ...this._config, view: "normal", layout: "full" });
     card.hass = this._hass;
     sr.querySelector(".wrap").appendChild(card);
     const close = () => this._closeCardDialog();
@@ -687,8 +707,23 @@ if (!customElements.get("dooya-cover-card")) {
 /** Visual editor: a native ha-form with a cover entity picker + options. */
 class DooyaCoverCardEditor extends HTMLElement {
   setConfig(config) {
-    this._config = config || {};
+    this._config = DooyaCoverCardEditor._normalise(config || {});
     this._render();
+  }
+
+  /**
+   * Rewrite a stored `view` as `layout`, and drop it.
+   *
+   * The form writes back the whole config, so a card left carrying both names
+   * could be saved with the two disagreeing -- and the card would then obey
+   * `layout` while the editor showed `view`. Translating on the way in means
+   * anything saved from the editor carries one spelling. The card itself still
+   * reads `view` for dashboards nobody has opened in the editor.
+   */
+  static _normalise(config) {
+    if (!config.view) return config;
+    const { view, ...rest } = config;
+    return { layout: rest.layout || (view === "normal" ? "full" : view), ...rest };
   }
 
   set hass(hass) {
@@ -719,7 +754,7 @@ class DooyaCoverCardEditor extends HTMLElement {
       ({
         entity: fr ? "Entité cover (requis)" : "Cover entity (required)",
         name: fr ? "Nom (optionnel)" : "Name (optional)",
-        view: fr ? "Affichage" : "View",
+        layout: fr ? "Affichage" : "Layout",
         show_presets: fr ? "Afficher les positions prédéfinies" : "Show preset positions",
         show_calibration: fr ? "Afficher le recalage manuel" : "Show manual recalibration",
       }[s.name] || s.name);
@@ -728,12 +763,12 @@ class DooyaCoverCardEditor extends HTMLElement {
       { name: "entity", required: true, selector: { entity: { domain: "cover" } } },
       { name: "name", selector: { text: {} } },
       {
-        name: "view",
+        name: "layout",
         selector: {
           select: {
             mode: "dropdown",
             options: [
-              { value: "normal", label: fr ? "Normale" : "Normal" },
+              { value: "full", label: fr ? "Complète" : "Full" },
               { value: "compact", label: fr ? "Réduite" : "Compact" },
               { value: "tile", label: fr ? "Tuile" : "Tile" },
             ],
@@ -743,7 +778,7 @@ class DooyaCoverCardEditor extends HTMLElement {
       { name: "show_presets", selector: { boolean: {} } },
       { name: "show_calibration", selector: { boolean: {} } },
     ];
-    this._form.data = { view: "normal", show_presets: true, show_calibration: true, ...this._config };
+    this._form.data = { layout: "full", show_presets: true, show_calibration: true, ...this._config };
   }
 }
 
