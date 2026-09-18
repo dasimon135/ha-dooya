@@ -8,11 +8,13 @@ from dooya_protocol import (
     BIT_ZERO_HIGH_US,
     BIT_ZERO_LOW_US,
     BUTTON_DOWN,
+    BUTTON_LED,
     BUTTON_STOP,
     BUTTON_UP,
     HEADER_HIGH_US,
     HEADER_LOW_US,
     DooyaData,
+    check_for_button,
     decode_dooya,
     encode_dooya,
 )
@@ -57,6 +59,7 @@ class TestEncodeDooya:
             (BUTTON_UP, 1),
             (BUTTON_DOWN, 3),
             (BUTTON_STOP, 5),
+            (BUTTON_LED, 15),
         ]:
             data = DooyaData(id=0x00D1C917, channel=5, button=button, check=check)
             timings = encode_dooya(data)
@@ -67,6 +70,27 @@ class TestEncodeDooya:
         t1 = encode_dooya(VOLET_SALON_GAUCHE)
         t2 = encode_dooya(VOLET_SALON_DROIT)
         assert t1 != t2
+
+
+class TestCheckForButton:
+    """Check nibble lookup, per button code."""
+
+    @pytest.mark.parametrize(
+        ("button", "expected_check"),
+        [
+            (BUTTON_UP, 1),
+            (BUTTON_DOWN, 3),
+            (BUTTON_STOP, 5),
+            (BUTTON_LED, 15),
+        ],
+    )
+    def test_known_buttons(self, button: int, expected_check: int) -> None:
+        """UP/DOWN/STOP repeat their code; LED does not (issue #14)."""
+        assert check_for_button(button) == expected_check
+
+    def test_unknown_button_repeats_itself(self) -> None:
+        """A button code outside the table falls back to the old rule."""
+        assert check_for_button(9) == 9
 
 
 class TestDecodeDooya:
@@ -109,6 +133,7 @@ class TestDecodeDooya:
             DooyaData(id=0x009CC99F, channel=5, button=BUTTON_STOP, check=5),
             DooyaData(id=0x00C9C9D4, channel=5, button=BUTTON_UP, check=1),
             DooyaData(id=0x00D9C95A, channel=5, button=BUTTON_UP, check=1),
+            DooyaData(id=0x001589D1, channel=5, button=BUTTON_LED, check=15),
         ],
     )
     def test_roundtrip_parametrized(self, volet: DooyaData) -> None:

@@ -137,6 +137,9 @@
       "calibrate_down": {
         "name": "Calibrate closing time"
       },
+      "toggle_led": {
+        "name": "Toggle LED"
+      },
       "favorite": {
         "name": "Favorite position"
       }

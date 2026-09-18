@@ -35,6 +35,7 @@ async def async_setup_entry(
         DooyaMarkClosedButton(config_entry),
         DooyaCalibrateUpButton(config_entry),
         DooyaCalibrateDownButton(config_entry),
+        DooyaToggleLedButton(config_entry),
     ]
     # The favorite button only exists when a favorite position is set in
     # the options (the entry reloads on options change, so it appears and
@@ -114,6 +115,19 @@ class DooyaCalibrateDownButton(DooyaButtonBase):
         """Start measuring the closing time."""
         if (cover := self._cover) is not None:
             await cover.async_start_calibration(-1)
+
+
+class DooyaToggleLedButton(DooyaButtonBase):
+    """Toggle the receiver's LED indicator (DC1600A remotes, issue #14)."""
+
+    translation_key = "toggle_led"
+    _attr_icon = "mdi:led-outline"
+    _attr_entity_category = None  # control, not configuration
+
+    async def async_press(self) -> None:
+        """Send the LED toggle command."""
+        if (cover := self._cover) is not None:
+            await cover.async_toggle_led()
 
 
 class DooyaFavoriteButton(DooyaButtonBase):

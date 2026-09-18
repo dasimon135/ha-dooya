@@ -92,6 +92,45 @@ async def test_recalibration_buttons_exist(hass: HomeAssistant) -> None:
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 
+async def test_toggle_led_button_exists(hass: HomeAssistant) -> None:
+    """The LED toggle button is created for every entry, like calibration."""
+    entry = _make_entry()
+    await _setup_entry(hass, entry)
+
+    assert _button_id(hass, entry, "toggle_led") is not None
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_toggle_led_button_transmits_button_0_check_15(
+    hass: HomeAssistant,
+) -> None:
+    """Pressing the LED button sends btn=0/check=15 and does not move the cover."""
+    calls: list[dict] = []
+
+    @callback
+    def _record(call) -> None:
+        calls.append(dict(call.data))
+
+    hass.services.async_register("esphome", GATEWAY_SERVICE, _record)
+
+    entry = _make_entry()
+    await _setup_entry(hass, entry)
+
+    await hass.services.async_call(
+        "button",
+        "press",
+        {"entity_id": _button_id(hass, entry, "toggle_led")},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    assert [(c["btn"], c["check"]) for c in calls] == [(0, 15)]
+    assert hass.states.get(COVER_ENTITY_ID).state not in ("opening", "closing")
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
 async def test_favorite_button_absent_without_option(hass: HomeAssistant) -> None:
     """No favorite position configured means no favorite button."""
     entry = _make_entry()

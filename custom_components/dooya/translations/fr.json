@@ -137,6 +137,9 @@
       "calibrate_down": {
         "name": "Calibrer le temps de fermeture"
       },
+      "toggle_led": {
+        "name": "Basculer la LED"
+      },
       "favorite": {
         "name": "Position favorite"
       }
