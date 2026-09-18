@@ -60,6 +60,8 @@ Around that:
   position you know.
 - **A favourite position**, per blind, on a single button — the same idea as the
   one on a real Dooya remote.
+- **An LED toggle button**, for DC1600A-style remotes whose fourth button
+  controls a status LED on the receiver rather than the blind itself.
 - **One control for all of them.** A single entity that opens or closes every
   blind paired with the remote, in one radio frame rather than one per blind.
 - **A card, already included.** An animated shutter with position, presets and

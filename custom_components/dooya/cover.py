@@ -44,7 +44,13 @@ from .const import (
     gateway_issue_id,
     transmit_service_name,
 )
-from .dooya_protocol import BUTTON_DOWN, BUTTON_STOP, BUTTON_UP, check_for_button
+from .dooya_protocol import (
+    BUTTON_DOWN,
+    BUTTON_LED,
+    BUTTON_STOP,
+    BUTTON_UP,
+    check_for_button,
+)
 from .echo_filter import TxEchoFilter
 from .entity import DooyaBaseEntity
 from .travel_calc import clamp_position, position_after, travel_duration
@@ -348,6 +354,20 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
         await self._async_transmit(self._button_for(-1))
         self._start_estimated_motion(direction=-1, target_position=position)
+
+    async def async_toggle_led(self) -> None:
+        """Toggle the receiver's LED indicator (button=0, check=15).
+
+        One-way like every other Dooya command: nothing in the protocol
+        confirms whether the LED actually changed state (issue #14).
+        """
+        if self._is_broadcast:
+            _LOGGER.warning(
+                "%s: LED toggle is not available on the broadcast channel",
+                self._cover_name,
+            )
+            return
+        await self._async_transmit(BUTTON_LED)
 
     @callback
     def async_mark_open(self) -> None:

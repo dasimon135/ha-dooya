@@ -31,11 +31,12 @@ estimated from travel time (`assumed_state`, no feedback from the motor).
 - Dooya timings (µs): Header 5000/1500 · Bit1 750/350 · Bit0 350/750
 - Frame: header + 24-bit id + 8-bit channel + 4-bit button + 4-bit check
   (last bit = mark only)
-- Buttons: UP=1, DOWN=3, STOP=5. The check nibble **always repeats the button
-  code** and is derived at transmit time (`dooya_protocol.check_for_button`) —
-  it is deliberately NOT configurable. The learn step only ever observes the
-  check of an UP press, so a single stored value cannot be correct for UP, DOWN
-  and STOP at once. Do not re-add a per-entry check override.
+- Buttons: UP=1, DOWN=3, STOP=5, LED=0. The check nibble is derived at
+  transmit time from a per-button lookup table (`dooya_protocol.check_for_button`)
+  — it is deliberately NOT configurable. UP/DOWN/STOP repeat their own code
+  (1/1, 3/3, 5/5); LED does not (0/15, issue #14). The learn step only ever
+  observes the check of an UP press, so a single stored value cannot be
+  correct for every button. Do not re-add a per-entry check override.
 - `dooya_id` is 24 bits: validate against `MAX_DOOYA_ID` and format as `:06X`.
   A wider value is silently truncated by the encoder on the ESP32, so the node
   would transmit a different remote id than the UI shows.
@@ -53,7 +54,7 @@ custom_components/dooya/
 ├── config_flow.py       # user (pick ESPHome node) → method → learn/manual → confirm; options; reconfigure; unique_id + 24-bit id guards
 ├── entity.py            # DooyaBaseEntity: device info, via_device, gateway availability tracking
 ├── cover.py             # DooyaCover: transmit via esphome.<node>_transmit_dooya, time-based position, calibration
-├── button.py            # mark open/closed, calibrate up/down, favorite position
+├── button.py            # mark open/closed, calibrate up/down, favorite position, LED toggle
 ├── diagnostics.py       # config entry diagnostics (dooya_id redacted)
 ├── dooya_protocol.py    # DooyaData, buttons, check_for_button, MAX_DOOYA_ID + reference encode/decode (NOT the transmit path)
 ├── echo_filter.py       # suppress RX echoes of our own transmissions (multi-node)

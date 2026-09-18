@@ -35,22 +35,32 @@ BIT_ONE_LOW_US: int = 350
 BUTTON_UP: int = 1
 BUTTON_DOWN: int = 3
 BUTTON_STOP: int = 5
+BUTTON_LED: int = 0
 
 # Widest id a Dooya frame can carry (the id field is 24 bits).
 MAX_DOOYA_ID: int = 0xFFFFFF
+
+# Check nibble transmitted with each button. UP/DOWN/STOP repeat their own
+# code; LED does not (issue #14 — two independent remote captures, both
+# DC1600A, agree on button=0, check=15). A lookup table rather than a rule,
+# because the moment a second button code showed up it stopped being one.
+_CHECK_BY_BUTTON: dict[int, int] = {
+    BUTTON_UP: BUTTON_UP,
+    BUTTON_DOWN: BUTTON_DOWN,
+    BUTTON_STOP: BUTTON_STOP,
+    BUTTON_LED: 15,
+}
 
 
 def check_for_button(button: int) -> int:
     """Return the 4-bit check nibble that goes with a button code.
 
-    On the remotes this integration was built against, the check nibble simply
-    repeats the button code. It is derived here rather than configured on
-    purpose: a single stored value cannot be correct for UP, DOWN and STOP at
-    once, and the learn step only ever observes the check of an UP press, so
-    honouring a stored check would send the wrong nibble for the other two
-    buttons.
+    Derived here rather than configured: the learn step only ever observes
+    the check of an UP press, so honouring a stored check would send the
+    wrong nibble for every other button. Buttons this table does not know
+    fall back to repeating themselves, matching the historical behaviour.
     """
-    return button
+    return _CHECK_BY_BUTTON.get(button, button)
 
 
 @dataclass
