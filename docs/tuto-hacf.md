@@ -158,7 +158,7 @@ entity: cover.volet_salon
 
 La carte affiche une fenetre animee qui suit la position estimee (cliquer dedans envoie le volet a cette hauteur), les boutons Ouvrir / Stop / Fermer, un slider, des positions predefinies et les raccourcis de recalage.
 
-Pour les tableaux de bord avec beaucoup de volets, une **vue compacte** est disponible (option `view: compact` ou champ "Affichage" dans l'editeur) : une seule ligne avec barre de position cliquable et boutons.
+Pour les tableaux de bord avec beaucoup de volets, une **vue compacte** est disponible (option `layout: compact`, anciennement `view`, ou champ "Affichage" dans l'editeur) : une seule ligne avec barre de position cliquable et boutons.
 
 ## 8. Recalage, calibration et confiance
 

@@ -2,7 +2,11 @@
 //
 // Usage: node card_harness.js '<scenario json>'
 // Scenario: { config, state: { state, attributes }, language, click?: { selector, clientX?, clientY? } }
-// Prints: { html, calls } — the rendered body markup and every service call made.
+//       or: { editor: { config }, language } — exercises the visual editor instead
+// Prints: { html, calls, size } — the rendered body markup, every service call
+// made, and what the card answers for `getCardSize()`.
+// In editor mode: { data, schema } — the values the form is filled with, and the
+// name of every field it offers.
 //
 // The card only ever writes innerHTML strings and reads a handful of element
 // methods, so a fake element is enough to exercise its real render and click
@@ -54,6 +58,24 @@ const cardFile = path.join(
 (0, eval)(fs.readFileSync(cardFile, "utf8"));
 
 const scenario = JSON.parse(process.argv[2]);
+
+// Editor mode: no card, no state — just the form the visual editor builds from
+// a stored config. What matters is which field names it offers and the values
+// it fills them with, since that is what gets written back to the dashboard.
+if (scenario.editor) {
+  const Editor = registry["dooya-cover-card-editor"];
+  const editor = new Editor();
+  editor.setConfig(scenario.editor.config);
+  editor.hass = { language: scenario.language || "en", states: {}, entities: {} };
+  process.stdout.write(
+    JSON.stringify({
+      data: editor._form.data,
+      schema: editor._form.schema.map((f) => f.name),
+    })
+  );
+  return;
+}
+
 const Card = registry["dooya-cover-card"];
 const card = new Card();
 const calls = [];
@@ -82,4 +104,6 @@ if (scenario.click) {
   card._onClick({ target, clientX, clientY });
 }
 
-process.stdout.write(JSON.stringify({ html: card._body.innerHTML, calls }));
+process.stdout.write(
+  JSON.stringify({ html: card._body.innerHTML, calls, size: card.getCardSize() })
+);
