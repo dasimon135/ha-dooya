@@ -37,7 +37,8 @@ from custom_components.dooya.const import (
 )
 
 GATEWAY_SLUG = "volets-dooya-rf433"
-GATEWAY_IDENTIFIER = ("esphome", "a1b2c3d4")
+GATEWAY_FRIENDLY_NAME = "Dooya RF Node 1"
+GATEWAY_MAC = "b0:cb:d8:00:00:01"
 COVER_ENTITY_ID = "cover.salon"
 
 
@@ -64,18 +65,25 @@ def _make_entry() -> MockConfigEntry:
 
 
 def _create_gateway(hass: HomeAssistant) -> tuple[dr.DeviceEntry, str]:
-    """Register an ESPHome device named like the configured node.
+    """Register an ESPHome node the way Home Assistant really does.
 
-    The integration matches the gateway on the *slugified device name*, not on
-    an identifier, because the config entry only ever stores the node slug.
+    The main device of a node has a MAC connection and NO identifier, its name
+    is the node's `friendly_name`, and the node name only lives in the ESPHome
+    config entry as `device_name`. An earlier version of this helper invented
+    an `esphome` identifier and named the device after the node; the lookup
+    passed these tests and never matched a single real registry.
     """
-    esphome_entry = MockConfigEntry(domain="esphome", title="Node")
+    esphome_entry = MockConfigEntry(
+        domain="esphome",
+        title=GATEWAY_FRIENDLY_NAME,
+        data={"device_name": GATEWAY_SLUG},
+    )
     esphome_entry.add_to_hass(hass)
 
     device = dr.async_get(hass).async_get_or_create(
         config_entry_id=esphome_entry.entry_id,
-        identifiers={GATEWAY_IDENTIFIER},
-        name=GATEWAY_SLUG,
+        connections={(dr.CONNECTION_NETWORK_MAC, GATEWAY_MAC)},
+        name=GATEWAY_FRIENDLY_NAME,
     )
     gateway_entity = er.async_get(hass).async_get_or_create(
         "sensor",
@@ -86,6 +94,21 @@ def _create_gateway(hass: HomeAssistant) -> tuple[dr.DeviceEntry, str]:
     )
     hass.states.async_set(gateway_entity.entity_id, "1234")
     return device, gateway_entity.entity_id
+
+
+def _create_namesake(hass: HomeAssistant) -> dr.DeviceEntry:
+    """Register a foreign device named exactly like the node.
+
+    A router integration tracking the node's network presence does precisely
+    this, so the device name cannot be what identifies the gateway.
+    """
+    router_entry = MockConfigEntry(domain="some_router", title="Router")
+    router_entry.add_to_hass(hass)
+    return dr.async_get(hass).async_get_or_create(
+        config_entry_id=router_entry.entry_id,
+        identifiers={("some_router", "client-42")},
+        name=GATEWAY_SLUG,
+    )
 
 
 async def _setup_entry(hass: HomeAssistant, entry: MockConfigEntry) -> None:
@@ -138,6 +161,23 @@ async def test_shutter_is_linked_to_its_gateway(hass: HomeAssistant) -> None:
 
     device_registry = dr.async_get(hass)
     shutter = device_registry.async_get_device_by_identifier(
+        (DOMAIN, entry.entry_id), entry.entry_id
+    )
+    assert shutter is not None
+    assert shutter.via_device_id == gateway.id
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_a_namesake_device_is_not_the_gateway(hass: HomeAssistant) -> None:
+    """A foreign device named like the node is never taken for the gateway."""
+    _create_namesake(hass)
+    gateway, _ = _create_gateway(hass)
+
+    entry = _make_entry()
+    await _setup_entry(hass, entry)
+
+    shutter = dr.async_get(hass).async_get_device_by_identifier(
         (DOMAIN, entry.entry_id), entry.entry_id
     )
     assert shutter is not None

@@ -6,6 +6,7 @@ installed (e.g. on Windows, where the harness cannot run).
 
 from __future__ import annotations
 
+import asyncio
 import sys
 
 import pytest
@@ -575,3 +576,71 @@ async def test_options_refuse_a_second_common_button_on_one_remote(
 
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {CONF_IS_GROUP: "duplicate_group"}
+
+
+# ---- automatic detection from the remote ---------------------------------
+
+
+async def _start_learning(hass: HomeAssistant) -> dict:
+    """Walk the user flow up to the listening step."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_ESPHOME_DEVICE: GATEWAY_SLUG}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"method": "learn"}
+    )
+    assert result["type"] is FlowResultType.SHOW_PROGRESS
+    assert result["step_id"] == "learn"
+    return result
+
+
+async def test_learn_reads_the_remote(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """A frame heard while listening moves the flow on to the confirm step."""
+    result = await _start_learning(hass)
+    # Not async_block_till_done(): it would wait out the whole listening window.
+    await asyncio.sleep(0)
+
+    hass.bus.async_fire(
+        "esphome.dooya_received",
+        {"id": "00D1C917", "channel": 5, "button": 1, "check": 1},
+    )
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.flow.async_configure(result["flow_id"])
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "confirm"
+    assert result["description_placeholders"]["channel"] == "5"
+
+
+async def test_learn_timeout_offers_a_retry(
+    hass: HomeAssistant,
+    gateway_service: list[dict],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Silence during the listening window ends on the retry form.
+
+    The step used to return that form straight from the progress step, which
+    the flow manager forbids: it raised in a background task and the dialog
+    stayed on its spinner, with neither a retry nor manual entry on offer.
+    """
+    monkeypatch.setattr("custom_components.dooya.config_flow.LEARN_TIMEOUT_SEC", 0.05)
+    result = await _start_learning(hass)
+
+    await asyncio.sleep(0.2)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.flow.async_configure(result["flow_id"])
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "learn_retry"
+    assert result["errors"] == {"base": "learn_timeout"}
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"skip": True}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "manual"

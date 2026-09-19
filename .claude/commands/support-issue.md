@@ -134,7 +134,7 @@ Then the rest:
 
 | Topic in the issue | Read these |
 | --- | --- |
-| Setup, discovery, pairing a remote id, reconfigure | `config_flow.py`, `device_match.py`, `const.py`, `tests/test_config_flow.py`, `tests/test_device_match.py` |
+| Setup, discovery, pairing a remote id, reconfigure | `config_flow.py`, `const.py`, `tests/test_config_flow.py` |
 | Position wrong, drift, cover stops early or late | `travel_calc.py`, `cover.py`, `tests/test_travel_calc.py`, `tests/test_cover_motion.py` |
 | Calibration, `mark_open` / `mark_closed` / `set_known_position` | `cover.py`, `services.yaml`, `tests/test_cover.py` |
 | Physical remote does not update HA, or updates twice | `echo_filter.py`, `cover.py`, `tests/test_echo_filter.py` |
