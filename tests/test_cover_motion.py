@@ -152,6 +152,96 @@ async def test_partial_move_sends_stop_at_the_target(
     assert state.attributes["moves_since_sync"] == 1
 
 
+async def test_unloading_during_a_partial_move_stops_the_shutter(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """Reloading the entry mid-move sends the STOP the timer would have sent.
+
+    The timer dies with the entity. Without this the shutter ran on to its end
+    stop while the restored estimate claimed a position halfway up.
+    """
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover",
+        "set_cover_position",
+        {"entity_id": ENTITY_ID, "position": 90},
+        blocking=True,
+    )
+    await asyncio.sleep(0.6)
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert [f["btn"] for f in frames] == [1, 5]
+
+    # Nothing more is transmitted once the original deadline passes.
+    await asyncio.sleep(TRAVEL)
+    await hass.async_block_till_done()
+    assert [f["btn"] for f in frames] == [1, 5]
+
+
+async def test_unloading_at_rest_transmits_nothing(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """An unload with no partial move pending stays silent on the air."""
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover", "open_cover", {"entity_id": ENTITY_ID}, blocking=True
+    )
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+
+    # A full run ends on the motor's own end stop: no STOP to send.
+    assert [f["btn"] for f in frames] == [1]
+
+
+async def test_a_command_during_the_auto_stop_keeps_its_own_movement(
+    hass: HomeAssistant,
+) -> None:
+    """A command arriving while the automatic STOP transmits is not undone."""
+    sent: list[int] = []
+    release = asyncio.Event()
+
+    async def _slow(call) -> None:
+        sent.append(call.data["btn"])
+        if call.data["btn"] == 5:
+            await release.wait()
+
+    hass.services.async_register("esphome", GATEWAY_SERVICE, _slow)
+
+    entry = await _setup(hass, _make_entry())
+    cover = entry.runtime_data.cover
+    cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover",
+        "set_cover_position",
+        {"entity_id": ENTITY_ID, "position": 20},
+        blocking=True,
+    )
+    # Wait for the automatic STOP to be in flight, then press DOWN on the
+    # remote (UP would be filtered out as an echo of our own UP).
+    for _ in range(40):
+        if 5 in sent:
+            break
+        await asyncio.sleep(0.05)
+    assert 5 in sent
+    _fire_frame(hass, 3)
+    # Not async_block_till_done(): it would wait for the STOP held back above.
+    await asyncio.sleep(0.05)
+    assert hass.states.get(ENTITY_ID).state == "closing"
+    release.set()
+    await asyncio.sleep(0.1)
+
+    assert hass.states.get(ENTITY_ID).state == "closing"
+    assert cover._target_position == 0
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
 async def test_user_stop_cancels_the_scheduled_auto_stop(
     hass: HomeAssistant, frames: list[dict]
 ) -> None:

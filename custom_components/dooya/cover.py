@@ -245,6 +245,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
     async def async_will_remove_from_hass(self) -> None:
         """Cancel the pending callbacks when the entity is removed."""
+        await self._async_stop_pending_partial_move()
         self._cancel_motion_callbacks()
         self._cancel_calibration_timeout()
         if self._event_unsub is not None:
@@ -835,12 +836,44 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             "dooya partial move stop",
         )
 
-    async def _async_complete_partial_move(self) -> None:
-        """Finish a partial move with a STOP command."""
-        target_position = self._target_position
+    async def _async_stop_pending_partial_move(self) -> None:
+        """Send now the STOP that a partial move was still waiting for.
+
+        The timer that would send it dies with the entity, and a reload of the
+        entry (saved options, a reconfigure) removes the entity: left alone,
+        the shutter would run on to its end stop. Stopping short of the target
+        is the only outcome the estimate can still describe truthfully.
+        """
+        if self._target_reached_unsub is None or self._target_position in (
+            None,
+            0,
+            100,
+        ):
+            return
+        direction = self._movement_direction
+        self._refresh_position()
+        self._cancel_motion_callbacks()
         try:
             await self._async_transmit(BUTTON_STOP)
         except HomeAssistantError:
+            _LOGGER.error(
+                "%s: could not send STOP while unloading; the shutter will run "
+                "to its end stop",
+                self._cover_name,
+            )
+            self._finalize_position(100 if direction > 0 else 0)
+            return
+        self._stop_estimated_motion()
+
+    async def _async_complete_partial_move(self) -> None:
+        """Finish a partial move with a STOP command."""
+        target_position = self._target_position
+        movement = self._movement_start_time
+        try:
+            await self._async_transmit(BUTTON_STOP)
+        except HomeAssistantError:
+            if self._movement_start_time != movement:
+                return
             # STOP could not be sent: the shutter keeps moving to the end
             # stop it was heading to, so track the estimate there instead of
             # freezing it at the partial target.
@@ -855,6 +888,11 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
                     direction=direction,
                     target_position=100 if direction > 0 else 0,
                 )
+            return
+        # Transmitting takes a while (repeats, blocking service calls). A
+        # command that arrived meanwhile owns the estimate now: finalizing
+        # here would cancel its movement and freeze it at a stale target.
+        if self._movement_start_time != movement:
             return
         if target_position is not None:
             self._finalize_position(target_position)
