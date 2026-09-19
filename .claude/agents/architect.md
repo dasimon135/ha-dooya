@@ -34,7 +34,7 @@ handling, and the corresponding calls/listeners in `custom_components/dooya/`
 constants that may need bumping. Cross-reference `docs/` for documented
 behavior that must stay accurate. After changing logic, run the test suite
 (`pytest`, or targeted files like `tests/test_travel_calc.py`,
-`tests/test_cover.py`, `tests/test_device_match.py`) and ruff
+`tests/test_cover.py`) and ruff
 (`ruff check .`) via Bash, and fix failures before considering the work
 done. Favor small, well-tested increments to the pure-math functions in
 `travel_calc.py` since they carry no HA imports and are the easiest place to

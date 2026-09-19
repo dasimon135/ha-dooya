@@ -20,10 +20,13 @@ from .const import (
     DOMAIN,
     entry_value,
 )
-from .device_match import is_esphome_device
 
 if TYPE_CHECKING:
     from . import DooyaConfigEntry
+
+ESPHOME_DOMAIN = "esphome"
+# Key of the node name in an ESPHome config entry (esphome.const.CONF_DEVICE_NAME).
+ESPHOME_CONF_DEVICE_NAME = "device_name"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -62,19 +65,16 @@ class DooyaBaseEntity(Entity):
 
     @property
     def device_info(self) -> DeviceInfo:
-        """Return device info, linked to the ESPHome gateway when known."""
+        """Return the device of this shutter."""
         info = DeviceInfo(
             identifiers={(DOMAIN, self._config_entry.entry_id)},
             name=self._cover_name,
             manufacturer="Dooya",
             model="RF433 Cover",
         )
-        gateway = self._find_gateway_device()
-        if gateway is not None:
-            for ident in gateway.identifiers:
-                if ident and len(ident) >= 2 and ident[0] == "esphome":
-                    info["via_device"] = (ident[0], ident[1])
-                    break
+        # No `via_device` here: it can only name an identifier, and Home
+        # Assistant registers an ESPHome node with a MAC connection and no
+        # identifier at all. The link is made in `_link_to_gateway` instead.
         return info
 
     @property
@@ -97,7 +97,9 @@ class DooyaBaseEntity(Entity):
         """Start tracking the availability of the ESPHome gateway."""
         await super().async_added_to_hass()
         try:
-            self._gateway_entity_ids = self._resolve_gateway_entities()
+            gateway = self._find_gateway_device()
+            self._link_to_gateway(gateway)
+            self._gateway_entity_ids = self._resolve_gateway_entities(gateway)
         except Exception:  # availability tracking is best-effort by contract
             _LOGGER.warning(
                 "%s: could not resolve the ESPHome gateway, "
@@ -130,31 +132,46 @@ class DooyaBaseEntity(Entity):
     def _find_gateway_device(self) -> dr.DeviceEntry | None:
         """Return the registry device of the configured ESPHome gateway.
 
-        The config entry only stores the device slug (e.g.
-        `volets-dooya-rf433`); match it against the ESPHome device names in
-        the registry.
+        The config entry only stores the node name (e.g. `volets-dooya-rf433`),
+        which is also what the ESPHome config entry keeps as `device_name`. The
+        node is found through that entry, never through the device *name*: the
+        name shown in the registry is the node's `friendly_name`, and other
+        integrations (a router's device tracker, for one) register devices
+        named exactly like the node.
         """
-        if getattr(self, "hass", None) is None:
-            return None
         gateway_slug = slugify(self._esphome_device)
         if not gateway_slug:
             return None
 
         device_registry = dr.async_get(self.hass)
-        for device in device_registry.devices.values():
-            if not is_esphome_device(device.identifiers):
+        for entry in self.hass.config_entries.async_entries(ESPHOME_DOMAIN):
+            if slugify(entry.data.get(ESPHOME_CONF_DEVICE_NAME) or "") != gateway_slug:
                 continue
-            if slugify(device.name or "") == gateway_slug:
-                return device
+            for device in dr.async_entries_for_config_entry(
+                device_registry, entry.entry_id
+            ):
+                # The node itself carries the MAC; its sub-devices do not.
+                if device.connections:
+                    return device
         return None
 
-    def _resolve_gateway_entities(self) -> list[str]:
-        """Find the entities of the configured ESPHome device.
+    def _link_to_gateway(self, gateway: dr.DeviceEntry | None) -> None:
+        """Hang the shutter's device off its ESPHome node in the device tree."""
+        device = self.device_entry
+        if device is None:
+            return
+        via_device_id = gateway.id if gateway is not None else None
+        if device.via_device_id != via_device_id:
+            dr.async_get(self.hass).async_update_device(
+                device.id, via_device_id=via_device_id
+            )
+
+    def _resolve_gateway_entities(self, device: dr.DeviceEntry | None) -> list[str]:
+        """Return the entities of the gateway device.
 
         When nothing matches, the entity stays permanently available: losing
         availability tracking must never be a regression.
         """
-        device = self._find_gateway_device()
         if device is None:
             _LOGGER.debug(
                 "%s: ESPHome gateway %s not found in device registry, "

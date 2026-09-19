@@ -185,7 +185,10 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
         self._learn_task = None
 
         if learned is None:
-            return await self.async_step_learn_retry()
+            # A progress step may only hand over to "progress done": returning
+            # the retry form from here makes the flow manager raise, and the
+            # dialog stays on its spinner for good.
+            return self.async_show_progress_done(next_step_id="learn_retry")
 
         self._learned_data = learned
         return self.async_show_progress_done(next_step_id="confirm")

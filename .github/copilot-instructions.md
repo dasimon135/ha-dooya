@@ -59,7 +59,6 @@ custom_components/dooya/
 ├── dooya_protocol.py    # DooyaData, buttons, check_for_button, MAX_DOOYA_ID + reference encode/decode (NOT the transmit path)
 ├── echo_filter.py       # suppress RX echoes of our own transmissions (multi-node)
 ├── travel_calc.py       # pure position/travel-time math
-├── device_match.py      # registry identifier helpers
 ├── frontend/            # bundled Lovelace card (auto-registered)
 ├── strings.json         # reference strings (EN)
 └── translations/        # en.json, fr.json
