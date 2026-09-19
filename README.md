@@ -67,7 +67,9 @@ Around that:
 - **A card, already included.** An animated shutter with position, presets and
   recalibration, in full, compact and tile sizes. Nothing extra to install.
 - **Honest availability.** When the ESPHome gateway goes offline, the covers say
-  `unavailable` instead of pretending to work.
+  `unavailable` instead of pretending to work. This follows the gateway's own
+  entities, so the node needs at least one enabled — the `status` sensor in
+  [`esphome/dooya-node.yaml`](esphome/dooya-node.yaml) is there for that.
 - **A diagnostics download**, so a bug report can be answered on the first reply.
 
 ## Installation

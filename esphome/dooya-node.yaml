@@ -114,6 +114,14 @@ web_server:
     username: !secret dooya_web_user
     password: !secret dooya_web_password
 
+# The one entity this node needs. The Dooya integration mirrors the node's
+# availability on the covers by watching the node's entities, and a node that
+# exposes none gives it nothing to watch: the covers would then stay
+# "available" while the node is offline.
+binary_sensor:
+  - platform: status
+    name: "Status"
+
 # SPI bus for the CC1101
 spi:
   id: spi_bus
