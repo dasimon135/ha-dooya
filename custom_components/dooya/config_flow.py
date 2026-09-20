@@ -362,7 +362,10 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                     errors[CONF_DOOYA_ID] = "duplicate_shutter"
                 else:
                     name = user_input[CONF_COVER_NAME]
-                    return self.async_update_reload_and_abort(
+                    # No explicit reload: the entry's update listener
+                    # already reloads on any change, and asking for a
+                    # second one is an error from Home Assistant 2026.12.
+                    return self.async_update_and_abort(
                         entry,
                         title=name,
                         unique_id=shutter_unique_id(dooya_id, channel),

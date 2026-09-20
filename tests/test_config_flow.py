@@ -184,7 +184,9 @@ async def test_manual_step_rejects_invalid_dooya_id(
 
 
 async def test_reconfigure_updates_entry(
-    hass: HomeAssistant, gateway_service: list[dict]
+    hass: HomeAssistant,
+    gateway_service: list[dict],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """The reconfigure step fixes the shutter identity in place."""
     entry = MockConfigEntry(
@@ -232,6 +234,12 @@ async def test_reconfigure_updates_entry(
     assert entry.data[CONF_COVER_NAME] == "Salon gauche"
     # Travel times are untouched by a reconfigure.
     assert entry.data[CONF_TRAVEL_TIME_UP] == 20.0
+
+    # The update listener reloaded the entry: the running cover is the new one.
+    assert entry.runtime_data.cover._channel == 7
+    # ... and only the listener did. Asking for a second reload on top of it is
+    # reported by Home Assistant, and breaks in 2026.12.
+    assert "should use it for scheduling a reload" not in caplog.text
 
     assert await hass.config_entries.async_unload(entry.entry_id)
 
