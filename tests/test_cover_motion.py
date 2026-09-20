@@ -181,6 +181,38 @@ async def test_unloading_during_a_partial_move_stops_the_shutter(
     assert [f["btn"] for f in frames] == [1, 5]
 
 
+async def test_the_estimate_survives_a_reload_mid_move(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """After a reload mid-move the estimate is where the shutter really stopped.
+
+    The STOP has to be sent before Home Assistant snapshots the state for
+    restore, or the position saved is the one from before the shutter stopped
+    and the drift of the interrupted move is lost.
+    """
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover",
+        "set_cover_position",
+        {"entity_id": ENTITY_ID, "position": 90},
+        blocking=True,
+    )
+    await asyncio.sleep(0.6)
+    await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert [f["btn"] for f in frames] == [1, 5]
+    state = hass.states.get(ENTITY_ID)
+    # 0.6 s into a 3 s travel: short of the 90 % it was asked for.
+    assert 5 <= state.attributes["current_position"] <= 45
+    # It ended between the end stops, so the estimate is one move less sure.
+    assert state.attributes["moves_since_sync"] == 1
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
 async def test_unloading_at_rest_transmits_nothing(
     hass: HomeAssistant, frames: list[dict]
 ) -> None:

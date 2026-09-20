@@ -244,8 +244,16 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         self._config_entry.runtime_data.cover = self
 
     async def async_will_remove_from_hass(self) -> None:
-        """Cancel the pending callbacks when the entity is removed."""
-        await self._async_stop_pending_partial_move()
+        """Cancel the pending callbacks when the entity is removed.
+
+        Last resort for the pending STOP: an entry unload stops the shutter
+        before removal (`__init__.async_unload_entry`), where the estimate can
+        still be written. Removing the entity on its own lands here instead,
+        and Home Assistant drops state writes from this point on
+        (`EntityPlatformState.REMOVED`), so the shutter is stopped but the
+        estimate keeps the position of the last progress tick.
+        """
+        await self.async_stop_pending_partial_move()
         self._cancel_motion_callbacks()
         self._cancel_calibration_timeout()
         if self._event_unsub is not None:
@@ -836,13 +844,16 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             "dooya partial move stop",
         )
 
-    async def _async_stop_pending_partial_move(self) -> None:
+    async def async_stop_pending_partial_move(self) -> None:
         """Send now the STOP that a partial move was still waiting for.
 
         The timer that would send it dies with the entity, and a reload of the
         entry (saved options, a reconfigure) removes the entity: left alone,
         the shutter would run on to its end stop. Stopping short of the target
         is the only outcome the estimate can still describe truthfully.
+
+        Called once per removal, from whichever comes first; the second call
+        finds no pending move and returns.
         """
         if self._target_reached_unsub is None or self._target_position in (
             None,
