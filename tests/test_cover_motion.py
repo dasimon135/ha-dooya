@@ -92,17 +92,68 @@ async def _setup(hass: HomeAssistant, entry: MockConfigEntry) -> MockConfigEntry
     return entry
 
 
-def _fire_frame(hass: HomeAssistant, button: int, channel: int = CHANNEL) -> None:
+def _fire_frame(
+    hass: HomeAssistant,
+    button: int,
+    channel: int = CHANNEL,
+    check: int | None = None,
+) -> None:
     """Fire the event an ESPHome node publishes for a decoded frame."""
+    data = {
+        "id": f"{DOOYA_ID:06X}",
+        "channel": str(channel),
+        "button": str(button),
+        "check": str(button if check is None else check),
+    }
+    hass.bus.async_fire(EVENT_DOOYA_RECEIVED, data)
+
+
+def _fire_frame_without_check(hass: HomeAssistant, button: int) -> None:
+    """Fire the event as a human does from Developer tools: no check field."""
     hass.bus.async_fire(
         EVENT_DOOYA_RECEIVED,
-        {
-            "id": f"{DOOYA_ID:06X}",
-            "channel": str(channel),
-            "button": str(button),
-            "check": str(button),
-        },
+        {"id": f"{DOOYA_ID:06X}", "channel": str(CHANNEL), "button": str(button)},
     )
+
+
+async def test_a_mis_decoded_frame_is_ignored(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """A frame whose check disagrees with its button never moves the estimate.
+
+    Issue #19: a weak remote had one press decoded three times, twice with a
+    check of 15. A flipped button bit is the reason this matters — UP is one
+    bit from DOWN and from STOP — and it arrives with the check of the button
+    that was really pressed.
+    """
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 50
+
+    _fire_frame(hass, 1, check=15)
+    await hass.async_block_till_done()
+    assert hass.states.get(ENTITY_ID).state != "opening"
+
+    _fire_frame(hass, 3, check=1)
+    await hass.async_block_till_done()
+    assert hass.states.get(ENTITY_ID).state != "closing"
+
+    # The same press, decoded correctly, is still acted on.
+    _fire_frame(hass, 1)
+    await hass.async_block_till_done()
+    assert hass.states.get(ENTITY_ID).state == "opening"
+
+
+async def test_a_frame_without_a_check_is_still_acted_on(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """An event fired by hand carries no check; there is nothing to verify."""
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 50
+
+    _fire_frame_without_check(hass, 1)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(ENTITY_ID).state == "opening"
 
 
 # ---- estimated motion ---------------------------------------------------

@@ -625,6 +625,37 @@ async def test_learn_reads_the_remote(
     assert result["description_placeholders"]["channel"] == "5"
 
 
+async def test_learn_ignores_a_mis_decoded_frame(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """Learning waits for a clean frame rather than store a corrupted id.
+
+    Issue #19: a weak remote produced `id=00B03AB9 btn=1 chk=15` next to the
+    real `id=00B032B9 btn=1 chk=1` — one bit off, and an id that no shutter
+    would ever answer.
+    """
+    result = await _start_learning(hass)
+    await asyncio.sleep(0)
+
+    hass.bus.async_fire(
+        "esphome.dooya_received",
+        {"id": "00B03AB9", "channel": 80, "button": 1, "check": 15},
+    )
+    await asyncio.sleep(0.1)
+
+    hass.bus.async_fire(
+        "esphome.dooya_received",
+        {"id": "00B032B9", "channel": 80, "button": 1, "check": 1},
+    )
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.flow.async_configure(result["flow_id"])
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "confirm"
+    # The clean frame, not the one with the flipped bit (0x00B03AB9).
+    assert result["description_placeholders"]["dooya_id"] == "0xB032B9"
+
+
 async def test_learn_timeout_offers_a_retry(
     hass: HomeAssistant,
     gateway_service: list[dict],
