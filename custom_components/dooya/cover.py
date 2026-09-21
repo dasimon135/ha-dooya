@@ -50,6 +50,7 @@ from .dooya_protocol import (
     BUTTON_STOP,
     BUTTON_UP,
     check_for_button,
+    is_frame_consistent,
 )
 from .echo_filter import TxEchoFilter
 from .entity import DooyaBaseEntity
@@ -642,7 +643,22 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             )
             event_channel = int(data["channel"])
             button = int(data["button"])
+            # Absent from an event fired by hand from Developer tools: there
+            # is nothing to check against, so such a frame is taken as it is.
+            check = None if data.get("check") is None else int(data["check"])
         except (KeyError, TypeError, ValueError):
+            return
+
+        if check is not None and not is_frame_consistent(button, check):
+            # A mis-decoded frame, not a press: acting on it would move an
+            # estimate, or cancel the STOP a partial move is waiting for.
+            _LOGGER.debug(
+                "%s: ignoring a frame whose check does not match its button "
+                "(button=%d, check=%d)",
+                self._cover_name,
+                button,
+                check,
+            )
             return
 
         if event_id != self._dooya_id:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any
 
 from homeassistant.config_entries import (
@@ -37,9 +38,16 @@ from .const import (
     TRANSMIT_SERVICE_SUFFIX,
     entry_value,
 )
-from .dooya_protocol import BUTTON_UP, MAX_DOOYA_ID, DooyaData, check_for_button
+from .dooya_protocol import (
+    BUTTON_UP,
+    MAX_DOOYA_ID,
+    DooyaData,
+    check_for_button,
+    is_frame_consistent,
+)
 
 # Maximum time spent listening for a remote in learn mode (seconds)
+_LOGGER = logging.getLogger(__name__)
 LEARN_TIMEOUT_SEC = 30
 
 
@@ -223,7 +231,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
             nonlocal result
             data = event.data
             try:
-                result = DooyaData(
+                learned = DooyaData(
                     id=int(data["id"], 16)
                     if isinstance(data["id"], str)
                     else int(data["id"]),
@@ -233,6 +241,21 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
             except (KeyError, ValueError, TypeError):
                 return
+
+            # Keep listening rather than learn a mis-decoded frame: a weak
+            # remote gets a bit read wrong now and then (issue #19), and an id
+            # off by one bit configures a shutter that never answers.
+            if not is_frame_consistent(learned.button, learned.check):
+                _LOGGER.debug(
+                    "Ignoring a mis-decoded frame while learning "
+                    "(id=%06X, button=%d, check=%d)",
+                    learned.id,
+                    learned.button,
+                    learned.check,
+                )
+                return
+
+            result = learned
 
             # Completing the task is enough: the flow manager watches the
             # progress_task passed to async_show_progress and advances the

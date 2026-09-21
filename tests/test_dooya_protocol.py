@@ -17,6 +17,7 @@ from dooya_protocol import (
     check_for_button,
     decode_dooya,
     encode_dooya,
+    is_frame_consistent,
 )
 import pytest
 
@@ -91,6 +92,34 @@ class TestCheckForButton:
     def test_unknown_button_repeats_itself(self) -> None:
         """A button code outside the table falls back to the old rule."""
         assert check_for_button(9) == 9
+
+
+class TestFrameConsistency:
+    """The check nibble read as an integrity field (issue #19)."""
+
+    @pytest.mark.parametrize(
+        ("button", "check"),
+        [(BUTTON_UP, 1), (BUTTON_DOWN, 3), (BUTTON_STOP, 5), (BUTTON_LED, 15)],
+    )
+    def test_a_well_formed_frame_passes(self, button: int, check: int) -> None:
+        """Every button a remote really sends is consistent with its check."""
+        assert is_frame_consistent(button, check)
+
+    @pytest.mark.parametrize(
+        ("button", "check"),
+        [
+            # Straight from the node log on issue #19: one press of UP, read
+            # three times, twice with a check of 15.
+            (BUTTON_UP, 15),
+            # The dangerous flips: UP is one bit away from DOWN and from STOP,
+            # and such a frame keeps the check of the button really pressed.
+            (BUTTON_DOWN, 1),
+            (BUTTON_STOP, 1),
+        ],
+    )
+    def test_a_mis_decoded_frame_fails(self, button: int, check: int) -> None:
+        """A bit read wrong leaves button and check disagreeing."""
+        assert not is_frame_consistent(button, check)
 
 
 class TestDecodeDooya:

@@ -63,6 +63,22 @@ def check_for_button(button: int) -> int:
     return _CHECK_BY_BUTTON.get(button, button)
 
 
+def is_frame_consistent(button: int, check: int) -> bool:
+    """Whether a received frame's check nibble matches its button.
+
+    The check nibble is the only integrity field a Dooya frame carries, and
+    a weak remote is what makes it worth reading. In issue #19 a single press
+    reached the node three times: `btn=1 chk=1`, then `btn=1 chk=15`, then
+    `btn=1 chk=15` again with one bit flipped in the id — marginal timings,
+    and the decoder reads 1 bits that were never sent.
+
+    A flip in the button itself is the dangerous one: UP (1) is a single bit
+    away from DOWN (3) and from STOP (5). Such a frame still carries the
+    check of the button really pressed, so the mismatch gives it away.
+    """
+    return check == check_for_button(button)
+
+
 @dataclass
 class DooyaData:
     """Fields of one Dooya command.
