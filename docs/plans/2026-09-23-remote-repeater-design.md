@@ -63,12 +63,15 @@ it working in both houses.
   estimate update:
 
   ```python
-  if (self._repeat_remote
-          and event_channel == self._channel
-          and button in (BUTTON_UP, BUTTON_DOWN, BUTTON_STOP)):
+  if (
+      self._repeat_remote
+      and event_channel == self._channel
+      and button in (BUTTON_UP, BUTTON_DOWN, BUTTON_STOP)
+  ):
       self._echo_filter.record_tx(button, monotonic())
       self._config_entry.async_create_task(
-          self.hass, self._async_repeat(button), "dooya remote repeat")
+          self.hass, self._async_repeat(button), "dooya remote repeat"
+      )
   ```
 
   `record_tx` runs synchronously so the next copy of the burst, a few

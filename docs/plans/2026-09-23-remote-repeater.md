@@ -40,9 +40,7 @@ Baseline before starting: `DOCKER_PYTEST` (no args) must report 160 passed, 28 s
 Replace the function with:
 
 ```python
-def _make_entry(
-    channel: int = CHANNEL, options: dict | None = None
-) -> MockConfigEntry:
+def _make_entry(channel: int = CHANNEL, options: dict | None = None) -> MockConfigEntry:
     return MockConfigEntry(
         domain=DOMAIN,
         title="Salon",
@@ -123,9 +121,7 @@ async def test_a_press_is_repeated_through_this_covers_node(
     _fire_frame(hass, 1)
     await hass.async_block_till_done()
 
-    assert frames == [
-        {"dooya_id": DOOYA_ID, "channel": CHANNEL, "btn": 1, "check": 1}
-    ]
+    assert frames == [{"dooya_id": DOOYA_ID, "channel": CHANNEL, "btn": 1, "check": 1}]
     # The press itself still moves the estimate, as it always has.
     assert hass.states.get(ENTITY_ID).state == "opening"
 ```
