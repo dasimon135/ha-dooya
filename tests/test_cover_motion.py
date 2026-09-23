@@ -1239,3 +1239,16 @@ async def test_a_mis_decoded_frame_is_never_repeated(
     await hass.async_block_till_done()
 
     assert frames == []
+
+
+async def test_a_group_press_is_repeated_once_by_the_group_cover(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """Every sibling hears the common button; only its owner repeats it."""
+    await _setup(hass, _make_group_entry(flagged=True, options=REPEAT))
+    await _setup(hass, _make_entry(options=REPEAT))
+
+    _fire_frame(hass, 1, channel=GROUP_CHANNEL)
+    await hass.async_block_till_done()
+
+    assert [(f["channel"], f["btn"]) for f in frames] == [(GROUP_CHANNEL, 1)]
