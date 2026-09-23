@@ -1158,3 +1158,17 @@ async def test_a_press_is_repeated_through_this_covers_node(
     assert frames == [{"dooya_id": DOOYA_ID, "channel": CHANNEL, "btn": 1, "check": 1}]
     # The press itself still moves the estimate, as it always has.
     assert hass.states.get(ENTITY_ID).state == "opening"
+
+
+async def test_a_burst_from_the_remote_is_repeated_once(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """A remote sends each press several times; it goes out again only once."""
+    entry = await _setup(hass, _make_entry(options=REPEAT))
+    entry.runtime_data.cover._current_position = 0
+
+    for _ in range(3):
+        _fire_frame(hass, 1)
+    await hass.async_block_till_done()
+
+    assert [f["btn"] for f in frames] == [1]

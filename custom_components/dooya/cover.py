@@ -756,8 +756,10 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
         # Only the entry owning this exact id and channel repeats, so a press
         # goes out once: group siblings reach this point through the group
-        # channel, which is not their own. The press is claimed right away,
-        # so the rest of the remote's burst, a few ms later, is an echo.
+        # channel, which is not their own. The press is claimed here and not
+        # left to _async_transmit, which records it only after resolving the
+        # node: when the node is missing, the rest of the remote's burst, a few
+        # ms later, would each be repeated too.
         if (
             self._repeat_remote
             and event_channel == self._channel
