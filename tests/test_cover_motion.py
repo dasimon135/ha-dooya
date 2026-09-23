@@ -39,6 +39,7 @@ from custom_components.dooya.const import (
     CONF_DOOYA_ID,
     CONF_ESPHOME_DEVICE,
     CONF_IS_GROUP,
+    CONF_REPEAT_REMOTE,
     CONF_TRAVEL_TIME_DOWN,
     CONF_TRAVEL_TIME_UP,
     DOMAIN,
@@ -1137,3 +1138,23 @@ async def test_a_group_command_arms_the_siblings_echo_filter(
     await hass.async_block_till_done()
 
     assert hass.states.get(ENTITY_ID).state != "opening"
+
+
+# ---- repeating presses from the remote (issue #19) ----------------------
+
+REPEAT = {CONF_REPEAT_REMOTE: True}
+
+
+async def test_a_press_is_repeated_through_this_covers_node(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """With the option on, a press on the remote goes out once more."""
+    entry = await _setup(hass, _make_entry(options=REPEAT))
+    entry.runtime_data.cover._current_position = 0
+
+    _fire_frame(hass, 1)
+    await hass.async_block_till_done()
+
+    assert frames == [{"dooya_id": DOOYA_ID, "channel": CHANNEL, "btn": 1, "check": 1}]
+    # The press itself still moves the estimate, as it always has.
+    assert hass.states.get(ENTITY_ID).state == "opening"

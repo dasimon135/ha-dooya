@@ -70,6 +70,7 @@ CONF_IS_AWNING: Final = "is_awning"  # DOWN deploys it, and deployed is open
 CONF_TRAVEL_TIME_UP: Final = "travel_time_up"  # Full opening time (s)
 CONF_TRAVEL_TIME_DOWN: Final = "travel_time_down"  # Full closing time (s)
 CONF_REPEAT_COUNT: Final = "repeat_count"  # RF frame repetitions (reliability)
+CONF_REPEAT_REMOTE: Final = "repeat_remote"  # Send presses from the remote again
 CONF_FAVORITE_POSITION: Final = (
     "favorite_position"  # Favorite position (0-100, optional)
 )
