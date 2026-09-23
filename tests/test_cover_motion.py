@@ -23,6 +23,7 @@ if sys.platform == "win32":
     )
 pytest.importorskip("pytest_homeassistant_custom_component")
 
+from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import HomeAssistant, State, callback
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
@@ -279,6 +280,63 @@ async def test_unloading_at_rest_transmits_nothing(
 
     # A full run ends on the motor's own end stop: no STOP to send.
     assert [f["btn"] for f in frames] == [1]
+
+
+async def test_a_restart_during_a_partial_move_stops_the_shutter(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """Home Assistant stopping does not unload the entry: the STOP must still go."""
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover",
+        "set_cover_position",
+        {"entity_id": ENTITY_ID, "position": 90},
+        blocking=True,
+    )
+    await asyncio.sleep(0.6)
+    hass.bus.async_fire(EVENT_HOMEASSISTANT_STOP)
+    await hass.async_block_till_done()
+
+    assert [f["btn"] for f in frames] == [1, 5]
+    assert 5 <= hass.states.get(ENTITY_ID).attributes["current_position"] <= 45
+
+
+async def test_a_reload_during_a_full_travel_keeps_the_end_stop(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """No STOP is due on a full travel; the estimate lands where the motor goes."""
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover", "open_cover", {"entity_id": ENTITY_ID}, blocking=True
+    )
+    await asyncio.sleep(1.0)
+    await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert [f["btn"] for f in frames] == [1]
+    assert hass.states.get(ENTITY_ID).attributes["current_position"] == 100
+
+
+async def test_a_restart_during_a_full_travel_keeps_the_end_stop(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """Same on a restart: nothing transmitted, the estimate at the end stop."""
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover", "open_cover", {"entity_id": ENTITY_ID}, blocking=True
+    )
+    await asyncio.sleep(1.0)
+    hass.bus.async_fire(EVENT_HOMEASSISTANT_STOP)
+    await hass.async_block_till_done()
+
+    assert [f["btn"] for f in frames] == [1]
+    assert hass.states.get(ENTITY_ID).attributes["current_position"] == 100
 
 
 async def test_a_command_during_the_auto_stop_keeps_its_own_movement(

@@ -14,7 +14,8 @@ from homeassistant.components.cover import (
     CoverEntity,
     CoverEntityFeature,
 )
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.const import EVENT_HOMEASSISTANT_STOP
+from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_platform, issue_registry as ir
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -240,6 +241,13 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         self._event_unsub = self.hass.bus.async_listen(
             EVENT_DOOYA_RECEIVED, self._handle_dooya_event
         )
+        # A plain listener, not async_listen_once: removing a one-time
+        # listener after it fired logs an exception in Home Assistant.
+        self.async_on_remove(
+            self.hass.bus.async_listen(
+                EVENT_HOMEASSISTANT_STOP, self._async_handle_hass_stop
+            )
+        )
 
         # Share the cover object with the button platform of this entry.
         self._config_entry.runtime_data.cover = self
@@ -247,14 +255,14 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     async def async_will_remove_from_hass(self) -> None:
         """Cancel the pending callbacks when the entity is removed.
 
-        Last resort for the pending STOP: an entry unload stops the shutter
-        before removal (`__init__.async_unload_entry`), where the estimate can
-        still be written. Removing the entity on its own lands here instead,
-        and Home Assistant drops state writes from this point on
-        (`EntityPlatformState.REMOVED`), so the shutter is stopped but the
-        estimate keeps the position of the last progress tick.
+        Last resort for `async_settle_movement`: an entry unload settles the
+        movement before removal (`__init__.async_unload_entry`), where the
+        estimate can still be written. Removing the entity on its own lands
+        here instead, and Home Assistant drops state writes from this point on
+        (`EntityPlatformState.REMOVED`), so a pending STOP is still sent but
+        the estimate keeps the position of the last progress tick.
         """
-        await self.async_stop_pending_partial_move()
+        await self.async_settle_movement()
         self._cancel_motion_callbacks()
         self._cancel_calibration_timeout()
         if self._event_unsub is not None:
@@ -863,17 +871,28 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             "dooya partial move stop",
         )
 
-    async def async_stop_pending_partial_move(self) -> None:
-        """Send now the STOP that a partial move was still waiting for.
+    async def _async_handle_hass_stop(self, _event: Event) -> None:
+        """Settle the movement while ESPHome can still transmit."""
+        await self.async_settle_movement()
 
-        The timer that would send it dies with the entity, and a reload of the
-        entry (saved options, a reconfigure) removes the entity: left alone,
-        the shutter would run on to its end stop. Stopping short of the target
-        is the only outcome the estimate can still describe truthfully.
+    async def async_settle_movement(self) -> None:
+        """End a movement in progress before its timers die.
+
+        A reload of the entry removes the entity, and a restart of Home
+        Assistant kills the process: either way the timers go. A partial move
+        gets its STOP now, stopping short of the target, the only outcome the
+        estimate can still describe truthfully. A full travel needs no STOP,
+        the motor stops itself at its end stop, so the estimate goes there.
+
+        On a restart this runs at EVENT_HOMEASSISTANT_STOP: ESPHome is still
+        connected and the state written is the one restore saves.
 
         Called once per removal, from whichever comes first; the second call
-        finds no pending move and returns.
+        finds no movement and returns.
         """
+        if self._movement_direction != 0 and self._target_position in (0, 100):
+            self._finalize_position(self._target_position)
+            return
         if self._target_reached_unsub is None or self._target_position in (
             None,
             0,
