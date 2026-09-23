@@ -1276,3 +1276,31 @@ async def test_the_siblings_ignore_the_echo_of_a_repeated_group_press(
     await hass.async_block_till_done()
 
     assert hass.states.get(ENTITY_ID).state != "opening"
+
+
+async def test_a_repeat_without_a_gateway_does_not_break_the_press(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The node is gone: the press still moves the estimate, and says why."""
+    entry = await _setup(hass, _make_entry(options=REPEAT))
+    entry.runtime_data.cover._current_position = 0
+
+    _fire_frame(hass, 1)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(ENTITY_ID).state == "opening"
+    assert "could not repeat a press from the remote" in caplog.text
+
+
+async def test_a_burst_without_a_gateway_is_tried_once(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """No node: one failed repeat per press, not one per copy of the burst."""
+    entry = await _setup(hass, _make_entry(options=REPEAT))
+    entry.runtime_data.cover._current_position = 0
+
+    for _ in range(3):
+        _fire_frame(hass, 1)
+    await hass.async_block_till_done()
+
+    assert caplog.text.count("could not repeat a press from the remote") == 1

@@ -643,7 +643,16 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             now = monotonic()
             for cover in self._async_group_siblings():
                 cover._echo_filter.record_tx(button, now)
-        await self._async_transmit(button)
+        try:
+            await self._async_transmit(button)
+        except HomeAssistantError:
+            # _async_transmit has already opened its repair issue. The press
+            # itself reached Home Assistant and moved the estimate.
+            _LOGGER.warning(
+                "%s: could not repeat a press from the remote, its ESPHome "
+                "node is not available",
+                self._cover_name,
+            )
 
     def _resolve_service_name(self) -> str:
         """Return the ESPHome service name to call, raising on hard failure."""
