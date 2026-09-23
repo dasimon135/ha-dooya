@@ -225,10 +225,20 @@ async def test_a_burst_from_the_remote_is_repeated_once(
 Run: `DOCKER_PYTEST tests/test_cover_motion.py -k burst_from_the_remote`
 Expected: PASS. Listeners run synchronously inside `async_fire`, so all three copies are handled before the repeat task starts: only the synchronous `record_tx` in the guard can stop copies two and three.
 
-**Step 3: Prove the test can fail**
+**Step 3: What this test does NOT prove (corrected after execution)**
 
-Temporarily delete the line `self._echo_filter.record_tx(button, monotonic())` from the guard. Run the same command.
-Expected: FAIL, `[1, 1, 1] != [1]`. Restore the line, run again, PASS.
+Deleting the guard's `record_tx` does not make it fail. `ConfigEntry.async_create_task` starts the task eagerly (`eager_start=True` by default, checked in HA 2026.7 and 2026.8), and `_async_transmit` records the frame before its first `await`. So when the node is there, the task itself claims the press before copy two arrives. The test pins the behaviour, one repeat per burst, not that line.
+
+The guard's `record_tx` is load-bearing when `_async_transmit` fails before recording, i.e. when the node is missing (`_resolve_service_name` raises first). Its mutation proof is in Task 7. Correct the comment above the guard to say so:
+
+```python
+        # Only the entry owning this exact id and channel repeats, so a press
+        # goes out once: group siblings reach this point through the group
+        # channel, which is not their own. The press is claimed here and not
+        # left to _async_transmit, which records it only after resolving the
+        # node: when the node is missing, the rest of the remote's burst, a few
+        # ms later, would each be repeated too.
+```
 
 **Step 4: Commit**
 
@@ -507,7 +517,28 @@ Replace the body of `_async_repeat` after the debug log with:
 Run: `DOCKER_PYTEST tests/test_cover_motion.py -k without_a_gateway`
 Expected: PASS.
 
-**Step 5: Commit**
+**Step 5: The burst without a gateway, and the guard's claim**
+
+This is where the guard's own `record_tx` matters (see Task 3): with no node, `_async_transmit` raises before recording, so only the guard claims the press.
+
+```python
+async def test_a_burst_without_a_gateway_is_tried_once(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """No node: one failed repeat per press, not one per copy of the burst."""
+    entry = await _setup(hass, _make_entry(options=REPEAT))
+    entry.runtime_data.cover._current_position = 0
+
+    for _ in range(3):
+        _fire_frame(hass, 1)
+    await hass.async_block_till_done()
+
+    assert caplog.text.count("could not repeat a press from the remote") == 1
+```
+
+Run: PASS. Then delete the guard's `self._echo_filter.record_tx(button, monotonic())`, run: FAIL (the count is 3). Restore it, PASS.
+
+**Step 6: Commit**
 
 ```bash
 python -m ruff check . && python -m ruff format .
