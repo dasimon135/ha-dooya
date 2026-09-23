@@ -94,14 +94,16 @@
           "repeat_count": "Nombre de répétitions de l'émission RF (1–3)",
           "favorite_position": "Position favorite (%, optionnelle)",
           "is_group": "Ce volet est le bouton commun de la télécommande",
-          "is_awning": "Cette couverture est un store banne (DOWN la déploie)"
+          "is_awning": "Cette couverture est un store banne (DOWN la déploie)",
+          "repeat_remote": "Répéter les appuis de la télécommande"
         },
         "data_description": {
           "esphome_device": "Nœud ESPHome utilisé pour émettre les commandes RF de ce volet. Avec plusieurs nœuds dans la maison, choisissez le plus proche du volet.",
           "repeat_count": "Nombre de fois où la commande RF est envoyée à chaque action. Augmenter à 2 ou 3 si le volet rate parfois une commande (interférences RF). Défaut : 1.",
           "favorite_position": "Position utilisée par le bouton « Position favorite » sur la page de l'appareil et sur la carte. Laisser vide pour masquer le bouton.",
           "is_group": "À cocher pour le volet qui représente le bouton « tout » de la télécommande. Les trames reçues sur son canal resynchronisent tous les autres volets de la même télécommande, et ce volet n'expose pas de position propre. Par défaut, le volet sur le canal 0, là où la plupart des télécommandes le placent.",
-          "is_awning": "À cocher pour un store banne : DOWN le déploie, et Home Assistant l'affiche ouvert une fois déployé. Le temps d'ouverture devient alors le temps de déploiement. À laisser décoché pour les volets et les stores."
+          "is_awning": "À cocher pour un store banne : DOWN le déploie, et Home Assistant l'affiche ouvert une fois déployé. Le temps d'ouverture devient alors le temps de déploiement. À laisser décoché pour les volets et les stores.",
+          "repeat_remote": "À cocher seulement pour un volet que la télécommande physique n'atteint pas bien. Chaque appui de la télécommande destiné à ce volet est renvoyé par le nœud ESPHome de ce volet. Les commandes envoyées par Home Assistant ne sont jamais répétées, donc les commandes de position continuent de fonctionner. Le bouton commun de la télécommande n'est répété que par la cover qui porte ce rôle, si la case y est cochée aussi."
         }
       }
     },

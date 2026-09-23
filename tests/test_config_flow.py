@@ -32,6 +32,7 @@ from custom_components.dooya.const import (
     CONF_IS_AWNING,
     CONF_IS_GROUP,
     CONF_REPEAT_COUNT,
+    CONF_REPEAT_REMOTE,
     CONF_TRAVEL_TIME_DOWN,
     CONF_TRAVEL_TIME_UP,
     DOMAIN,
@@ -566,6 +567,27 @@ async def test_options_can_mark_a_cover_as_the_common_button(
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options[CONF_IS_GROUP] is True
+
+
+async def test_options_offer_to_repeat_the_remote_off_by_default(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """The repeater is opt-in, per cover (issue #19)."""
+    entry = await _add_cover(hass, channel=5, name="Salon")
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    field = next(
+        key for key in result["data_schema"].schema if key == CONF_REPEAT_REMOTE
+    )
+    assert field.default() is False
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {**OPTIONS_BASE, CONF_REPEAT_REMOTE: True}
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_REPEAT_REMOTE] is True
 
 
 async def test_options_refuse_a_second_common_button_on_one_remote(

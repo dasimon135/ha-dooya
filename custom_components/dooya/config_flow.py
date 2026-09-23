@@ -26,6 +26,7 @@ from .const import (
     CONF_IS_AWNING,
     CONF_IS_GROUP,
     CONF_REPEAT_COUNT,
+    CONF_REPEAT_REMOTE,
     CONF_TRAVEL_TIME_DOWN,
     CONF_TRAVEL_TIME_UP,
     DEFAULT_CHANNEL,
@@ -503,6 +504,7 @@ class DooyaOptionsFlow(OptionsFlow):
             )
         )
         current_is_awning = bool(entry_value(entry, CONF_IS_AWNING, False))
+        current_repeat_remote = bool(entry_value(entry, CONF_REPEAT_REMOTE, False))
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -558,6 +560,7 @@ class DooyaOptionsFlow(OptionsFlow):
                 favorite_field: vol.All(vol.Coerce(int), vol.Range(min=0, max=100)),
                 vol.Required(CONF_IS_GROUP, default=current_is_group): bool,
                 vol.Required(CONF_IS_AWNING, default=current_is_awning): bool,
+                vol.Required(CONF_REPEAT_REMOTE, default=current_repeat_remote): bool,
             }
         )
 
