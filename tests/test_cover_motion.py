@@ -1252,3 +1252,27 @@ async def test_a_group_press_is_repeated_once_by_the_group_cover(
     await hass.async_block_till_done()
 
     assert [(f["channel"], f["btn"]) for f in frames] == [(GROUP_CHANNEL, 1)]
+
+
+async def test_the_siblings_ignore_the_echo_of_a_repeated_group_press(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """A second node hears our repeat of the common button: not a new press."""
+    # Group cover first: its listener then runs before the sibling's, which
+    # is the order in which arming the sibling too early would bite.
+    await _setup(hass, _make_group_entry(flagged=True, options=REPEAT))
+    sibling = await _setup(hass, _make_entry())
+    sibling.runtime_data.cover._current_position = 0
+
+    _fire_frame(hass, 1, channel=GROUP_CHANNEL)
+    await hass.async_block_till_done()
+    assert hass.states.get(ENTITY_ID).state == "opening"
+
+    # The user stops that shutter; then the other node reports our repeat.
+    await hass.services.async_call(
+        "dooya", "mark_closed", {"entity_id": ENTITY_ID}, blocking=True
+    )
+    _fire_frame(hass, 1, channel=GROUP_CHANNEL)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(ENTITY_ID).state != "opening"

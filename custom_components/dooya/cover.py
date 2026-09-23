@@ -634,6 +634,15 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             self._cover_name,
             button,
         )
+        if self._is_broadcast:
+            # Every sibling handles the common button too; the echo of this
+            # repeat, heard by another node, must not look like a new press.
+            # Yield first: this task starts inside the group cover's handler,
+            # before the siblings' handlers have seen the press itself.
+            await asyncio.sleep(0)
+            now = monotonic()
+            for cover in self._async_group_siblings():
+                cover._echo_filter.record_tx(button, now)
         await self._async_transmit(button)
 
     def _resolve_service_name(self) -> str:
