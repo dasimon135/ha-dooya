@@ -94,9 +94,11 @@ No change to the ESPHome configuration, no new service, no new entity.
   would let a late echo of the first UP, heard after the STOP, be repeated and
   restart a real motor. Losing a press is the recoverable failure.
 - A repeated group press: the siblings' echo filters are armed in
-  `_async_repeat`, not in the guard, so the echo of the repeat is not a new press
-  for them. Arming them in the guard could make a sibling ignore the original
-  press, since covers handle the same event in no guaranteed order.
+  `_async_repeat`, after one `await asyncio.sleep(0)`, so the echo of the repeat
+  is not a new press for them. Home Assistant runs every callback listener of an
+  event synchronously, and the repeat task starts eagerly inside the group
+  cover's handler: arming the siblings before yielding would arm one registered
+  later before it has seen the original press, and it would ignore it.
 - Entry reloaded during a repeat: the task belongs to the entry, the unload waits.
 - Option off: first condition, nothing changes.
 

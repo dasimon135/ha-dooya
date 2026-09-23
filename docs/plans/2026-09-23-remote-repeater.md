@@ -415,7 +415,7 @@ git commit -m "test: a group press is repeated once, by its owner"
 
 When the group cover repeats, only its own echo filter records the frame. A second node republishes the repeated group frame, and every sibling would take it as a fresh press: a sibling stopped in the meantime starts moving again in Home Assistant. `_async_drive_siblings` already arms the siblings for Home Assistant's own group commands; the repeat must do the same.
 
-It must NOT be done in the guard: all covers handle the same original event synchronously and in no guaranteed order, so arming a sibling there could make it ignore the real press. Arm them in `_async_repeat`, which runs after every handler has seen the press.
+It must not happen while the original event is still being dispatched. Home Assistant calls every `@callback` listener synchronously, in registration order, inside one `async_fire`, and `ConfigEntry.async_create_task` starts `_async_repeat` eagerly, inside the group cover's own handler. Arming the siblings before the task's first `await` would therefore arm a sibling registered after the group cover before that sibling has seen the real press, and it would ignore it. So `_async_repeat` yields once (`await asyncio.sleep(0)`), by which time every listener has handled the press, and only then arms the siblings, before anything is transmitted.
 
 Failing test first:
 
@@ -424,6 +424,8 @@ async def test_the_siblings_ignore_the_echo_of_a_repeated_group_press(
     hass: HomeAssistant, frames: list[dict]
 ) -> None:
     """A second node hears our repeat of the common button: not a new press."""
+    # Group cover first: its listener then runs before the sibling's, which
+    # is the order in which arming the sibling too early would bite.
     await _setup(hass, _make_group_entry(flagged=True, options=REPEAT))
     sibling = await _setup(hass, _make_entry())
     sibling.runtime_data.cover._current_position = 0
@@ -451,12 +453,15 @@ Then in `_async_repeat`, before `_async_transmit`:
         if self._is_broadcast:
             # Every sibling handles the common button too; the echo of this
             # repeat, heard by another node, must not look like a new press.
+            # Yield first: this task starts inside the group cover's handler,
+            # before the siblings' handlers have seen the press itself.
+            await asyncio.sleep(0)
             now = monotonic()
             for cover in self._async_group_siblings():
                 cover._echo_filter.record_tx(button, now)
 ```
 
-Run it again: PASS. Full motion file green. Commit:
+Run it again: PASS. Mutation proof of the yield: delete `await asyncio.sleep(0)`, run: FAIL at the first assertion (the sibling never starts opening, it took the real press for an echo). Restore, PASS. Full motion file green. Commit:
 
 ```bash
 git add custom_components/dooya/cover.py tests/test_cover_motion.py
