@@ -794,6 +794,9 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     @callback
     def _finalize_position(self, position: int) -> None:
         """End an estimated movement on a target position."""
+        # Stop the timers before setting the position: cancelling one in
+        # asyncio debug mode reads the state, which would re-estimate it.
+        self._cancel_motion_callbacks()
         self._current_position = clamp_position(position)
         if self._current_position in (0, 100):
             # End stop reached: the estimate is resynchronized.

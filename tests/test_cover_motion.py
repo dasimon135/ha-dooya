@@ -558,6 +558,31 @@ async def test_set_known_position_resyncs_without_transmitting(
     assert frames == []
 
 
+async def test_mark_closed_holds_during_a_movement(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """Set as closed mid-travel ends at 0, even with asyncio debug on.
+
+    Cancelling a timer in debug mode reads the entity's state through its
+    repr, which used to recompute the travelled position over the one set.
+    """
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover", "open_cover", {"entity_id": ENTITY_ID}, blocking=True
+    )
+    await asyncio.sleep(1.0)
+    await hass.services.async_call(
+        "dooya", "mark_closed", {"entity_id": ENTITY_ID}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    state = hass.states.get(ENTITY_ID)
+    assert state.state == "closed"
+    assert state.attributes["current_position"] == 0
+
+
 async def test_position_and_drift_are_restored_after_a_restart(
     hass: HomeAssistant, frames: list[dict]
 ) -> None:
