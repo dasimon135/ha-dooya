@@ -553,6 +553,81 @@ git commit -m "fix(cover): a repeat without a gateway does not break the press"
 
 ---
 
+### Task 7b: The siblings stay armed through a slow repeat (added after the Task 6 review)
+
+The siblings are armed once, before `_async_transmit`. The group cover re-records its own filter after every call, and `_async_drive_siblings` arms after transmitting. With `repeat_count` 3 and a slow node, the transmission can outlast the 2 s window, and the echo of its last frame would be a new press for the siblings.
+
+**Files:**
+- Modify: `custom_components/dooya/cover.py` (`_async_repeat`)
+- Test: `tests/test_cover_motion.py`
+
+**Step 1: The failing test**
+
+Import `CONF_REPEAT_COUNT` in the test file if it is not there yet, then:
+
+```python
+async def test_the_siblings_stay_armed_through_a_slow_repeat(
+    hass: HomeAssistant,
+) -> None:
+    """Three slow transmissions outlast the echo window; the last echo still
+    must not look like a new press to the siblings."""
+
+    async def _slow(call) -> None:
+        await asyncio.sleep(0.8)
+
+    hass.services.async_register("esphome", GATEWAY_SERVICE, _slow)
+    await _setup(
+        hass,
+        _make_group_entry(flagged=True, options={**REPEAT, CONF_REPEAT_COUNT: 3}),
+    )
+    sibling = await _setup(hass, _make_entry())
+    sibling.runtime_data.cover._current_position = 0
+
+    _fire_frame(hass, 1, channel=GROUP_CHANNEL)
+    await hass.async_block_till_done()  # the repeat takes about 2.6 s
+
+    await hass.services.async_call(
+        "dooya", "mark_closed", {"entity_id": ENTITY_ID}, blocking=True
+    )
+    _fire_frame(hass, 1, channel=GROUP_CHANNEL)  # echo of the last frame
+    await hass.async_block_till_done()
+
+    assert hass.states.get(ENTITY_ID).state == "closed"
+```
+
+Run: `DOCKER_PYTEST tests/test_cover_motion.py -k stay_armed_through`. Expected: FAIL (`opening`).
+
+**Step 2: Re-arm after transmitting**
+
+Extract the arming loop of `_async_repeat` into a small method, and call it again after the transmission, whether it succeeded or not:
+
+```python
+    @callback
+    def _arm_group_siblings(self, button: int) -> None:
+        """Make the siblings take the echo of a repeated group press for ours."""
+        now = monotonic()
+        for cover in self._async_group_siblings():
+            cover._echo_filter.record_tx(button, now)
+```
+
+In `_async_repeat`, the pre-transmit block keeps its `await asyncio.sleep(0)` and then calls `self._arm_group_siblings(button)`; after the `try/except` around `_async_transmit`, add:
+
+```python
+        if self._is_broadcast:
+            self._arm_group_siblings(button)
+```
+
+**Step 3:** Run it: PASS. Also tighten the last assertion of `test_the_siblings_ignore_the_echo_of_a_repeated_group_press` from `!= "opening"` to `== "closed"`, and run the whole motion file: green.
+
+**Step 4: Commit**
+
+```bash
+git add custom_components/dooya/cover.py tests/test_cover_motion.py
+git commit -m "fix(cover): keep the siblings armed through a slow repeat"
+```
+
+---
+
 ### Task 8: The option in the options flow
 
 **Files:**
