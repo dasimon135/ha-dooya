@@ -72,7 +72,7 @@ def frames(hass: HomeAssistant) -> list[dict]:
     return calls
 
 
-def _make_entry(channel: int = CHANNEL) -> MockConfigEntry:
+def _make_entry(channel: int = CHANNEL, options: dict | None = None) -> MockConfigEntry:
     return MockConfigEntry(
         domain=DOMAIN,
         title="Salon",
@@ -85,6 +85,7 @@ def _make_entry(channel: int = CHANNEL) -> MockConfigEntry:
             CONF_TRAVEL_TIME_UP: TRAVEL,
             CONF_TRAVEL_TIME_DOWN: TRAVEL,
         },
+        options=options or {},
     )
 
 
@@ -851,7 +852,7 @@ GROUP_ENTITY_ID = "cover.all_shutters"
 
 
 def _make_group_entry(
-    *, flagged: bool, channel: int = GROUP_CHANNEL
+    *, flagged: bool, channel: int = GROUP_CHANNEL, options: dict | None = None
 ) -> MockConfigEntry:
     """A second cover of the same remote, standing for its common button."""
     return MockConfigEntry(
@@ -866,7 +867,7 @@ def _make_group_entry(
             CONF_TRAVEL_TIME_UP: TRAVEL,
             CONF_TRAVEL_TIME_DOWN: TRAVEL,
         },
-        options={CONF_IS_GROUP: True} if flagged else {},
+        options={**({CONF_IS_GROUP: True} if flagged else {}), **(options or {})},
     )
 
 
