@@ -1172,3 +1172,33 @@ async def test_a_burst_from_the_remote_is_repeated_once(
     await hass.async_block_till_done()
 
     assert [f["btn"] for f in frames] == [1]
+
+
+async def test_home_assistants_own_command_is_never_repeated(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """A second node hears our UP; it must not be repeated, and the STOP holds.
+
+    Issue #19: an automation repeating presses could not tell this echo from
+    the remote, repeated it as a full open, and cancelled the STOP scheduled
+    for the target.
+    """
+    entry = await _setup(hass, _make_entry(options=REPEAT))
+    entry.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover",
+        "set_cover_position",
+        {"entity_id": ENTITY_ID, "position": 50},
+        blocking=True,
+    )
+    # The other node reports our own UP, as a press would look.
+    _fire_frame(hass, 1)
+    await hass.async_block_till_done()
+    assert [f["btn"] for f in frames] == [1]
+
+    await asyncio.sleep(TRAVEL * 0.5 + 1.0)
+    await hass.async_block_till_done()
+
+    assert [f["btn"] for f in frames] == [1, 5]
+    assert hass.states.get(ENTITY_ID).attributes["current_position"] == 50
