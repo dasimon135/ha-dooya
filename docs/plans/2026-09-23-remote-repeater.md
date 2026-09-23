@@ -401,6 +401,58 @@ git add tests/test_cover_motion.py
 git commit -m "test: a group press is repeated once, by its owner"
 ```
 
+**Step 5: The siblings must recognise the repeated group frame (added after the Task 2 review)**
+
+When the group cover repeats, only its own echo filter records the frame. A second node republishes the repeated group frame, and every sibling would take it as a fresh press: a sibling stopped in the meantime starts moving again in Home Assistant. `_async_drive_siblings` already arms the siblings for Home Assistant's own group commands; the repeat must do the same.
+
+It must NOT be done in the guard: all covers handle the same original event synchronously and in no guaranteed order, so arming a sibling there could make it ignore the real press. Arm them in `_async_repeat`, which runs after every handler has seen the press.
+
+Failing test first:
+
+```python
+async def test_the_siblings_ignore_the_echo_of_a_repeated_group_press(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """A second node hears our repeat of the common button: not a new press."""
+    await _setup(hass, _make_group_entry(flagged=True, options=REPEAT))
+    sibling = await _setup(hass, _make_entry())
+    sibling.runtime_data.cover._current_position = 0
+
+    _fire_frame(hass, 1, channel=GROUP_CHANNEL)
+    await hass.async_block_till_done()
+    assert hass.states.get(ENTITY_ID).state == "opening"
+
+    # The user stops that shutter; then the other node reports our repeat.
+    await hass.services.async_call(
+        "dooya", "mark_closed", {"entity_id": ENTITY_ID}, blocking=True
+    )
+    _fire_frame(hass, 1, channel=GROUP_CHANNEL)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(ENTITY_ID).state != "opening"
+```
+
+Run: `DOCKER_PYTEST tests/test_cover_motion.py -k siblings_ignore_the_echo`
+Expected: FAIL, the sibling is `opening` again.
+
+Then in `_async_repeat`, before `_async_transmit`:
+
+```python
+        if self._is_broadcast:
+            # Every sibling handles the common button too; the echo of this
+            # repeat, heard by another node, must not look like a new press.
+            now = monotonic()
+            for cover in self._async_group_siblings():
+                cover._echo_filter.record_tx(button, now)
+```
+
+Run it again: PASS. Full motion file green. Commit:
+
+```bash
+git add custom_components/dooya/cover.py tests/test_cover_motion.py
+git commit -m "fix(cover): the siblings recognise a repeated group press"
+```
+
 ---
 
 ### Task 7: A missing gateway does not break the press

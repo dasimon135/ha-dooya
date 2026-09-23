@@ -88,6 +88,15 @@ No change to the ESPHome configuration, no new service, no new entity.
   started.
 - A genuine press within two seconds of Home Assistant sending the same button
   is taken for an echo and not repeated. The estimate already treats it so.
+- With the option on, a remote press claims its button for two seconds too. UP,
+  STOP, UP again within two seconds loses the second UP: no repeat and no
+  estimate update. Deliberate: forgetting the claim when another button arrives
+  would let a late echo of the first UP, heard after the STOP, be repeated and
+  restart a real motor. Losing a press is the recoverable failure.
+- A repeated group press: the siblings' echo filters are armed in
+  `_async_repeat`, not in the guard, so the echo of the repeat is not a new press
+  for them. Arming them in the guard could make a sibling ignore the original
+  press, since covers handle the same event in no guaranteed order.
 - Entry reloaded during a repeat: the task belongs to the entry, the unload waits.
 - Option off: first condition, nothing changes.
 
