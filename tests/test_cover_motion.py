@@ -1202,3 +1202,40 @@ async def test_home_assistants_own_command_is_never_repeated(
 
     assert [f["btn"] for f in frames] == [1, 5]
     assert hass.states.get(ENTITY_ID).attributes["current_position"] == 50
+
+
+async def test_nothing_is_repeated_with_the_option_off(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """The option is off by default: a press transmits nothing."""
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 0
+
+    _fire_frame(hass, 1)
+    await hass.async_block_till_done()
+
+    assert frames == []
+
+
+async def test_the_led_button_is_never_repeated(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """LED toggles: repeating it would toggle it twice, so nothing changes."""
+    await _setup(hass, _make_entry(options=REPEAT))
+
+    _fire_frame(hass, 0, check=15)
+    await hass.async_block_till_done()
+
+    assert frames == []
+
+
+async def test_a_mis_decoded_frame_is_never_repeated(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """A frame whose check contradicts its button is not put back on the air."""
+    await _setup(hass, _make_entry(options=REPEAT))
+
+    _fire_frame(hass, 1, check=15)
+    await hass.async_block_till_done()
+
+    assert frames == []
