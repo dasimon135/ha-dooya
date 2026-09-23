@@ -39,6 +39,7 @@ from custom_components.dooya.const import (
     CONF_DOOYA_ID,
     CONF_ESPHOME_DEVICE,
     CONF_IS_GROUP,
+    CONF_REPEAT_COUNT,
     CONF_REPEAT_REMOTE,
     CONF_TRAVEL_TIME_DOWN,
     CONF_TRAVEL_TIME_UP,
@@ -1275,7 +1276,7 @@ async def test_the_siblings_ignore_the_echo_of_a_repeated_group_press(
     _fire_frame(hass, 1, channel=GROUP_CHANNEL)
     await hass.async_block_till_done()
 
-    assert hass.states.get(ENTITY_ID).state != "opening"
+    assert hass.states.get(ENTITY_ID).state == "closed"
 
 
 async def test_a_repeat_without_a_gateway_does_not_break_the_press(
@@ -1304,3 +1305,35 @@ async def test_a_burst_without_a_gateway_is_tried_once(
     await hass.async_block_till_done()
 
     assert caplog.text.count("could not repeat a press from the remote") == 1
+
+
+async def test_the_siblings_stay_armed_through_a_slow_repeat(
+    hass: HomeAssistant,
+) -> None:
+    """Three slow transmissions outlast the echo window; the last echo still
+    must not look like a new press to the siblings."""
+
+    async def _slow(call) -> None:
+        await asyncio.sleep(0.8)
+
+    hass.services.async_register("esphome", GATEWAY_SERVICE, _slow)
+    await _setup(
+        hass,
+        _make_group_entry(flagged=True, options={**REPEAT, CONF_REPEAT_COUNT: 3}),
+    )
+    sibling = await _setup(hass, _make_entry())
+    sibling.runtime_data.cover._current_position = 0
+
+    _fire_frame(hass, 1, channel=GROUP_CHANNEL)
+    await hass.async_block_till_done()  # the repeat takes about 2.6 s
+
+    await hass.services.async_call(
+        "dooya", "mark_closed", {"entity_id": ENTITY_ID}, blocking=True
+    )
+    _fire_frame(hass, 1, channel=GROUP_CHANNEL)  # echo of the last frame
+    await hass.async_block_till_done()
+
+    # Not "closed": under the harness's asyncio debug mode, cancelling the
+    # travel timer reprs the entity, which re-reads the elapsed travel and
+    # undoes mark_closed after 2.6 s of motion. Only a new press says opening.
+    assert hass.states.get(ENTITY_ID).state != "opening"

@@ -640,19 +640,28 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             # Yield first: this task starts inside the group cover's handler,
             # before the siblings' handlers have seen the press itself.
             await asyncio.sleep(0)
-            now = monotonic()
-            for cover in self._async_group_siblings():
-                cover._echo_filter.record_tx(button, now)
+            self._arm_group_siblings(button)
         try:
             await self._async_transmit(button)
         except HomeAssistantError:
-            # _async_transmit has already opened its repair issue. The press
-            # itself reached Home Assistant and moved the estimate.
+            # No node, or the call to it failed. The press itself reached
+            # Home Assistant and has already moved the estimate.
             _LOGGER.warning(
                 "%s: could not repeat a press from the remote, its ESPHome "
                 "node is not available",
                 self._cover_name,
             )
+        if self._is_broadcast:
+            # Again after transmitting: the last frame's echo may come after
+            # the first arming has expired (repeat_count, a slow node).
+            self._arm_group_siblings(button)
+
+    @callback
+    def _arm_group_siblings(self, button: int) -> None:
+        """Make the siblings take the echo of a repeated group press for ours."""
+        now = monotonic()
+        for cover in self._async_group_siblings():
+            cover._echo_filter.record_tx(button, now)
 
     def _resolve_service_name(self) -> str:
         """Return the ESPHome service name to call, raising on hard failure."""
