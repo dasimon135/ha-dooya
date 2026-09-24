@@ -308,7 +308,7 @@ A remote whose common button drives both shutters and an awning moves each of th
 
 Dooya multi-channel remotes have an "all" button that moves every shutter paired with the remote from a single RF frame. On most remotes it transmits on **channel 0**.
 
-You can create such an entity with manual entry by setting the channel to `0`. It exposes open/close/stop only (no position estimate, since each shutter moves independently), and is ideal for "close everything" automations — one RF frame instead of one per shutter.
+You can create such an entity with manual entry by setting the channel to `0`. It exposes open/close/stop only (no position estimate, since each shutter moves independently) and no position or calibration buttons, and is ideal for "close everything" automations — one RF frame instead of one per shutter.
 
 ### When the common button is not on channel 0
 

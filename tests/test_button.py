@@ -28,6 +28,7 @@ from custom_components.dooya.const import (
     CONF_DOOYA_ID,
     CONF_ESPHOME_DEVICE,
     CONF_FAVORITE_POSITION,
+    CONF_IS_GROUP,
     CONF_TRAVEL_TIME_DOWN,
     CONF_TRAVEL_TIME_UP,
     DOMAIN,
@@ -44,14 +45,14 @@ def auto_enable_custom_integrations(enable_custom_integrations: None) -> None:
     return
 
 
-def _make_entry(**options) -> MockConfigEntry:
+def _make_entry(*, channel: int = 5, **options) -> MockConfigEntry:
     return MockConfigEntry(
         domain=DOMAIN,
         title="Salon",
         data={
             CONF_ESPHOME_DEVICE: GATEWAY_SLUG,
             CONF_DOOYA_ID: 0x00D1C917,
-            CONF_CHANNEL: 5,
+            CONF_CHANNEL: channel,
             CONF_CHECK: 7,
             CONF_COVER_NAME: "Salon",
             CONF_TRAVEL_TIME_UP: 20.0,
@@ -98,6 +99,54 @@ async def test_toggle_led_button_exists(hass: HomeAssistant) -> None:
     await _setup_entry(hass, entry)
 
     assert _button_id(hass, entry, "toggle_led") is not None
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+def _buttons(hass: HomeAssistant, entry: MockConfigEntry) -> list[str]:
+    registry = er.async_get(hass)
+    return [
+        regentry.entity_id
+        for regentry in er.async_entries_for_config_entry(registry, entry.entry_id)
+        if regentry.domain == "button"
+    ]
+
+
+async def test_channel_0_entry_has_no_buttons(hass: HomeAssistant) -> None:
+    """The group cover ignores every button action, so it gets none."""
+    entry = _make_entry(channel=0, **{CONF_FAVORITE_POSITION: 40})
+    await _setup_entry(hass, entry)
+
+    assert _buttons(hass, entry) == []
+    assert hass.states.get("cover.salon") is not None
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_flagged_group_entry_has_no_buttons(hass: HomeAssistant) -> None:
+    """A cover flagged as the common button off channel 0 gets none either."""
+    entry = _make_entry(channel=80, **{CONF_IS_GROUP: True})
+    await _setup_entry(hass, entry)
+
+    assert _buttons(hass, entry) == []
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
+async def test_stale_group_buttons_are_removed(hass: HomeAssistant) -> None:
+    """Buttons an earlier version created for the group cover do not linger."""
+    entry = _make_entry(channel=0)
+    entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+    stale = registry.async_get_or_create(
+        "button", DOMAIN, f"{entry.entry_id}_mark_open", config_entry=entry
+    )
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert registry.async_get(stale.entity_id) is None
+    assert _buttons(hass, entry) == []
 
     assert await hass.config_entries.async_unload(entry.entry_id)
 

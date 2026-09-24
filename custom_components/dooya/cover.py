@@ -29,7 +29,6 @@ from .const import (
     CONF_CHANNEL,
     CONF_DOOYA_ID,
     CONF_IS_AWNING,
-    CONF_IS_GROUP,
     CONF_REPEAT_COUNT,
     CONF_TRAVEL_TIME_DOWN,
     CONF_TRAVEL_TIME_UP,
@@ -43,6 +42,7 @@ from .const import (
     TRANSMIT_SERVICE_SUFFIX,
     entry_value,
     gateway_issue_id,
+    is_group_entry,
     transmit_service_name,
 )
 from .dooya_protocol import (
@@ -83,7 +83,7 @@ def group_channel_for(hass: HomeAssistant, dooya_id: int) -> int:
         channel = entry.data.get(CONF_CHANNEL)
         if entry.data.get(CONF_DOOYA_ID) != dooya_id or channel is None:
             continue
-        if entry_value(entry, CONF_IS_GROUP, channel == BROADCAST_CHANNEL):
+        if is_group_entry(entry):
             return int(channel)
     return BROADCAST_CHANNEL
 
@@ -128,9 +128,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         # inferred from the channel, because some motors ignore channel 0 and
         # answer a group button of their own (issue #33); the historical rule
         # is the default, so existing channel-0 entries need no migration.
-        self._is_broadcast = bool(
-            entry_value(config_entry, CONF_IS_GROUP, self._channel == BROADCAST_CHANNEL)
-        )
+        self._is_broadcast = is_group_entry(config_entry)
         self._attr_supported_features = (
             CoverEntityFeature.OPEN | CoverEntityFeature.CLOSE | CoverEntityFeature.STOP
         )
