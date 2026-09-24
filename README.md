@@ -62,6 +62,9 @@ Around that:
   one on a real Dooya remote.
 - **An LED toggle button**, for DC1600A-style remotes whose fourth button
   controls a status LED on the receiver rather than the blind itself.
+- **A repeater for a weak remote.** Ticked on a shutter the remote does not
+  reach, each press on the remote is sent again by the ESPHome node. Home
+  Assistant's own commands are never repeated.
 - **One control for all of them.** A single entity that opens or closes every
   blind paired with the remote, in one radio frame rather than one per blind.
 - **A card, already included.** An animated shutter with position, presets and
@@ -369,6 +372,34 @@ The **RF transmission repeat count** option (in the cover's **Configure** dialog
 Each of those transmissions is already a burst: the reference node sends every frame five times (`set_send_times(5)` in [`esphome/dooya-node.yaml`](esphome/dooya-node.yaml)), so a repeat count of 2 puts ten frames on the air.
 
 > ⚠️ Do not exceed 3 repetitions. Some Dooya motors may interpret repeated signals as a pairing or limit-setting command.
+
+## A Remote That Does Not Reach Every Shutter
+
+The ESPHome node often hears a remote that a distant shutter does not. Tick
+**Repeat presses from the remote** in that shutter's options, and every press
+on the remote meant for it is sent again, through the node configured for that
+shutter.
+
+It is off by default and set per shutter, so tick it only where it is needed.
+
+What it never sends again:
+
+- a command from Home Assistant itself. The integration knows the frames it
+  just sent, so a position command is never repeated and its STOP holds. This
+  is why it is an option here and not an automation: with two nodes, an
+  automation cannot tell Home Assistant's frame from a press on the remote;
+- the LED button, which toggles and would toggle twice;
+- a frame that was decoded wrongly, or that belongs to no configured shutter.
+
+A press is sent again once, however many copies the remote sends and however
+many nodes hear it. A press on the remote's common button is repeated once, by
+the shutter that holds the group role, and only if the option is ticked on that
+one too.
+
+A press claims its button for two seconds. Pressing Up, Stop and Up again within
+two seconds loses the second Up: press it again after a moment.
+
+If you built a repeater as an automation before, remove it when you tick this.
 
 ## Known limitations
 

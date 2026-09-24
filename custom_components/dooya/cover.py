@@ -34,6 +34,7 @@ from .const import (
     CONF_DOOYA_ID,
     CONF_IS_AWNING,
     CONF_REPEAT_COUNT,
+    CONF_REPEAT_REMOTE,
     CONF_TRAVEL_TIME_DOWN,
     CONF_TRAVEL_TIME_UP,
     DEFAULT_REPEAT_COUNT,
@@ -145,6 +146,10 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         # through _button_for / _direction_for: buttons stay physical,
         # directions and positions stay semantic (issue #50).
         self._is_awning = bool(entry_value(config_entry, CONF_IS_AWNING, False))
+        # A weak remote reaches some shutters and not others. Repeating its
+        # presses from Home Assistant is only safe here, where our own frames
+        # are known: an automation cannot tell them apart (issue #19).
+        self._repeat_remote = bool(entry_value(config_entry, CONF_REPEAT_REMOTE, False))
         self._attr_device_class = (
             CoverDeviceClass.AWNING if self._is_awning else CoverDeviceClass.SHUTTER
         )
@@ -622,6 +627,42 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             )
             self._echo_filter.record_tx(button, monotonic())
 
+    async def _async_repeat(self, button: int) -> None:
+        """Send a press from the remote again, for a shutter it does not reach."""
+        _LOGGER.debug(
+            "%s: repeating a press from the remote (button=%d)",
+            self._cover_name,
+            button,
+        )
+        if self._is_broadcast:
+            # Every sibling handles the common button too; the echo of this
+            # repeat, heard by another node, must not look like a new press.
+            # Yield first: this task starts inside the group cover's handler,
+            # before the siblings' handlers have seen the press itself.
+            await asyncio.sleep(0)
+            self._arm_group_siblings(button)
+        try:
+            await self._async_transmit(button)
+        except HomeAssistantError:
+            # No node, or the call to it failed. The press itself reached
+            # Home Assistant and has already moved the estimate.
+            _LOGGER.warning(
+                "%s: could not repeat a press from the remote, its ESPHome "
+                "node is not available",
+                self._cover_name,
+            )
+        if self._is_broadcast:
+            # Again after transmitting: the last frame's echo may come after
+            # the first arming has expired (repeat_count, a slow node).
+            self._arm_group_siblings(button)
+
+    @callback
+    def _arm_group_siblings(self, button: int) -> None:
+        """Make the siblings take the echo of a repeated group press for ours."""
+        now = monotonic()
+        for cover in self._async_group_siblings():
+            cover._echo_filter.record_tx(button, now)
+
     def _resolve_service_name(self) -> str:
         """Return the ESPHome service name to call, raising on hard failure."""
         device = self._esphome_device
@@ -739,6 +780,22 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
                 button,
             )
             return
+
+        # Only the entry owning this exact id and channel repeats, so a press
+        # goes out once: group siblings reach this point through the group
+        # channel, which is not their own. The press is claimed here and not
+        # left to _async_transmit, which records it only after resolving the
+        # node: when the node is missing, the rest of the remote's burst, a few
+        # ms later, would each be repeated too.
+        if (
+            self._repeat_remote
+            and event_channel == self._channel
+            and button in (BUTTON_UP, BUTTON_DOWN, BUTTON_STOP)
+        ):
+            self._echo_filter.record_tx(button, monotonic())
+            self._config_entry.async_create_task(
+                self.hass, self._async_repeat(button), "dooya remote repeat"
+            )
 
         if (direction := self._direction_for(button)) > 0:
             self._start_estimated_motion(direction=1, target_position=100)

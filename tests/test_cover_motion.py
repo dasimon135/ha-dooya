@@ -39,6 +39,8 @@ from custom_components.dooya.const import (
     CONF_DOOYA_ID,
     CONF_ESPHOME_DEVICE,
     CONF_IS_GROUP,
+    CONF_REPEAT_COUNT,
+    CONF_REPEAT_REMOTE,
     CONF_TRAVEL_TIME_DOWN,
     CONF_TRAVEL_TIME_UP,
     DOMAIN,
@@ -72,7 +74,7 @@ def frames(hass: HomeAssistant) -> list[dict]:
     return calls
 
 
-def _make_entry(channel: int = CHANNEL) -> MockConfigEntry:
+def _make_entry(channel: int = CHANNEL, options: dict | None = None) -> MockConfigEntry:
     return MockConfigEntry(
         domain=DOMAIN,
         title="Salon",
@@ -85,6 +87,7 @@ def _make_entry(channel: int = CHANNEL) -> MockConfigEntry:
             CONF_TRAVEL_TIME_UP: TRAVEL,
             CONF_TRAVEL_TIME_DOWN: TRAVEL,
         },
+        options=options or {},
     )
 
 
@@ -851,7 +854,7 @@ GROUP_ENTITY_ID = "cover.all_shutters"
 
 
 def _make_group_entry(
-    *, flagged: bool, channel: int = GROUP_CHANNEL
+    *, flagged: bool, channel: int = GROUP_CHANNEL, options: dict | None = None
 ) -> MockConfigEntry:
     """A second cover of the same remote, standing for its common button."""
     return MockConfigEntry(
@@ -866,7 +869,7 @@ def _make_group_entry(
             CONF_TRAVEL_TIME_UP: TRAVEL,
             CONF_TRAVEL_TIME_DOWN: TRAVEL,
         },
-        options={CONF_IS_GROUP: True} if flagged else {},
+        options={**({CONF_IS_GROUP: True} if flagged else {}), **(options or {})},
     )
 
 
@@ -1136,3 +1139,199 @@ async def test_a_group_command_arms_the_siblings_echo_filter(
     await hass.async_block_till_done()
 
     assert hass.states.get(ENTITY_ID).state != "opening"
+
+
+# ---- repeating presses from the remote (issue #19) ----------------------
+
+REPEAT = {CONF_REPEAT_REMOTE: True}
+
+
+async def test_a_press_is_repeated_through_this_covers_node(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """With the option on, a press on the remote goes out once more."""
+    entry = await _setup(hass, _make_entry(options=REPEAT))
+    entry.runtime_data.cover._current_position = 0
+
+    _fire_frame(hass, 1)
+    await hass.async_block_till_done()
+
+    assert frames == [{"dooya_id": DOOYA_ID, "channel": CHANNEL, "btn": 1, "check": 1}]
+    # The press itself still moves the estimate, as it always has.
+    assert hass.states.get(ENTITY_ID).state == "opening"
+
+
+async def test_a_burst_from_the_remote_is_repeated_once(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """A remote sends each press several times; it goes out again only once."""
+    entry = await _setup(hass, _make_entry(options=REPEAT))
+    entry.runtime_data.cover._current_position = 0
+
+    for _ in range(3):
+        _fire_frame(hass, 1)
+    await hass.async_block_till_done()
+
+    assert [f["btn"] for f in frames] == [1]
+
+
+async def test_home_assistants_own_command_is_never_repeated(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """A second node hears our UP; it must not be repeated, and the STOP holds.
+
+    Issue #19: an automation repeating presses could not tell this echo from
+    the remote, repeated it as a full open, and cancelled the STOP scheduled
+    for the target.
+    """
+    entry = await _setup(hass, _make_entry(options=REPEAT))
+    entry.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover",
+        "set_cover_position",
+        {"entity_id": ENTITY_ID, "position": 50},
+        blocking=True,
+    )
+    # The other node reports our own UP, as a press would look.
+    _fire_frame(hass, 1)
+    await hass.async_block_till_done()
+    assert [f["btn"] for f in frames] == [1]
+
+    await asyncio.sleep(TRAVEL * 0.5 + 1.0)
+    await hass.async_block_till_done()
+
+    assert [f["btn"] for f in frames] == [1, 5]
+    assert hass.states.get(ENTITY_ID).attributes["current_position"] == 50
+
+
+async def test_nothing_is_repeated_with_the_option_off(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """The option is off by default: a press transmits nothing."""
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 0
+
+    _fire_frame(hass, 1)
+    await hass.async_block_till_done()
+
+    assert frames == []
+
+
+async def test_the_led_button_is_never_repeated(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """LED toggles: repeating it would toggle it twice, so nothing changes."""
+    await _setup(hass, _make_entry(options=REPEAT))
+
+    _fire_frame(hass, 0, check=15)
+    await hass.async_block_till_done()
+
+    assert frames == []
+
+
+async def test_a_mis_decoded_frame_is_never_repeated(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """A frame whose check contradicts its button is not put back on the air."""
+    await _setup(hass, _make_entry(options=REPEAT))
+
+    _fire_frame(hass, 1, check=15)
+    await hass.async_block_till_done()
+
+    assert frames == []
+
+
+async def test_a_group_press_is_repeated_once_by_the_group_cover(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """Every sibling hears the common button; only its owner repeats it."""
+    await _setup(hass, _make_group_entry(flagged=True, options=REPEAT))
+    await _setup(hass, _make_entry(options=REPEAT))
+
+    _fire_frame(hass, 1, channel=GROUP_CHANNEL)
+    await hass.async_block_till_done()
+
+    assert [(f["channel"], f["btn"]) for f in frames] == [(GROUP_CHANNEL, 1)]
+
+
+async def test_the_siblings_ignore_the_echo_of_a_repeated_group_press(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """A second node hears our repeat of the common button: not a new press."""
+    # Group cover first: its listener then runs before the sibling's, which
+    # is the order in which arming the sibling too early would bite.
+    await _setup(hass, _make_group_entry(flagged=True, options=REPEAT))
+    sibling = await _setup(hass, _make_entry())
+    sibling.runtime_data.cover._current_position = 0
+
+    _fire_frame(hass, 1, channel=GROUP_CHANNEL)
+    await hass.async_block_till_done()
+    assert hass.states.get(ENTITY_ID).state == "opening"
+
+    # The user stops that shutter; then the other node reports our repeat.
+    await hass.services.async_call(
+        "dooya", "mark_closed", {"entity_id": ENTITY_ID}, blocking=True
+    )
+    _fire_frame(hass, 1, channel=GROUP_CHANNEL)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(ENTITY_ID).state == "closed"
+
+
+async def test_a_repeat_without_a_gateway_does_not_break_the_press(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The node is gone: the press still moves the estimate, and says why."""
+    entry = await _setup(hass, _make_entry(options=REPEAT))
+    entry.runtime_data.cover._current_position = 0
+
+    _fire_frame(hass, 1)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(ENTITY_ID).state == "opening"
+    assert "could not repeat a press from the remote" in caplog.text
+
+
+async def test_a_burst_without_a_gateway_is_tried_once(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """No node: one failed repeat per press, not one per copy of the burst."""
+    entry = await _setup(hass, _make_entry(options=REPEAT))
+    entry.runtime_data.cover._current_position = 0
+
+    for _ in range(3):
+        _fire_frame(hass, 1)
+    await hass.async_block_till_done()
+
+    assert caplog.text.count("could not repeat a press from the remote") == 1
+
+
+async def test_the_siblings_stay_armed_through_a_slow_repeat(
+    hass: HomeAssistant,
+) -> None:
+    """Three slow transmissions outlast the echo window; the last echo still
+    must not look like a new press to the siblings."""
+
+    async def _slow(call) -> None:
+        await asyncio.sleep(0.8)
+
+    hass.services.async_register("esphome", GATEWAY_SERVICE, _slow)
+    await _setup(
+        hass,
+        _make_group_entry(flagged=True, options={**REPEAT, CONF_REPEAT_COUNT: 3}),
+    )
+    sibling = await _setup(hass, _make_entry())
+    sibling.runtime_data.cover._current_position = 0
+
+    _fire_frame(hass, 1, channel=GROUP_CHANNEL)
+    await hass.async_block_till_done()  # the repeat takes about 2.6 s
+
+    await hass.services.async_call(
+        "dooya", "mark_closed", {"entity_id": ENTITY_ID}, blocking=True
+    )
+    _fire_frame(hass, 1, channel=GROUP_CHANNEL)  # echo of the last frame
+    await hass.async_block_till_done()
+
+    # A new press would say opening; an ignored echo leaves it closed.
+    assert hass.states.get(ENTITY_ID).state == "closed"
