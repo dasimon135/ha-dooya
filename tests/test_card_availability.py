@@ -43,8 +43,11 @@ def _run(
     layout: str = "full",
     language: str = "en",
     click: dict | None = None,
+    device_class: str | None = None,
 ) -> dict:
     attributes: dict = {"friendly_name": "Salon"}
+    if device_class:
+        attributes["device_class"] = device_class
     if position is not None:
         attributes["current_position"] = position
     if features is not None:
@@ -218,3 +221,55 @@ def test_an_unknown_state_is_not_treated_as_unavailable() -> None:
 
     assert "Unavailable" not in html
     assert "disabled" not in html
+
+
+# ---- a cover that knows no state (the group cover) ------------------------
+
+
+def _state_word(html: str) -> str:
+    """The text of the state label, whatever the layout."""
+    m = re.search(r'<(?:div class="state[^"]*"[^>]*|span class="tsub")>([^<]*)<', html)
+    assert m, html
+    return m.group(1)
+
+
+def _window_classes(html: str) -> str:
+    m = re.search(r'<div class="(window[^"]*)"', html)
+    assert m, html
+    return m.group(1)
+
+
+@pytest.mark.parametrize("layout", LAYOUTS)
+def test_the_group_cover_claims_no_state(layout: str) -> None:
+    html = _run("unknown", features=NO_POSITION, position=None, layout=layout)["html"]
+
+    assert _state_word(html) == "", layout
+
+
+def test_the_group_shutter_is_drawn_half_way_not_greyed() -> None:
+    html = _run("unknown", features=NO_POSITION, position=None)["html"]
+
+    assert 'style="height:50%"' in html
+    assert "off" not in _window_classes(html).split()
+
+
+def test_the_group_awning_is_drawn_half_deployed_not_greyed() -> None:
+    html = _run("unknown", features=NO_POSITION, position=None, device_class="awning")[
+        "html"
+    ]
+
+    assert "aw-stripe" in html
+    assert "off" not in _window_classes(html).split()
+
+
+def test_the_group_tile_shows_the_closed_icon() -> None:
+    html = _run("unknown", features=NO_POSITION, position=None, layout="tile")["html"]
+
+    assert 'icon="mdi:window-shutter"' in html
+    assert "mdi:window-shutter-open" not in html
+
+
+def test_a_cover_with_a_known_state_but_no_position_keeps_its_word() -> None:
+    html = _run("closed", features=NO_POSITION, position=None)["html"]
+
+    assert _state_word(html) == "Closed"

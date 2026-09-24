@@ -317,6 +317,12 @@ class DooyaCoverCard extends HTMLElement {
     const closing = st.state === "closing";
     const moving = opening || closing;
     const closed = st.state === "closed" || pos === 0;
+    // No position and no state word (the group cover, always `unknown`): claim
+    // nothing. Drawn half-way like an unavailable cover, but not greyed.
+    const vague =
+      usable && pos == null && !["open", "opening", "closed", "closing"].includes(st.state);
+    // Where the drawing sits when there is nothing to show: half-way.
+    const neutral = !usable || vague;
     const name = this._esc(
       this._config.name || st.attributes.friendly_name || "Cover"
     );
@@ -329,6 +335,7 @@ class DooyaCoverCard extends HTMLElement {
 
     let stateLabel;
     if (!usable) stateLabel = t.unavailable;
+    else if (vague) stateLabel = "";
     else if (opening) stateLabel = ta.opening;
     else if (closing) stateLabel = ta.closing;
     else if (pos == null) stateLabel = closed ? t.closed : t.open;
@@ -337,7 +344,7 @@ class DooyaCoverCard extends HTMLElement {
     else stateLabel = t.position(pos);
 
     // Curtain covers the (100 - position)% upper part of the window.
-    const curtainPct = !usable ? 50 : pos == null ? (closed ? 100 : 0) : 100 - pos;
+    const curtainPct = neutral ? 50 : pos == null ? (closed ? 100 : 0) : 100 - pos;
 
     // The favorite is a stored position: no position, no favorite.
     const favBtn = hasPos ? this._favoriteButton() : null;
@@ -345,9 +352,9 @@ class DooyaCoverCard extends HTMLElement {
     // Tile: an ultra-compact row aligned with HA's native tile cards. Tapping
     // the icon/name opens the full card in a popup (see _openCardDialog).
     if (this._layout() === "tile") {
-      const icon = closed || !usable ? "mdi:window-shutter" : "mdi:window-shutter-open";
+      const icon = closed || neutral ? "mdi:window-shutter" : "mdi:window-shutter-open";
       const dot = awning
-        ? AWNING_GLYPH[closed || !usable ? "retracted" : "deployed"]
+        ? AWNING_GLYPH[closed || neutral ? "retracted" : "deployed"]
         : `<ha-icon icon="${icon}"></ha-icon>`;
       this._body.innerHTML = `
         <div class="tile ${closed || !usable ? "off" : ""}">
@@ -368,7 +375,7 @@ class DooyaCoverCard extends HTMLElement {
     }
 
     if (this._layout() === "compact") {
-      const fillPct = !usable ? 0 : pos != null ? pos : closed ? 0 : 100;
+      const fillPct = neutral ? 0 : pos != null ? pos : closed ? 0 : 100;
       // No position feature: a spacer keeps the buttons on the right.
       const bar = hasPos
         ? `<div class="cbar ${usable ? "" : "off"}" ${usable ? "data-bar" : ""} title="${t.estimated}">
@@ -429,7 +436,7 @@ class DooyaCoverCard extends HTMLElement {
       </div>
       <div class="hero">
         <div class="window ${awning ? "awning" : ""} ${usable ? "" : "off"} ${usable && hasPos ? "" : "static"} sc-${this._scene()}" data-window title="${t.estimated}">
-          ${awning ? this._awningScene(usable ? pos : 50) : `
+          ${awning ? this._awningScene(neutral ? 50 : pos) : `
           <div class="sky">
             <div class="stars"></div>
             <div class="sun"></div>
