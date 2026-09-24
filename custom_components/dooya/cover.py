@@ -906,7 +906,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             await self._async_transmit(BUTTON_STOP)
         except HomeAssistantError:
             _LOGGER.error(
-                "%s: could not send STOP while unloading; the shutter will run "
+                "%s: could not send the pending STOP; the shutter will run "
                 "to its end stop",
                 self._cover_name,
             )
