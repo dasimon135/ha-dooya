@@ -363,6 +363,14 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
         current_position = self._current_position
         if current_position == position:
+            # Moving: stop on the position being passed. At an end stop: drive
+            # there anyway, the only way to resync a drifted estimate.
+            if self._movement_direction != 0:
+                await self.async_stop_cover()
+            elif position == 100:
+                await self.async_open_cover()
+            elif position == 0:
+                await self.async_close_cover()
             return
 
         if position > current_position:

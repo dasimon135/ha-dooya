@@ -213,6 +213,25 @@ async def test_setting_an_awning_position_deploys_with_down(
     assert hass.states.get(AWNING_ID).attributes["current_position"] == 50
 
 
+async def test_set_position_100_on_a_deployed_awning_still_sends_down(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """The Open preset resyncs an awning with its own deploy button."""
+    entry = await _setup(hass, _entry("Terrasse", 5, awning=True))
+    entry.runtime_data.cover._current_position = 100
+
+    await hass.services.async_call(
+        "cover",
+        "set_cover_position",
+        {"entity_id": AWNING_ID, "position": 100},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    assert [f["btn"] for f in frames] == [DOWN]
+    assert hass.states.get(AWNING_ID).state == "open"
+
+
 async def test_down_on_the_remote_opens_an_awning(
     hass: HomeAssistant, frames: list[dict]
 ) -> None:
