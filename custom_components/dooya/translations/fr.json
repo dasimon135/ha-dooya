@@ -103,7 +103,7 @@
           "favorite_position": "Position utilisée par le bouton « Position favorite » sur la page de l'appareil et sur la carte. Laisser vide pour masquer le bouton.",
           "is_group": "À cocher pour le volet qui représente le bouton « tout » de la télécommande. Les trames reçues sur son canal resynchronisent tous les autres volets de la même télécommande, et ce volet n'expose pas de position propre. Par défaut, le volet sur le canal 0, là où la plupart des télécommandes le placent.",
           "is_awning": "À cocher pour un store banne : DOWN le déploie, et Home Assistant l'affiche ouvert une fois déployé. Le temps d'ouverture devient alors le temps de déploiement. À laisser décoché pour les volets et les stores.",
-          "repeat_remote": "À cocher seulement pour un volet que la télécommande physique n'atteint pas bien. Chaque appui de la télécommande destiné à ce volet est renvoyé par le nœud ESPHome de ce volet. Les commandes envoyées par Home Assistant ne sont jamais répétées, donc les commandes de position continuent de fonctionner. Le bouton commun de la télécommande n'est répété que par la cover qui porte ce rôle, si la case y est cochée aussi."
+          "repeat_remote": "À cocher seulement pour un volet que la télécommande physique n'atteint pas bien. Chaque appui de la télécommande destiné à ce volet est renvoyé par le nœud ESPHome de ce volet. Les commandes envoyées par Home Assistant ne sont jamais répétées, donc les commandes de position continuent de fonctionner. Le bouton commun de la télécommande n'est répété que par le volet qui porte ce rôle, si la case y est cochée aussi."
         }
       }
     },
