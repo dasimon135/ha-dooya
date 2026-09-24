@@ -1333,7 +1333,5 @@ async def test_the_siblings_stay_armed_through_a_slow_repeat(
     _fire_frame(hass, 1, channel=GROUP_CHANNEL)  # echo of the last frame
     await hass.async_block_till_done()
 
-    # Not "closed": under the harness's asyncio debug mode, cancelling the
-    # travel timer reprs the entity, which re-reads the elapsed travel and
-    # undoes mark_closed after 2.6 s of motion. Only a new press says opening.
-    assert hass.states.get(ENTITY_ID).state != "opening"
+    # A new press would say opening; an ignored echo leaves it closed.
+    assert hass.states.get(ENTITY_ID).state == "closed"
