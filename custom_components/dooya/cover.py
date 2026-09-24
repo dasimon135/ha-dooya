@@ -20,7 +20,11 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_platform, issue_registry as ir
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later
-from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.helpers.restore_state import (
+    ExtraStoredData,
+    RestoredExtraData,
+    RestoreEntity,
+)
 import voluptuous as vol
 
 from .const import (
@@ -210,6 +214,35 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         }
 
     @property
+    def extra_restore_state_data(self) -> ExtraStoredData | None:
+        """Save where the movement in progress will leave the shutter.
+
+        The restore snapshot of a restart can be taken before any
+        EVENT_HOMEASSISTANT_STOP listener of ours runs (its own listener is
+        registered first for an entity added after start), so it must
+        describe the outcome of the movement, not the moment of the snapshot.
+        """
+        if self._is_broadcast:
+            return None
+        position, moves = self._settled_estimate()
+        return RestoredExtraData({"position": position, "moves_since_sync": moves})
+
+    def _settled_estimate(self) -> tuple[int | None, int]:
+        """Position and drift once the movement in progress has ended.
+
+        A full travel ends at its end stop, resynchronized; a partial move
+        ends where its pending STOP catches it, one more move off the stops,
+        the same rule as `_stop_estimated_motion`.
+        """
+        if self._movement_direction != 0 and self._target_position in (0, 100):
+            return self._target_position, 0
+        self._refresh_position()
+        moves = self._moves_since_sync
+        if self._movement_direction != 0 and self._current_position not in (0, 100):
+            moves += 1
+        return self._current_position, moves
+
+    @property
     def is_opening(self) -> bool:
         """Return whether the shutter is currently opening."""
         self._refresh_position()
@@ -224,7 +257,22 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     async def async_added_to_hass(self) -> None:
         """Restore the previous state from Home Assistant storage."""
         await super().async_added_to_hass()
-        if (last_state := await self.async_get_last_state()) is not None:
+        extra = await self.async_get_last_extra_data()
+        extra_data = extra.as_dict() if extra is not None else {}
+        extra_position = extra_data.get("position")
+        extra_moves = extra_data.get("moves_since_sync")
+        if (
+            isinstance(extra_position, int)
+            and 0 <= extra_position <= 100
+            and isinstance(extra_moves, int)
+            and extra_moves >= 0
+        ):
+            # Saved by `extra_restore_state_data`: where the movement in
+            # progress at the restart ended, not a mid-course progress tick.
+            self._current_position = extra_position
+            self._moves_since_sync = extra_moves
+        elif (last_state := await self.async_get_last_state()) is not None:
+            # No extra data (saved by v0.12.0 or older): the state attributes.
             restored_position = last_state.attributes.get(ATTR_CURRENT_POSITION)
             if restored_position is not None:
                 self._current_position = clamp_position(restored_position)
@@ -890,8 +938,10 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         estimate can still describe truthfully. A full travel needs no STOP,
         the motor stops itself at its end stop, so the estimate goes there.
 
-        On a restart this runs at EVENT_HOMEASSISTANT_STOP: ESPHome is still
-        connected and the state written is the one restore saves.
+        On a restart this runs at EVENT_HOMEASSISTANT_STOP, while ESPHome is
+        still connected, so the STOP still goes out. What restore saves does
+        not depend on it: the snapshot may be taken before this runs, and it
+        reads `extra_restore_state_data`, which already describes this outcome.
 
         Called once per removal, from whichever comes first; the second call
         finds no movement and returns.

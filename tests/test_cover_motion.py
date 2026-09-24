@@ -25,9 +25,11 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import HomeAssistant, State, callback
+from homeassistant.helpers import restore_state
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     mock_restore_cache,
+    mock_restore_cache_with_extra_data,
 )
 
 from custom_components.dooya.const import (
@@ -746,6 +748,77 @@ async def test_position_and_drift_are_restored_after_a_restart(
     assert state.attributes["current_position"] == 64
     assert state.attributes["moves_since_sync"] == 6
     assert state.attributes["position_confidence"] == "medium"
+
+
+def _stored_extra_data(hass: HomeAssistant) -> dict | None:
+    """What a restore dump taken at this instant would save for the cover.
+
+    The dump can run before any EVENT_HOMEASSISTANT_STOP listener of ours
+    (it registers first for an entity added after start), so this snapshot
+    is all a restart can rely on.
+    """
+    for stored in restore_state.async_get(hass).async_get_stored_states():
+        if stored.state.entity_id == ENTITY_ID:
+            return stored.extra_data.as_dict() if stored.extra_data else None
+    raise AssertionError(f"{ENTITY_ID} is not in the restore snapshot")
+
+
+async def test_a_restart_during_a_full_travel_saves_the_end_stop(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """The motor stops itself at the end stop, whenever the snapshot is taken."""
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover", "open_cover", {"entity_id": ENTITY_ID}, blocking=True
+    )
+    await asyncio.sleep(1.0)
+
+    extra = _stored_extra_data(hass)
+    assert extra is not None
+    assert extra["position"] == 100
+    assert extra["moves_since_sync"] == 0
+
+
+async def test_a_restart_during_a_partial_move_saves_where_the_stop_ends_it(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """The pending STOP ends a partial move short of its target, off the stops."""
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 0
+
+    await _set_position(hass, 90)
+    await asyncio.sleep(0.6)
+
+    extra = _stored_extra_data(hass)
+    assert extra is not None
+    assert 0 < extra["position"] < 90
+    assert extra["moves_since_sync"] == 1
+
+
+async def test_restore_prefers_the_extra_data_over_the_attributes(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """The attributes may be a progress tick; the extra data is the outcome."""
+    mock_restore_cache_with_extra_data(
+        hass,
+        (
+            (
+                State(
+                    ENTITY_ID,
+                    "open",
+                    {"current_position": 33, "moves_since_sync": 0},
+                ),
+                {"position": 100, "moves_since_sync": 0},
+            ),
+        ),
+    )
+    await _setup(hass, _make_entry())
+
+    state = hass.states.get(ENTITY_ID)
+    assert state.attributes["current_position"] == 100
+    assert state.attributes["moves_since_sync"] == 0
 
 
 # ---- broadcast entity ---------------------------------------------------
