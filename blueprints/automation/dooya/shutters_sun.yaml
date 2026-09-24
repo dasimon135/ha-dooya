@@ -98,6 +98,12 @@ triggers:
     attribute: elevation
     above: !input morning_elevation
     id: morning
+  # A sun that rises before the earliest time crosses its elevation too early
+  # for the time condition, and never again that day: open at the earliest
+  # time instead. The elevation condition below keeps a winter morning shut.
+  - trigger: time
+    at: !input earliest_open
+    id: morning
   - trigger: template
     value_template: >-
       {{ temperature_sensor != '' and
@@ -123,6 +129,10 @@ actions:
             id: morning
           - condition: time
             after: !input earliest_open
+          - condition: numeric_state
+            entity_id: sun.sun
+            attribute: elevation
+            above: !input morning_elevation
           - condition: or
             conditions:
               - "{{ temperature_sensor == '' }}"

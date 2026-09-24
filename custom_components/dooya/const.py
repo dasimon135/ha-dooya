@@ -44,6 +44,19 @@ def entry_value(entry: ConfigEntry, key: str, default: Any = None) -> Any:
     return entry.options.get(key, entry.data.get(key, default))
 
 
+def is_group_entry(entry: ConfigEntry) -> bool:
+    """Return whether this entry holds the remote's group role.
+
+    The role is declared by CONF_IS_GROUP; channel 0 keeps it when the flag
+    was never set, so entries predating the checkbox need no migration.
+    """
+    return bool(
+        entry_value(
+            entry, CONF_IS_GROUP, entry.data.get(CONF_CHANNEL) == BROADCAST_CHANNEL
+        )
+    )
+
+
 EVENT_DOOYA_RECEIVED: Final = "esphome.dooya_received"
 
 # Configuration keys

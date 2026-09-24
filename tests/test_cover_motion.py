@@ -23,10 +23,13 @@ if sys.platform == "win32":
     )
 pytest.importorskip("pytest_homeassistant_custom_component")
 
+from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import HomeAssistant, State, callback
+from homeassistant.helpers import restore_state
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     mock_restore_cache,
+    mock_restore_cache_with_extra_data,
 )
 
 from custom_components.dooya.const import (
@@ -203,6 +206,91 @@ async def test_partial_move_sends_stop_at_the_target(
     assert state.attributes["moves_since_sync"] == 1
 
 
+async def _set_position(hass: HomeAssistant, position: int) -> None:
+    await hass.services.async_call(
+        "cover",
+        "set_cover_position",
+        {"entity_id": ENTITY_ID, "position": position},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+
+async def test_set_position_100_at_100_still_sends_up(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """The card's Open preset resyncs a drifted estimate by driving to the stop.
+
+    The estimate already reads 100, so no travel is scheduled: the state is
+    final right after the call and nothing is left to wait for.
+    """
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 100
+
+    await _set_position(hass, 100)
+
+    state = hass.states.get(ENTITY_ID)
+    assert [f["btn"] for f in frames] == [1]
+    assert state.state == "open"
+    assert state.attributes["current_position"] == 100
+
+
+async def test_set_position_0_at_0_still_sends_down(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """The card's Closed preset resyncs a drifted estimate the same way."""
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 0
+
+    await _set_position(hass, 0)
+
+    state = hass.states.get(ENTITY_ID)
+    assert [f["btn"] for f in frames] == [3]
+    assert state.state == "closed"
+
+
+async def test_set_position_to_the_position_being_passed_stops(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """Asking for the position the shutter is passing stops it there.
+
+    A long travel time keeps the estimate on the same integer between the
+    read and the service call (1 % is 0.6 s). The entity property is read
+    rather than the state, which only refreshes on the 1 s progress tick.
+    """
+    entry = await _setup(hass, _make_entry())
+    cover = entry.runtime_data.cover
+    cover._current_position = 0
+    cover._travel_time_up = 60.0
+
+    await hass.services.async_call(
+        "cover", "open_cover", {"entity_id": ENTITY_ID}, blocking=True
+    )
+    await asyncio.sleep(1.0)
+    passing = cover.current_cover_position
+    assert 0 < passing < 100
+
+    await _set_position(hass, passing)
+
+    state = hass.states.get(ENTITY_ID)
+    assert [f["btn"] for f in frames] == [1, 5]
+    assert state.state != "opening"
+    assert state.attributes["current_position"] == passing
+
+
+async def test_set_position_to_an_intermediate_rest_position_sends_nothing(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """At rest between the stops there is nothing to resync: no frame."""
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 40
+
+    await _set_position(hass, 40)
+
+    assert frames == []
+    assert entry.runtime_data.cover.current_cover_position == 40
+
+
 async def test_unloading_during_a_partial_move_stops_the_shutter(
     hass: HomeAssistant, frames: list[dict]
 ) -> None:
@@ -279,6 +367,63 @@ async def test_unloading_at_rest_transmits_nothing(
 
     # A full run ends on the motor's own end stop: no STOP to send.
     assert [f["btn"] for f in frames] == [1]
+
+
+async def test_a_restart_during_a_partial_move_stops_the_shutter(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """Home Assistant stopping does not unload the entry: the STOP must still go."""
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover",
+        "set_cover_position",
+        {"entity_id": ENTITY_ID, "position": 90},
+        blocking=True,
+    )
+    await asyncio.sleep(0.6)
+    hass.bus.async_fire(EVENT_HOMEASSISTANT_STOP)
+    await hass.async_block_till_done()
+
+    assert [f["btn"] for f in frames] == [1, 5]
+    assert 5 <= hass.states.get(ENTITY_ID).attributes["current_position"] <= 45
+
+
+async def test_a_reload_during_a_full_travel_keeps_the_end_stop(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """No STOP is due on a full travel; the estimate lands where the motor goes."""
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover", "open_cover", {"entity_id": ENTITY_ID}, blocking=True
+    )
+    await asyncio.sleep(1.0)
+    await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert [f["btn"] for f in frames] == [1]
+    assert hass.states.get(ENTITY_ID).attributes["current_position"] == 100
+
+
+async def test_a_restart_during_a_full_travel_keeps_the_end_stop(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """Same on a restart: nothing transmitted, the estimate at the end stop."""
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover", "open_cover", {"entity_id": ENTITY_ID}, blocking=True
+    )
+    await asyncio.sleep(1.0)
+    hass.bus.async_fire(EVENT_HOMEASSISTANT_STOP)
+    await hass.async_block_till_done()
+
+    assert [f["btn"] for f in frames] == [1]
+    assert hass.states.get(ENTITY_ID).attributes["current_position"] == 100
 
 
 async def test_a_command_during_the_auto_stop_keeps_its_own_movement(
@@ -558,6 +703,31 @@ async def test_set_known_position_resyncs_without_transmitting(
     assert frames == []
 
 
+async def test_mark_closed_holds_during_a_movement(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """Set as closed mid-travel ends at 0, even with asyncio debug on.
+
+    Cancelling a timer in debug mode reads the entity's state through its
+    repr, which used to recompute the travelled position over the one set.
+    """
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover", "open_cover", {"entity_id": ENTITY_ID}, blocking=True
+    )
+    await asyncio.sleep(1.0)
+    await hass.services.async_call(
+        "dooya", "mark_closed", {"entity_id": ENTITY_ID}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    state = hass.states.get(ENTITY_ID)
+    assert state.state == "closed"
+    assert state.attributes["current_position"] == 0
+
+
 async def test_position_and_drift_are_restored_after_a_restart(
     hass: HomeAssistant, frames: list[dict]
 ) -> None:
@@ -578,6 +748,77 @@ async def test_position_and_drift_are_restored_after_a_restart(
     assert state.attributes["current_position"] == 64
     assert state.attributes["moves_since_sync"] == 6
     assert state.attributes["position_confidence"] == "medium"
+
+
+def _stored_extra_data(hass: HomeAssistant) -> dict | None:
+    """What a restore dump taken at this instant would save for the cover.
+
+    The dump can run before any EVENT_HOMEASSISTANT_STOP listener of ours
+    (it registers first for an entity added after start), so this snapshot
+    is all a restart can rely on.
+    """
+    for stored in restore_state.async_get(hass).async_get_stored_states():
+        if stored.state.entity_id == ENTITY_ID:
+            return stored.extra_data.as_dict() if stored.extra_data else None
+    raise AssertionError(f"{ENTITY_ID} is not in the restore snapshot")
+
+
+async def test_a_restart_during_a_full_travel_saves_the_end_stop(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """The motor stops itself at the end stop, whenever the snapshot is taken."""
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover", "open_cover", {"entity_id": ENTITY_ID}, blocking=True
+    )
+    await asyncio.sleep(1.0)
+
+    extra = _stored_extra_data(hass)
+    assert extra is not None
+    assert extra["position"] == 100
+    assert extra["moves_since_sync"] == 0
+
+
+async def test_a_restart_during_a_partial_move_saves_where_the_stop_ends_it(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """The pending STOP ends a partial move short of its target, off the stops."""
+    entry = await _setup(hass, _make_entry())
+    entry.runtime_data.cover._current_position = 0
+
+    await _set_position(hass, 90)
+    await asyncio.sleep(0.6)
+
+    extra = _stored_extra_data(hass)
+    assert extra is not None
+    assert 0 < extra["position"] < 90
+    assert extra["moves_since_sync"] == 1
+
+
+async def test_restore_prefers_the_extra_data_over_the_attributes(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """The attributes may be a progress tick; the extra data is the outcome."""
+    mock_restore_cache_with_extra_data(
+        hass,
+        (
+            (
+                State(
+                    ENTITY_ID,
+                    "open",
+                    {"current_position": 33, "moves_since_sync": 0},
+                ),
+                {"position": 100, "moves_since_sync": 0},
+            ),
+        ),
+    )
+    await _setup(hass, _make_entry())
+
+    state = hass.states.get(ENTITY_ID)
+    assert state.attributes["current_position"] == 100
+    assert state.attributes["moves_since_sync"] == 0
 
 
 # ---- broadcast entity ---------------------------------------------------

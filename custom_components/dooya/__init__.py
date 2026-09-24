@@ -206,11 +206,12 @@ async def _async_update_listener(hass: HomeAssistant, entry: DooyaConfigEntry) -
 async def async_unload_entry(hass: HomeAssistant, entry: DooyaConfigEntry) -> bool:
     """Unload a Dooya config entry."""
     # Before the entity goes: a partial move still waiting for its STOP would
-    # otherwise run to the end stop. Here the entity is still on its platform,
-    # so the estimate it writes is kept; from inside the removal hooks Home
+    # otherwise run to the end stop, and a full travel would be restored at
+    # its last progress tick. Here the entity is still on its platform, so
+    # the estimate it writes is kept; from inside the removal hooks Home
     # Assistant drops state writes.
     if (cover := entry.runtime_data.cover) is not None:
-        await cover.async_stop_pending_partial_move()
+        await cover.async_settle_movement()
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
         ir.async_delete_issue(hass, DOMAIN, gateway_issue_id(entry.entry_id))

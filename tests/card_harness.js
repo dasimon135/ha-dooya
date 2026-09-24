@@ -1,7 +1,7 @@
 // Runs the shipped card under Node with just enough DOM to render it.
 //
 // Usage: node card_harness.js '<scenario json>'
-// Scenario: { config, state: { state, attributes }, language, click?: { selector, clientX?, clientY? } }
+// Scenario: { config, state: { state, attributes }, language, entities?, click?: { selector, clientX?, clientY? } }
 //       or: { editor: { config }, language } — exercises the visual editor instead
 // Prints: { html, calls, size } — the rendered body markup, every service call
 // made, and what the card answers for `getCardSize()`.
@@ -84,7 +84,8 @@ card.setConfig(scenario.config);
 card.hass = {
   language: scenario.language || "en",
   states: { [entity]: { entity_id: entity, ...scenario.state } },
-  entities: { [entity]: { platform: "dooya", device_id: "dev1" } },
+  // `entities` adds registry rows, e.g. a sibling favorite button on "dev1".
+  entities: { [entity]: { platform: "dooya", device_id: "dev1" }, ...(scenario.entities || {}) },
   callService: (domain, service, data) => calls.push({ domain, service, data }),
 };
 

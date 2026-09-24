@@ -38,6 +38,7 @@ const STRINGS = {
     markClosed: "Set as closed",
     favorite: "Favorite",
     notFound: (e) => `Entity ${e} not found`,
+    unavailable: "Unavailable",
     closeDialog: "Close",
     awning: {
       opening: "Deploying…",
@@ -67,6 +68,7 @@ const STRINGS = {
     markClosed: "Marquer fermé",
     favorite: "Favori",
     notFound: (e) => `Entité ${e} introuvable`,
+    unavailable: "Indisponible",
     closeDialog: "Fermer",
     awning: {
       opening: "Déploiement…",
@@ -268,7 +270,24 @@ class DooyaCoverCard extends HTMLElement {
     const s = this._hass.states[this._config.entity];
     if (!s) return `${this._config.entity}:none:${lang}`;
     const a = s.attributes;
-    return `${this._config.entity}:${s.state}:${a.current_position}:${this._favoriteButton() || ""}:${this._scene()}:${lang}`;
+    return `${this._config.entity}:${s.state}:${a.current_position}:${a.supported_features}:${this._favoriteButton() || ""}:${this._scene()}:${lang}`;
+  }
+
+  // Whether the cover takes a live command at all: since v0.12.0 a cover
+  // follows its ESPHome gateway, so an offline gateway makes it `unavailable`.
+  // `unknown` is not the same: the group cover never has a position, so it is
+  // always `unknown`, and its open / stop / close still work.
+  _usable(st) {
+    return !!st && st.state !== "unavailable";
+  }
+
+  // Whether position controls (slider, presets, favorite, recalibration,
+  // tap-to-position) exist: SET_POSITION is bit 4 of `supported_features`.
+  // The group cover lacks it. A state without the attribute keeps the old
+  // behaviour, since Home Assistant always writes it for a cover.
+  _hasPosition(st) {
+    const f = st && st.attributes.supported_features;
+    return f == null || (f & 4) !== 0;
   }
 
   _call(domain, service, data) {
@@ -288,11 +307,22 @@ class DooyaCoverCard extends HTMLElement {
       return;
     }
 
-    const pos = st.attributes.current_position;
+    const usable = this._usable(st);
+    const hasPos = this._hasPosition(st);
+    // Added to every button and the slider of an unavailable cover.
+    const dis = usable ? "" : " disabled";
+    // An unavailable cover has no position: drawn half-way and greyed, not open.
+    const pos = usable ? st.attributes.current_position : null;
     const opening = st.state === "opening";
     const closing = st.state === "closing";
     const moving = opening || closing;
     const closed = st.state === "closed" || pos === 0;
+    // No position and no state word (the group cover, always `unknown`): claim
+    // nothing. Drawn half-way like an unavailable cover, but not greyed.
+    const vague =
+      usable && pos == null && !["open", "opening", "closed", "closing"].includes(st.state);
+    // Where the drawing sits when there is nothing to show: half-way.
+    const neutral = !usable || vague;
     const name = this._esc(
       this._config.name || st.attributes.friendly_name || "Cover"
     );
@@ -304,7 +334,9 @@ class DooyaCoverCard extends HTMLElement {
     const closeIcon = awning ? "mdi:arrow-collapse-horizontal" : "mdi:chevron-down";
 
     let stateLabel;
-    if (opening) stateLabel = ta.opening;
+    if (!usable) stateLabel = t.unavailable;
+    else if (vague) stateLabel = "";
+    else if (opening) stateLabel = ta.opening;
     else if (closing) stateLabel = ta.closing;
     else if (pos == null) stateLabel = closed ? t.closed : t.open;
     else if (pos <= 0) stateLabel = t.closed;
@@ -312,19 +344,20 @@ class DooyaCoverCard extends HTMLElement {
     else stateLabel = t.position(pos);
 
     // Curtain covers the (100 - position)% upper part of the window.
-    const curtainPct = pos == null ? (closed ? 100 : 0) : 100 - pos;
+    const curtainPct = neutral ? 50 : pos == null ? (closed ? 100 : 0) : 100 - pos;
 
-    const favBtn = this._favoriteButton();
+    // The favorite is a stored position: no position, no favorite.
+    const favBtn = hasPos ? this._favoriteButton() : null;
 
     // Tile: an ultra-compact row aligned with HA's native tile cards. Tapping
     // the icon/name opens the full card in a popup (see _openCardDialog).
     if (this._layout() === "tile") {
-      const icon = closed ? "mdi:window-shutter" : "mdi:window-shutter-open";
+      const icon = closed || neutral ? "mdi:window-shutter" : "mdi:window-shutter-open";
       const dot = awning
-        ? AWNING_GLYPH[closed ? "retracted" : "deployed"]
+        ? AWNING_GLYPH[closed || neutral ? "retracted" : "deployed"]
         : `<ha-icon icon="${icon}"></ha-icon>`;
       this._body.innerHTML = `
-        <div class="tile ${closed ? "off" : ""}">
+        <div class="tile ${closed || !usable ? "off" : ""}">
           <div class="tinfo" data-act="tileinfo" role="button" tabindex="0" aria-label="${name}">
             <div class="tdot">${dot}</div>
             <div class="ttext">
@@ -333,36 +366,41 @@ class DooyaCoverCard extends HTMLElement {
             </div>
           </div>
           <div class="tctl">
-            <button class="tbtn ${opening ? "active" : ""}" data-act="open" aria-label="${ta.up}"><ha-icon icon="${openIcon}"></ha-icon></button>
-            <button class="tbtn" data-act="stop" aria-label="${t.stop}"><ha-icon icon="mdi:stop"></ha-icon></button>
-            <button class="tbtn ${closing ? "active" : ""}" data-act="close" aria-label="${ta.down}"><ha-icon icon="${closeIcon}"></ha-icon></button>
+            <button class="tbtn ${opening ? "active" : ""}" data-act="open" aria-label="${ta.up}"${dis}><ha-icon icon="${openIcon}"></ha-icon></button>
+            <button class="tbtn" data-act="stop" aria-label="${t.stop}"${dis}><ha-icon icon="mdi:stop"></ha-icon></button>
+            <button class="tbtn ${closing ? "active" : ""}" data-act="close" aria-label="${ta.down}"${dis}><ha-icon icon="${closeIcon}"></ha-icon></button>
           </div>
         </div>`;
       return;
     }
 
     if (this._layout() === "compact") {
-      const fillPct = pos != null ? pos : closed ? 0 : 100;
+      const fillPct = neutral ? 0 : pos != null ? pos : closed ? 0 : 100;
+      // No position feature: a spacer keeps the buttons on the right.
+      const bar = hasPos
+        ? `<div class="cbar ${usable ? "" : "off"}" ${usable ? "data-bar" : ""} title="${t.estimated}">
+            <div class="cfill ${moving ? "moving" : ""}" style="width:${fillPct}%"></div>
+          </div>`
+        : `<div class="cspace"></div>`;
       this._body.innerHTML = `
         <div class="head chead">
           <div class="title">${name}</div>
           <div class="state ${moving ? "moving" : ""}" title="${t.estimated}">${stateLabel}</div>
         </div>
         <div class="compact">
-          <div class="cbar" data-bar title="${t.estimated}">
-            <div class="cfill ${moving ? "moving" : ""}" style="width:${fillPct}%"></div>
-          </div>
-          ${favBtn ? `<button class="ctl mini" data-fav="${this._esc(favBtn)}" title="${t.favorite}"><ha-icon icon="mdi:star"></ha-icon></button>` : ""}
-          <button class="ctl mini ${opening ? "active" : ""}" data-act="open" title="${ta.up}"><ha-icon icon="${openIcon}"></ha-icon></button>
-          <button class="ctl mini" data-act="stop" title="${t.stop}"><ha-icon icon="mdi:stop"></ha-icon></button>
-          <button class="ctl mini ${closing ? "active" : ""}" data-act="close" title="${ta.down}"><ha-icon icon="${closeIcon}"></ha-icon></button>
+          ${bar}
+          ${favBtn ? `<button class="ctl mini" data-fav="${this._esc(favBtn)}" title="${t.favorite}"${dis}><ha-icon icon="mdi:star"></ha-icon></button>` : ""}
+          <button class="ctl mini ${opening ? "active" : ""}" data-act="open" title="${ta.up}"${dis}><ha-icon icon="${openIcon}"></ha-icon></button>
+          <button class="ctl mini" data-act="stop" title="${t.stop}"${dis}><ha-icon icon="mdi:stop"></ha-icon></button>
+          <button class="ctl mini ${closing ? "active" : ""}" data-act="close" title="${ta.down}"${dis}><ha-icon icon="${closeIcon}"></ha-icon></button>
         </div>
       `;
       return;
     }
 
-    const showPresets = this._config.show_presets !== false;
-    const showCalib = this._config.show_calibration !== false && this._isDooya();
+    // Presets and recalibration are positions too: gone without SET_POSITION.
+    const showPresets = hasPos && this._config.show_presets !== false;
+    const showCalib = hasPos && this._config.show_calibration !== false && this._isDooya();
 
     let presetHtml = "";
     if (showPresets) {
@@ -372,11 +410,11 @@ class DooyaCoverCard extends HTMLElement {
           .map((p) => {
             const label = ta.presets[p] || `${p}%`;
             const active = pos != null && pos === p;
-            return `<button class="chip ${active ? "active" : ""}" data-pos="${p}">${label}</button>`;
+            return `<button class="chip ${active ? "active" : ""}" data-pos="${p}"${dis}>${label}</button>`;
           })
           .join("") +
         (favBtn
-          ? `<button class="chip star" data-fav="${this._esc(favBtn)}" title="${t.favorite}"><ha-icon icon="mdi:star"></ha-icon></button>`
+          ? `<button class="chip star" data-fav="${this._esc(favBtn)}" title="${t.favorite}"${dis}><ha-icon icon="mdi:star"></ha-icon></button>`
           : "") +
         `</div>`;
     }
@@ -386,8 +424,8 @@ class DooyaCoverCard extends HTMLElement {
       calibHtml = `
         <div class="calib">
           <span class="calib-label" title="${t.estimated}"><ha-icon icon="mdi:crosshairs-gps"></ha-icon>${t.calibrate}</span>
-          <button class="chip small" data-act="mark_closed" title="${ta.markClosed}"><ha-icon icon="${awning ? closeIcon : "mdi:arrow-collapse-down"}"></ha-icon><span>${ta.closed}</span></button>
-          <button class="chip small" data-act="mark_open" title="${ta.markOpen}"><ha-icon icon="${awning ? openIcon : "mdi:arrow-collapse-up"}"></ha-icon><span>${ta.open}</span></button>
+          <button class="chip small" data-act="mark_closed" title="${ta.markClosed}"${dis}><ha-icon icon="${awning ? closeIcon : "mdi:arrow-collapse-down"}"></ha-icon><span>${ta.closed}</span></button>
+          <button class="chip small" data-act="mark_open" title="${ta.markOpen}"${dis}><ha-icon icon="${awning ? openIcon : "mdi:arrow-collapse-up"}"></ha-icon><span>${ta.open}</span></button>
         </div>`;
     }
 
@@ -397,8 +435,8 @@ class DooyaCoverCard extends HTMLElement {
         <div class="state ${moving ? "moving" : ""}" title="${t.estimated}">${stateLabel}</div>
       </div>
       <div class="hero">
-        <div class="window ${awning ? "awning" : ""} sc-${this._scene()}" data-window title="${t.estimated}">
-          ${awning ? this._awningScene(pos) : `
+        <div class="window ${awning ? "awning" : ""} ${usable ? "" : "off"} ${usable && hasPos ? "" : "static"} sc-${this._scene()}" data-window title="${t.estimated}">
+          ${awning ? this._awningScene(neutral ? 50 : pos) : `
           <div class="sky">
             <div class="stars"></div>
             <div class="sun"></div>
@@ -412,16 +450,16 @@ class DooyaCoverCard extends HTMLElement {
           <div class="pos-label">${pos != null ? pos + "%" : "?"}</div>
         </div>
         <div class="btns">
-          <button class="ctl ${opening ? "active" : ""}" data-act="open" title="${ta.up}"><ha-icon icon="${openIcon}"></ha-icon></button>
-          <button class="ctl stop" data-act="stop" title="${t.stop}"><ha-icon icon="mdi:stop"></ha-icon></button>
-          <button class="ctl ${closing ? "active" : ""}" data-act="close" title="${ta.down}"><ha-icon icon="${closeIcon}"></ha-icon></button>
+          <button class="ctl ${opening ? "active" : ""}" data-act="open" title="${ta.up}"${dis}><ha-icon icon="${openIcon}"></ha-icon></button>
+          <button class="ctl stop" data-act="stop" title="${t.stop}"${dis}><ha-icon icon="mdi:stop"></ha-icon></button>
+          <button class="ctl ${closing ? "active" : ""}" data-act="close" title="${ta.down}"${dis}><ha-icon icon="${closeIcon}"></ha-icon></button>
         </div>
       </div>
-      <div class="sliderrow">
+      ${hasPos ? `<div class="sliderrow">
         ${awning ? AWNING_GLYPH.retracted : `<ha-icon icon="mdi:window-shutter"></ha-icon>`}
-        <input class="slider" type="range" min="0" max="100" step="1" value="${pos != null ? pos : 0}" data-slider/>
+        <input class="slider" type="range" min="0" max="100" step="1" value="${pos != null ? pos : 0}" data-slider${dis}/>
         ${awning ? AWNING_GLYPH.deployed : `<ha-icon icon="mdi:window-shutter-open"></ha-icon>`}
-      </div>
+      </div>` : ""}
       ${presetHtml}
       ${calibHtml}
     `;
@@ -518,7 +556,8 @@ class DooyaCoverCard extends HTMLElement {
 
   _onChange(e) {
     const s = e.target.closest("[data-slider]");
-    if (!s) return;
+    const st = this._hass.states[this._config.entity];
+    if (!s || !this._usable(st) || !this._hasPosition(st)) return;
     this._call("cover", "set_cover_position", {
       entity_id: this._config.entity,
       position: Number(s.value),
@@ -527,14 +566,20 @@ class DooyaCoverCard extends HTMLElement {
 
   _onClick(e) {
     const entity_id = this._config.entity;
+    const st = this._hass.states[entity_id];
+    // Disabled buttons already swallow the click in a browser; the drawing and
+    // the bar are plain elements, so the state decides here as well.
+    const usable = this._usable(st);
+    const canPos = usable && this._hasPosition(st);
     const w = e.target.closest("[data-window]");
     if (w && !e.target.closest("[data-slider]")) {
+      if (!canPos) return;
       // Click inside the window sets the position: top = closed curtain fully
       // raised (100 = open), bottom = fully lowered (0 = closed). An awning
       // hangs down as it deploys, so there low in the picture is more open.
       const r = w.getBoundingClientRect();
       const frac = (e.clientY - r.top) / r.height;
-      const awning = this._isAwning(this._hass.states[entity_id]);
+      const awning = this._isAwning(st);
       const share = awning ? frac : 1 - frac;
       const target = Math.max(0, Math.min(100, Math.round(share * 100)));
       this._call("cover", "set_cover_position", { entity_id, position: target });
@@ -542,6 +587,7 @@ class DooyaCoverCard extends HTMLElement {
     }
     const bar = e.target.closest("[data-bar]");
     if (bar) {
+      if (!canPos) return;
       // Horizontal position bar (compact view): left = closed, right = open.
       const r = bar.getBoundingClientRect();
       const frac = (e.clientX - r.left) / r.width;
@@ -551,18 +597,20 @@ class DooyaCoverCard extends HTMLElement {
     }
     const tgt = e.target.closest("[data-act],[data-pos],[data-fav]");
     if (!tgt) return;
+    const act = tgt.dataset.act;
+    // The tile's name still opens the popup / more-info: it commands nothing.
+    if (act === "tileinfo") return this._onTileTap();
+    if (!usable) return;
     if (tgt.dataset.fav) {
       this._call("button", "press", { entity_id: tgt.dataset.fav });
       return;
     }
-    const act = tgt.dataset.act;
-    if (act === "tileinfo") this._onTileTap();
-    else if (act === "open") this._call("cover", "open_cover", { entity_id });
+    if (act === "open") this._call("cover", "open_cover", { entity_id });
     else if (act === "close") this._call("cover", "close_cover", { entity_id });
     else if (act === "stop") this._call("cover", "stop_cover", { entity_id });
     else if (act === "mark_open") this._call("dooya", "mark_open", { entity_id });
     else if (act === "mark_closed") this._call("dooya", "mark_closed", { entity_id });
-    else if (tgt.dataset.pos != null)
+    else if (tgt.dataset.pos != null && canPos)
       this._call("cover", "set_cover_position", { entity_id, position: Number(tgt.dataset.pos) });
   }
 
@@ -693,6 +741,11 @@ class DooyaCoverCard extends HTMLElement {
       .ctl:hover, .chip:hover { filter: brightness(1.12); }
       .ctl:active, .chip:active { transform: scale(.95); }
       .warn { color: var(--error-color); padding:12px; }
+      /* unavailable cover, or no SET_POSITION: nothing here takes a command */
+      .window.static, .cbar.off { cursor:default; }
+      .window.off { filter:grayscale(1); opacity:.5; }
+      .cspace { flex:1; }
+      button:disabled, .slider:disabled { opacity:.4; cursor:default; filter:none; transform:none; }
     `;
   }
 }

@@ -11,10 +11,11 @@ from typing import TYPE_CHECKING
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import CONF_FAVORITE_POSITION
+from .const import CONF_FAVORITE_POSITION, is_group_entry
 from .entity import DooyaBaseEntity
 
 if TYPE_CHECKING:
@@ -30,6 +31,18 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Dooya buttons from a config entry."""
+    if is_group_entry(config_entry):
+        # The group cover ignores every button action (no position estimate),
+        # so it gets none, and the ones an earlier version created are purged
+        # instead of lingering as unavailable (every button entity of the
+        # entry comes from this platform, so the domain filter is exact).
+        registry = er.async_get(hass)
+        for regentry in er.async_entries_for_config_entry(
+            registry, config_entry.entry_id
+        ):
+            if regentry.domain == "button":
+                registry.async_remove(regentry.entity_id)
+        return
     entities: list[DooyaButtonBase] = [
         DooyaMarkOpenButton(config_entry),
         DooyaMarkClosedButton(config_entry),
