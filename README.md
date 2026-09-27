@@ -77,6 +77,14 @@ Around that:
 
 ## Installation
 
+**From HACS (recommended).** This button opens the repository in your own Home
+Assistant. HACS asks whether to add it as a custom repository: accept, then
+download **Dooya RF Covers** and restart Home Assistant.
+
+[![Open the Dooya RF Covers repository inside your Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=dasimon135&repository=ha-dooya&category=integration)
+
+If the button does not reach your instance, add the repository by hand:
+
 1. In HACS, open the menu for custom repositories
 2. Add `https://github.com/dasimon135/ha-dooya` as an `Integration` repository
 3. Install "Dooya RF Covers"
