@@ -8,4 +8,4 @@
 # range pinned 2026.9.0 betas. Bump deliberately, not by accident: check the
 # homeassistant== pin a new release drags in before merging it.
 # Requires Python >= 3.14 (see .github/workflows/tests.yml).
-pytest-homeassistant-custom-component==0.13.365
+pytest-homeassistant-custom-component==0.13.366
