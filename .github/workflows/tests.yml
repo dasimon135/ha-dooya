@@ -30,3 +30,31 @@ jobs:
         run: pip install -r requirements-test.txt
       - name: Run tests
         run: python -m pytest tests/ -q
+
+  esphome:
+    name: esphome (compile node config)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Deliberately unpinned: esphome/dooya-node.yaml is what users are told to
+      # flash, so it has to build with whatever ESPHome ships today. Compiling,
+      # not only validating: an external dependency that stops building (as
+      # RadioLib did with `driver/ledc.h`) passes validation and fails here.
+      - name: Compile the node config
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          cp esphome/dooya-node.yaml "$work/"
+          # esphome resolves !secret against a secrets.yaml next to the config, and
+          # rejects an API key that is not valid base64, hence a real-looking stub.
+          cat > "$work/secrets.yaml" <<'EOF'
+          wifi_ssid: "ci-stub"
+          wifi_password: "ci-stub-password"
+          dooya_ap_password: "ci-stub-password"
+          dooya_ota_password: "ci-stub-password"
+          dooya_api_key: "aHVudGVyMmh1bnRlcjJodW50ZXIyaHVudGVyMmh1bnQ="
+          dooya_web_user: "ci-stub"
+          dooya_web_password: "ci-stub-password"
+          EOF
+          docker run --rm -v "$work:/config" -w /config \
+            ghcr.io/esphome/esphome:latest compile dooya-node.yaml
