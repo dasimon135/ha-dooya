@@ -59,7 +59,7 @@ def _run(
         # A favorite button on the same device, so the star is drawn when it may be.
         "entities": {
             FAVORITE: {
-                "platform": "dooya",
+                "platform": "dooya_rf",
                 "device_id": "dev1",
                 "unique_id": "entry1_favorite",
             }

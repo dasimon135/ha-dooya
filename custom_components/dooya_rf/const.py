@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Final
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
 
-DOMAIN: Final = "dooya"
+DOMAIN: Final = "dooya_rf"
 
 # Repair issue raised when the configured ESPHome gateway service is missing.
 ISSUE_GATEWAY_SERVICE_MISSING: Final = "esphome_service_missing"

@@ -23,7 +23,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.dooya.const import (
+from custom_components.dooya_rf.const import (
     CONF_CHANNEL,
     CONF_CHECK,
     CONF_COVER_NAME,
@@ -689,7 +689,7 @@ async def test_learn_timeout_offers_a_retry(
     the flow manager forbids: it raised in a background task and the dialog
     stayed on its spinner, with neither a retry nor manual entry on offer.
     """
-    monkeypatch.setattr("custom_components.dooya.config_flow.LEARN_TIMEOUT_SEC", 0.05)
+    monkeypatch.setattr("custom_components.dooya_rf.config_flow.LEARN_TIMEOUT_SEC", 0.05)
     result = await _start_learning(hass)
 
     await asyncio.sleep(0.2)

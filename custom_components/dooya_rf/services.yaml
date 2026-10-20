@@ -2,19 +2,19 @@ mark_open:
   target:
     entity:
       domain: cover
-      integration: dooya
+      integration: dooya_rf
 
 mark_closed:
   target:
     entity:
       domain: cover
-      integration: dooya
+      integration: dooya_rf
 
 set_known_position:
   target:
     entity:
       domain: cover
-      integration: dooya
+      integration: dooya_rf
   fields:
     position:
       required: true

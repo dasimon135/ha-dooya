@@ -7,8 +7,8 @@
 [![License](https://img.shields.io/github/license/dasimon135/ha-dooya)](LICENSE)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="custom_components/dooya/brand/dark_logo.png">
-  <img src="custom_components/dooya/brand/logo.png" alt="Dooya RF" height="90">
+  <source media="(prefers-color-scheme: dark)" srcset="custom_components/dooya_rf/brand/dark_logo.png">
+  <img src="custom_components/dooya_rf/brand/logo.png" alt="Dooya RF" height="90">
 </picture>
 
 Open, close and position your **Dooya RF433 blinds, shutters and rollers**
@@ -93,7 +93,7 @@ If the button does not reach your instance, add the repository by hand:
 
 ## Manual installation
 
-1. Copy `custom_components/dooya` into your Home Assistant configuration directory
+1. Copy `custom_components/dooya_rf` into your Home Assistant configuration directory
 2. Restart Home Assistant
 3. **Settings → Devices & services → Add integration → Dooya RF Covers**
 
@@ -242,7 +242,7 @@ The card shows:
 - an **animated window** that tracks the estimated position in real time — click anywhere in the window to send the shutter to that height
 - **Open / Stop / Close** buttons
 - a **position slider** and **preset chips** (0 / 25 / 50 / 75 / 100 %)
-- **recalibration shortcuts** calling `dooya.mark_open` / `dooya.mark_closed` (shown only for Dooya entities)
+- **recalibration shortcuts** calling `dooya_rf.mark_open` / `dooya_rf.mark_closed` (shown only for Dooya entities)
 
 Options:
 
@@ -288,9 +288,9 @@ Important: this remains an estimated position, not a true measured position.
 
 If needed, you can recalibrate a cover manually with the entity services exposed by the integration:
 
-- `dooya.mark_open`
-- `dooya.mark_closed`
-- `dooya.set_known_position`
+- `dooya_rf.mark_open`
+- `dooya_rf.mark_closed`
+- `dooya_rf.set_known_position`
 
 The same actions are also available as **button entities** on the shutter's device page (*Set as open*, *Set as closed*), usable directly from the UI and in automations.
 

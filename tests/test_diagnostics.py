@@ -20,7 +20,7 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.dooya.const import (
+from custom_components.dooya_rf.const import (
     CONF_CHANNEL,
     CONF_CHECK,
     CONF_COVER_NAME,
@@ -31,7 +31,7 @@ from custom_components.dooya.const import (
     CONF_TRAVEL_TIME_UP,
     DOMAIN,
 )
-from custom_components.dooya.diagnostics import (
+from custom_components.dooya_rf.diagnostics import (
     async_get_config_entry_diagnostics,
 )
 
@@ -134,7 +134,7 @@ async def test_cover_state_empty_when_entity_absent(hass: HomeAssistant) -> None
     `runtime_data.cover` is None before the platform sets up and again after
     the entity is removed; diagnostics must degrade rather than raise.
     """
-    from custom_components.dooya import DooyaRuntimeData
+    from custom_components.dooya_rf import DooyaRuntimeData
 
     entry = _make_entry()
     entry.add_to_hass(hass)

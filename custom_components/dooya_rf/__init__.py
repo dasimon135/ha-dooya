@@ -35,7 +35,7 @@ class DooyaRuntimeData:
 
 type DooyaConfigEntry = ConfigEntry[DooyaRuntimeData]
 
-CARD_URL = "/dooya_frontend/dooya-cover-card.js"
+CARD_URL = "/dooya_rf_frontend/dooya-cover-card.js"
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:

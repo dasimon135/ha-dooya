@@ -1,5 +1,5 @@
 {
-  "domain": "dooya",
+  "domain": "dooya_rf",
   "name": "Dooya RF Covers",
   "after_dependencies": ["frontend", "lovelace"],
   "codeowners": ["@dasimon135"],
@@ -9,6 +9,6 @@
   "integration_type": "device",
   "iot_class": "assumed_state",
   "issue_tracker": "https://github.com/dasimon135/ha-dooya/issues",
-  "loggers": ["custom_components.dooya"],
+  "loggers": ["custom_components.dooya_rf"],
   "version": "0.13.0"
 }

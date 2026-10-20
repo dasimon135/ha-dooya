@@ -1,6 +1,6 @@
 """Generate the brand icon set for the Dooya RF Covers integration.
 
-Produces (under custom_components/dooya/brand/):
+Produces (under custom_components/dooya_rf/brand/):
   icon.png (256), icon@2x.png (512), dark_icon.png, dark_icon@2x.png,
   logo.png, dark_logo.png
 
@@ -16,7 +16,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-OUT_DIR = Path(__file__).resolve().parents[1] / "custom_components" / "dooya" / "brand"
+OUT_DIR = Path(__file__).resolve().parents[1] / "custom_components" / "dooya_rf" / "brand"
 
 # Sunset/terracotta gradient — evokes shutters + warmth, distinct from
 # the blue used by ha-rf-fan.

@@ -32,7 +32,7 @@ from pytest_homeassistant_custom_component.common import (
     mock_restore_cache_with_extra_data,
 )
 
-from custom_components.dooya.const import (
+from custom_components.dooya_rf.const import (
     CONF_CHANNEL,
     CONF_CHECK,
     CONF_COVER_NAME,
@@ -722,7 +722,7 @@ async def test_mark_closed_holds_during_a_movement(
     )
     await asyncio.sleep(1.0)
     await hass.services.async_call(
-        "dooya", "mark_closed", {"entity_id": ENTITY_ID}, blocking=True
+        DOMAIN, "mark_closed", {"entity_id": ENTITY_ID}, blocking=True
     )
     await hass.async_block_till_done()
 
@@ -1271,7 +1271,7 @@ async def test_the_siblings_ignore_the_echo_of_a_repeated_group_press(
 
     # The user stops that shutter; then the other node reports our repeat.
     await hass.services.async_call(
-        "dooya", "mark_closed", {"entity_id": ENTITY_ID}, blocking=True
+        DOMAIN, "mark_closed", {"entity_id": ENTITY_ID}, blocking=True
     )
     _fire_frame(hass, 1, channel=GROUP_CHANNEL)
     await hass.async_block_till_done()
@@ -1328,7 +1328,7 @@ async def test_the_siblings_stay_armed_through_a_slow_repeat(
     await hass.async_block_till_done()  # the repeat takes about 2.6 s
 
     await hass.services.async_call(
-        "dooya", "mark_closed", {"entity_id": ENTITY_ID}, blocking=True
+        DOMAIN, "mark_closed", {"entity_id": ENTITY_ID}, blocking=True
     )
     _fire_frame(hass, 1, channel=GROUP_CHANNEL)  # echo of the last frame
     await hass.async_block_till_done()
