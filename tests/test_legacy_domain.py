@@ -136,7 +136,9 @@ async def test_an_old_entry_comes_over_with_its_settings_and_entity_ids(
 
     await _start(hass)
 
-    assert hass.config_entries.async_get_entry(old.entry_id) is None, "old entry left behind"
+    assert hass.config_entries.async_get_entry(old.entry_id) is None, (
+        "old entry left behind"
+    )
     [new] = hass.config_entries.async_entries(DOMAIN)
     assert new.title == "Salon"
     assert new.unique_id == old.unique_id
@@ -221,7 +223,9 @@ async def test_old_repairs_are_cleared(hass: HomeAssistant) -> None:
 
     await _start(hass)
 
-    assert (LEGACY_DOMAIN, gateway_issue_id(old.entry_id)) not in ir.async_get(hass).issues
+    assert (LEGACY_DOMAIN, gateway_issue_id(old.entry_id)) not in ir.async_get(
+        hass
+    ).issues
 
 
 async def test_adding_the_integration_offers_to_bring_the_covers_over(

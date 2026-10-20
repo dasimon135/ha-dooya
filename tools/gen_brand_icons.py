@@ -16,7 +16,9 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-OUT_DIR = Path(__file__).resolve().parents[1] / "custom_components" / "dooya_rf" / "brand"
+OUT_DIR = (
+    Path(__file__).resolve().parents[1] / "custom_components" / "dooya_rf" / "brand"
+)
 
 # Sunset/terracotta gradient — evokes shutters + warmth, distinct from
 # the blue used by ha-rf-fan.

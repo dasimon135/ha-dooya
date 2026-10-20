@@ -65,6 +65,14 @@
           "dooya_id": "Identifiant du volet (par exemple : D1C917)",
           "channel": "Canal (1-255, ou 0 = tous les volets)"
         }
+      },
+      "legacy_installed": {
+        "title": "Supprimer d'abord l'ancienne version",
+        "description": "L'ancienne version de Dooya RF Covers est toujours installée, dans `{path}`, et c'est elle qui pilote vos {count} volet(s) en ce moment. Les reprendre pendant qu'elle tourne donnerait deux maîtres à chaque volet.\n\nValidez pour supprimer ce dossier. Redémarrez ensuite Home Assistant et ajoutez de nouveau Dooya RF Covers : vos volets sont repris avec leurs identifiants de télécommande, leurs temps de course, leurs options et leurs identifiants d'entité, sans rien réapprendre ni recalibrer."
+      },
+      "import_legacy": {
+        "title": "Reprendre vos volets",
+        "description": "Ces volets ont été configurés avec l'ancienne version de Dooya RF Covers : {covers}.\n\nValidez pour les reprendre. Identifiants de télécommande, temps de course, options, appareils et identifiants d'entité sont conservés : les tableaux de bord et automatisations qui nomment les volets continuent de fonctionner. Les automatisations qui appellent `dooya.mark_open`, `dooya.mark_closed` ou `dooya.set_known_position` doivent désormais appeler `dooya_rf.*`."
       }
     },
     "progress": {
@@ -72,7 +80,11 @@
     },
     "abort": {
       "reconfigure_successful": "Le volet a été reconfiguré avec succès.",
-      "already_configured": "Ce volet est déjà configuré."
+      "already_configured": "Ce volet est déjà configuré.",
+      "restart_to_finish": "L'ancienne version est supprimée. Redémarrez Home Assistant, puis ajoutez de nouveau Dooya RF Covers pour reprendre vos volets.",
+      "legacy_not_removed": "Le dossier `custom_components/dooya` n'est pas l'ancienne version de cette intégration : il n'a pas été touché. Supprimez-le vous-même si c'est bien elle, puis redémarrez Home Assistant.",
+      "legacy_gone": "Ce volet de l'ancienne version n'existe plus.",
+      "legacy_too_new": "Ce volet a été configuré par une version plus récente que celle-ci et ne peut pas être repris."
     },
     "error": {
       "invalid_dooya_id": "Identifiant invalide. Une valeur hexadécimale sur 24 bits est attendue, 6 chiffres maximum (ex. D1C917).",

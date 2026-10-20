@@ -7,6 +7,7 @@ import logging
 from typing import Any
 
 from homeassistant.config_entries import (
+    SOURCE_IMPORT,
     ConfigEntry,
     ConfigFlow,
     ConfigFlowResult,
@@ -25,6 +26,7 @@ from .const import (
     CONF_FAVORITE_POSITION,
     CONF_IS_AWNING,
     CONF_IS_GROUP,
+    CONF_LEGACY_ENTRY_ID,
     CONF_REPEAT_COUNT,
     CONF_REPEAT_REMOTE,
     CONF_TRAVEL_TIME_DOWN,
@@ -35,6 +37,7 @@ from .const import (
     DEFAULT_TRAVEL_TIME_UP,
     DOMAIN,
     EVENT_DOOYA_RECEIVED,
+    LEGACY_DOMAIN,
     MAX_CHANNEL,
     TRANSMIT_SERVICE_SUFFIX,
     entry_value,
@@ -45,6 +48,11 @@ from .dooya_protocol import (
     DooyaData,
     check_for_button,
     is_frame_consistent,
+)
+from .legacy import (
+    async_legacy_installed,
+    async_remove_legacy_installed,
+    legacy_entries,
 )
 
 # Maximum time spent listening for a remote in learn mode (seconds)
@@ -63,6 +71,13 @@ def _parse_dooya_id(raw: str) -> int:
     if not 0 <= value <= MAX_DOOYA_ID:
         raise ValueError(f"dooya id {value:X} does not fit in 24 bits")
     return value
+
+
+def _legacy_unique_id(old: ConfigEntry) -> str:
+    """The unique id an old entry keeps; computed for one that never got any."""
+    return old.unique_id or shutter_unique_id(
+        int(old.data[CONF_DOOYA_ID]), int(old.data.get(CONF_CHANNEL, DEFAULT_CHANNEL))
+    )
 
 
 def shutter_unique_id(dooya_id: int, channel: int) -> str:
@@ -107,10 +122,85 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
         """List the ESPHome devices exposing a transmit_dooya service."""
         return _list_transmit_devices(self.hass)
 
+    async def async_step_import(self, import_data: dict[str, Any]) -> ConfigFlowResult:
+        """Bring one entry over from the old `dooya` domain (see legacy.py).
+
+        The new entry carries the old one's id; its setup adopts the registry rows
+        and then removes the old entry.
+        """
+        old = self.hass.config_entries.async_get_entry(
+            import_data[CONF_LEGACY_ENTRY_ID]
+        )
+        if old is None or old.domain != LEGACY_DOMAIN:
+            return self.async_abort(reason="legacy_gone")
+        # Created at the current version, an entry from a newer schema would be
+        # read as this one: refuse rather than misread it.
+        if old.version > self.VERSION:
+            return self.async_abort(reason="legacy_too_new")
+        await self.async_set_unique_id(_legacy_unique_id(old))
+        self._abort_if_unique_id_configured()
+        return self.async_create_entry(
+            title=old.title,
+            data={**old.data, CONF_LEGACY_ENTRY_ID: old.entry_id},
+            options=dict(old.options),
+        )
+
+    async def async_step_legacy_installed(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """The previous version is still installed and running: remove it first."""
+        if user_input is not None:
+            if not await async_remove_legacy_installed(self.hass):
+                return self.async_abort(reason="legacy_not_removed")
+            return self.async_abort(reason="restart_to_finish")
+        return self.async_show_form(
+            step_id="legacy_installed",
+            description_placeholders={
+                "count": str(len(legacy_entries(self.hass))),
+                "path": f"custom_components/{LEGACY_DOMAIN}",
+            },
+        )
+
+    async def async_step_import_legacy(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Offer to bring the previous version's covers over."""
+        pending = legacy_entries(self.hass)
+        if user_input is None:
+            return self.async_show_form(
+                step_id="import_legacy",
+                description_placeholders={
+                    "covers": ", ".join(e.title for e in pending)
+                },
+            )
+        if not pending:
+            return self.async_abort(reason="legacy_gone")
+        # This flow carries the first; the rest get flows of their own. The first one
+        # coming over sets the integration up, and async_setup then starts a flow for
+        # every cover not yet claimed -- this one included. Its unique id is taken
+        # BEFORE anything starts, so that duplicate is the flow that aborts, not this
+        # one (in ha-rf-fan it did, as already_in_progress, while the id was taken
+        # last).
+        await self.async_set_unique_id(_legacy_unique_id(pending[0]))
+        self._abort_if_unique_id_configured()
+        for old in pending[1:]:
+            self.hass.async_create_task(
+                self.hass.config_entries.flow.async_init(
+                    DOMAIN,
+                    context={"source": SOURCE_IMPORT},
+                    data={CONF_LEGACY_ENTRY_ID: old.entry_id},
+                )
+            )
+        return await self.async_step_import({CONF_LEGACY_ENTRY_ID: pending[0].entry_id})
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Step 1: name the transmitting ESPHome device."""
+        if user_input is None and legacy_entries(self.hass):
+            if await async_legacy_installed(self.hass):
+                return await self.async_step_legacy_installed()
+            return await self.async_step_import_legacy()
         errors: dict[str, str] = {}
         available_devices = self._available_esphome_devices()
         default_device = available_devices[0] if len(available_devices) == 1 else ""

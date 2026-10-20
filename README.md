@@ -91,6 +91,30 @@ If the button does not reach your instance, add the repository by hand:
 4. Restart Home Assistant
 5. **Settings → Devices & services → Add integration → Dooya RF Covers**
 
+### Upgrading from 0.13 or earlier
+
+The integration's domain changed from `dooya` to `dooya_rf`: `dooya` belongs to
+a Home Assistant core entry that points Dooya owners to Motion Blinds, and this
+integration was hiding it. Your covers come over with their remote ids, travel
+times, options, devices and entity IDs, so nothing is learned or calibrated
+again, and dashboards and automations that name the covers keep working. It
+takes two restarts:
+
+1. Update **Dooya RF Covers** in HACS and restart Home Assistant. Your covers
+   keep running on the old version for now: HACS installs the new one beside
+   it, in `custom_components/dooya_rf/`, and leaves `custom_components/dooya/`
+   in place.
+2. Go to **Settings → Devices & services → Add integration → Dooya RF Covers**.
+   It offers to remove the old version: accept, then restart Home Assistant.
+3. Add **Dooya RF Covers** again. It lists your covers and offers to bring them
+   over: accept.
+
+One thing to change by hand: an automation or script that calls
+`dooya.mark_open`, `dooya.mark_closed` or `dooya.set_known_position` must now
+call `dooya_rf.mark_open`, `dooya_rf.mark_closed` or
+`dooya_rf.set_known_position`. Debug logging is now
+`custom_components.dooya_rf`. The ESPHome node needs no change.
+
 ## Manual installation
 
 1. Copy `custom_components/dooya_rf` into your Home Assistant configuration directory
