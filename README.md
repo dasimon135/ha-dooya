@@ -109,6 +109,12 @@ takes two restarts:
 3. Add **Dooya RF Covers** again. It lists your covers and offers to bring them
    over: accept.
 
+Between steps 2 and 3 your covers show as unavailable, and Home Assistant
+reports once *Setup failed for 'dooya': No setup or config entry setup function
+defined*: the old entries are still there while `dooya` now resolves to the core
+entry, which has no code. Both are expected and gone after step 3; the
+notification can be dismissed.
+
 One thing to change by hand: an automation or script that calls
 `dooya.mark_open`, `dooya.mark_closed` or `dooya.set_known_position` must now
 call `dooya_rf.mark_open`, `dooya_rf.mark_closed` or
