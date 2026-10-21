@@ -3,5 +3,5 @@
   "homeassistant": "2026.5.0",
   "render_readme": true,
   "zip_release": true,
-  "filename": "dooya.zip"
+  "filename": "dooya_rf.zip"
 }

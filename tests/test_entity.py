@@ -25,7 +25,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.dooya.const import (
+from custom_components.dooya_rf.const import (
     CONF_CHANNEL,
     CONF_CHECK,
     CONF_COVER_NAME,

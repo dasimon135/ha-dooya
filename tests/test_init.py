@@ -28,14 +28,14 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-import custom_components.dooya as dooya
-from custom_components.dooya import (
+import custom_components.dooya_rf as dooya
+from custom_components.dooya_rf import (
     CARD_URL,
     _async_register_card,
     _async_register_resource,
     async_setup,
 )
-from custom_components.dooya.const import (
+from custom_components.dooya_rf.const import (
     CONF_CHANNEL,
     CONF_CHECK,
     CONF_COVER_NAME,

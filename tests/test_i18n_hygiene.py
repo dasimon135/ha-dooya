@@ -20,7 +20,7 @@ import re
 import pytest
 
 REPO = Path(__file__).resolve().parent.parent
-COMPONENT = REPO / "custom_components" / "dooya"
+COMPONENT = REPO / "custom_components" / "dooya_rf"
 
 # Unambiguous French function words. Each one is either absent from English or
 # vanishingly rare in it; genuinely ambiguous words ("plus", "son", "car",
@@ -106,10 +106,10 @@ FRENCH_MARKERS = frozenset(
 ALLOWED_FRENCH = (
     "docs/",  # working notes, not shipped
     "tools/",  # generators embedding community-forum prose verbatim
-    "custom_components/dooya/translations/fr.json",  # the French locale itself
+    "custom_components/dooya_rf/translations/fr.json",  # the French locale itself
     # The bundled card carries its own bilingual string tables and inline
     # `fr ? "…" : "…"` ternaries; French is part of its source by design.
-    "custom_components/dooya/frontend/dooya-cover-card.js",
+    "custom_components/dooya_rf/frontend/dooya-cover-card.js",
     "tests/test_i18n_hygiene.py",  # this file lists French words on purpose
 )
 

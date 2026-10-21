@@ -22,7 +22,7 @@ ignore = [
 [tool.ruff.lint.isort]
 combine-as-imports = true
 force-sort-within-sections = true
-known-first-party = ["custom_components.dooya"]
+known-first-party = ["custom_components.dooya_rf"]
 
 [tool.ruff.lint.per-file-ignores]
 # E402: HA-harness test modules import after pytest.importorskip

@@ -18,7 +18,7 @@ import re
 CARD = (
     Path(__file__).parents[1]
     / "custom_components"
-    / "dooya"
+    / "dooya_rf"
     / "frontend"
     / "dooya-cover-card.js"
 )

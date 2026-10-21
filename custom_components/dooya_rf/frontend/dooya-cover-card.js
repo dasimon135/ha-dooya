@@ -1,5 +1,5 @@
 /**
- * Dooya Cover Card — a custom Lovelace card shipped with the `dooya` integration.
+ * Dooya Cover Card — a custom Lovelace card shipped with the `dooya_rf` integration.
  *
  * Usage:
  *   type: custom:dooya-cover-card
@@ -141,7 +141,7 @@ class DooyaCoverCard extends HTMLElement {
   static getStubConfig(hass) {
     const reg = hass.entities || {};
     const covers = Object.keys(hass.states).filter((e) => e.startsWith("cover."));
-    const dooya = covers.find((e) => reg[e] && reg[e].platform === "dooya");
+    const dooya = covers.find((e) => reg[e] && reg[e].platform === "dooya_rf");
     return { entity: dooya || covers[0] || "cover.example" };
   }
 
@@ -209,7 +209,7 @@ class DooyaCoverCard extends HTMLElement {
   _isDooya() {
     const reg = (this._hass && this._hass.entities) || {};
     const e = reg[this._config.entity];
-    return !!(e && e.platform === "dooya");
+    return !!(e && e.platform === "dooya_rf");
   }
 
   _scene() {
@@ -608,8 +608,8 @@ class DooyaCoverCard extends HTMLElement {
     if (act === "open") this._call("cover", "open_cover", { entity_id });
     else if (act === "close") this._call("cover", "close_cover", { entity_id });
     else if (act === "stop") this._call("cover", "stop_cover", { entity_id });
-    else if (act === "mark_open") this._call("dooya", "mark_open", { entity_id });
-    else if (act === "mark_closed") this._call("dooya", "mark_closed", { entity_id });
+    else if (act === "mark_open") this._call("dooya_rf", "mark_open", { entity_id });
+    else if (act === "mark_closed") this._call("dooya_rf", "mark_closed", { entity_id });
     else if (tgt.dataset.pos != null && canPos)
       this._call("cover", "set_cover_position", { entity_id, position: Number(tgt.dataset.pos) });
   }

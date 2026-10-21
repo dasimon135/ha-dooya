@@ -7,8 +7,8 @@
 [![License](https://img.shields.io/github/license/dasimon135/ha-dooya)](LICENSE)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="custom_components/dooya/brand/dark_logo.png">
-  <img src="custom_components/dooya/brand/logo.png" alt="Dooya RF" height="90">
+  <source media="(prefers-color-scheme: dark)" srcset="custom_components/dooya_rf/brand/dark_logo.png">
+  <img src="custom_components/dooya_rf/brand/logo.png" alt="Dooya RF" height="90">
 </picture>
 
 Open, close and position your **Dooya RF433 blinds, shutters and rollers**
@@ -91,9 +91,39 @@ If the button does not reach your instance, add the repository by hand:
 4. Restart Home Assistant
 5. **Settings → Devices & services → Add integration → Dooya RF Covers**
 
+### Upgrading from 0.13 or earlier
+
+The integration's domain changed from `dooya` to `dooya_rf`: `dooya` belongs to
+a Home Assistant core entry that points Dooya owners to Motion Blinds, and this
+integration was hiding it. Your covers come over with their remote ids, travel
+times, options, devices and entity IDs, so nothing is learned or calibrated
+again, and dashboards and automations that name the covers keep working. It
+takes two restarts:
+
+1. Update **Dooya RF Covers** in HACS and restart Home Assistant. Your covers
+   keep running on the old version for now: HACS installs the new one beside
+   it, in `custom_components/dooya_rf/`, and leaves `custom_components/dooya/`
+   in place.
+2. Go to **Settings → Devices & services → Add integration → Dooya RF Covers**.
+   It offers to remove the old version: accept, then restart Home Assistant.
+3. Add **Dooya RF Covers** again. It lists your covers and offers to bring them
+   over: accept.
+
+Between steps 2 and 3 your covers show as unavailable, and Home Assistant
+reports once *Setup failed for 'dooya': No setup or config entry setup function
+defined*: the old entries are still there while `dooya` now resolves to the core
+entry, which has no code. Both are expected and gone after step 3; the
+notification can be dismissed.
+
+One thing to change by hand: an automation or script that calls
+`dooya.mark_open`, `dooya.mark_closed` or `dooya.set_known_position` must now
+call `dooya_rf.mark_open`, `dooya_rf.mark_closed` or
+`dooya_rf.set_known_position`. Debug logging is now
+`custom_components.dooya_rf`. The ESPHome node needs no change.
+
 ## Manual installation
 
-1. Copy `custom_components/dooya` into your Home Assistant configuration directory
+1. Copy `custom_components/dooya_rf` into your Home Assistant configuration directory
 2. Restart Home Assistant
 3. **Settings → Devices & services → Add integration → Dooya RF Covers**
 
@@ -242,7 +272,7 @@ The card shows:
 - an **animated window** that tracks the estimated position in real time — click anywhere in the window to send the shutter to that height
 - **Open / Stop / Close** buttons
 - a **position slider** and **preset chips** (0 / 25 / 50 / 75 / 100 %)
-- **recalibration shortcuts** calling `dooya.mark_open` / `dooya.mark_closed` (shown only for Dooya entities)
+- **recalibration shortcuts** calling `dooya_rf.mark_open` / `dooya_rf.mark_closed` (shown only for Dooya entities)
 
 Options:
 
@@ -288,9 +318,9 @@ Important: this remains an estimated position, not a true measured position.
 
 If needed, you can recalibrate a cover manually with the entity services exposed by the integration:
 
-- `dooya.mark_open`
-- `dooya.mark_closed`
-- `dooya.set_known_position`
+- `dooya_rf.mark_open`
+- `dooya_rf.mark_closed`
+- `dooya_rf.set_known_position`
 
 The same actions are also available as **button entities** on the shutter's device page (*Set as open*, *Set as closed*), usable directly from the UI and in automations.
 

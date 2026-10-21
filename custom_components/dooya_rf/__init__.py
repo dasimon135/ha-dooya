@@ -15,6 +15,7 @@ from homeassistant.helpers import config_validation as cv, issue_registry as ir
 from homeassistant.helpers.typing import ConfigType
 
 from .const import DOMAIN, gateway_issue_id
+from .legacy import async_adopt_legacy_registry, async_import_legacy_entries
 
 if TYPE_CHECKING:
     from .cover import DooyaCover
@@ -35,7 +36,11 @@ class DooyaRuntimeData:
 
 type DooyaConfigEntry = ConfigEntry[DooyaRuntimeData]
 
-CARD_URL = "/dooya_frontend/dooya-cover-card.js"
+CARD_URL = "/dooya_rf_frontend/dooya-cover-card.js"
+# Where the card was served before the domain rename. A resource registered
+# there points at a file nothing serves any more: adopted, not duplicated.
+LEGACY_CARD_URL = "/dooya_frontend/dooya-cover-card.js"
+_CARD_PATHS = (CARD_URL, LEGACY_CARD_URL)
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -50,6 +55,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             "works but 'custom:dooya-cover-card' will not be available",
             exc_info=True,
         )
+    await async_import_legacy_entries(hass)
     return True
 
 
@@ -139,11 +145,12 @@ async def _async_register_resource(hass: HomeAssistant, url: str) -> bool:
     # Matched on the PATH, not the whole URL: the query changes with the file,
     # and a copy the user registered by hand carries a different one (or none).
     # Adopting that copy is what keeps a hand-registered entry from becoming a
-    # second, stale card.
+    # second, stale card. The path from before the domain rename counts as ours
+    # too: left alone, it is a dead resource reported on every dashboard.
     ours = [
         item
         for item in resources.async_items()
-        if str(item.get("url", "")).split("?")[0] == CARD_URL
+        if str(item.get("url", "")).split("?")[0] in _CARD_PATHS
     ]
 
     if not ours:
@@ -191,7 +198,13 @@ def _card_digest(path: Path) -> str:
 async def async_setup_entry(hass: HomeAssistant, entry: DooyaConfigEntry) -> bool:
     """Set up a Dooya config entry."""
     entry.runtime_data = DooyaRuntimeData()
+    # Before anything creates an entity: see legacy.async_adopt_legacy_registry.
+    legacy_id = async_adopt_legacy_registry(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    if legacy_id is not None:
+        # Removed last, once nothing it held is still linked to it: removing a
+        # config entry deletes the entities and devices that only it owns.
+        hass.async_create_task(hass.config_entries.async_remove(legacy_id))
     # Reload the entry when options change so the new ESPHome device,
     # travel times and repeat count apply without an HA restart.
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))

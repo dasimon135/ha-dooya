@@ -52,7 +52,7 @@ global.window = global;
 global.console = { ...console, info: () => {} };
 
 const cardFile = path.join(
-  __dirname, "..", "custom_components", "dooya", "frontend", "dooya-cover-card.js"
+  __dirname, "..", "custom_components", "dooya_rf", "frontend", "dooya-cover-card.js"
 );
 // eslint-disable-next-line no-eval
 (0, eval)(fs.readFileSync(cardFile, "utf8"));
@@ -85,7 +85,7 @@ card.hass = {
   language: scenario.language || "en",
   states: { [entity]: { entity_id: entity, ...scenario.state } },
   // `entities` adds registry rows, e.g. a sibling favorite button on "dev1".
-  entities: { [entity]: { platform: "dooya", device_id: "dev1" }, ...(scenario.entities || {}) },
+  entities: { [entity]: { platform: "dooya_rf", device_id: "dev1" }, ...(scenario.entities || {}) },
   callService: (domain, service, data) => calls.push({ domain, service, data }),
 };
 

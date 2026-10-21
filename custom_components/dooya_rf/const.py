@@ -7,7 +7,12 @@ from typing import TYPE_CHECKING, Any, Final
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
 
-DOMAIN: Final = "dooya"
+DOMAIN: Final = "dooya_rf"
+# The domain before the rename: core's virtual integration for Motion Blinds.
+# Only legacy.py should need it: its entries are brought over from there.
+LEGACY_DOMAIN: Final = "dooya"
+# Carried in an imported entry's data until its registry rows have been adopted.
+CONF_LEGACY_ENTRY_ID: Final = "legacy_entry_id"
 
 # Repair issue raised when the configured ESPHome gateway service is missing.
 ISSUE_GATEWAY_SERVICE_MISSING: Final = "esphome_service_missing"
