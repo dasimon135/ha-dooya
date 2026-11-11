@@ -2,6 +2,7 @@
   "domain": "dooya_rf",
   "name": "Dooya RF Covers",
   "after_dependencies": ["frontend", "lovelace"],
+  "categories": ["blinds_curtains"],
   "codeowners": ["@dasimon135"],
   "config_flow": true,
   "dependencies": ["http"],

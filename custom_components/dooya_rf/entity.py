@@ -118,6 +118,21 @@ class DooyaBaseEntity(Entity):
             )
 
     @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Keep the entity in place when the user renames its entity_id.
+
+        Nothing here is keyed on `self.entity_id` (the cover listens to the
+        bus, availability follows the gateway's entities), so there is nothing
+        to re-key. Defining the method is what matters: from Home Assistant
+        2026.11 on, a custom entity without it is removed and added again on a
+        rename, and removing a cover settles its movement, which sends the
+        STOP of a move still in progress. Never called before 2026.11, where
+        Entity has no such method, hence the guarded super() call.
+        """
+        if (parent := getattr(super(), "async_entity_id_changed", None)) is not None:
+            parent(old_entity_id)
+
+    @callback
     def _handle_gateway_state_change(self, _event) -> None:
         """Reflect a gateway state change on this entity.
 

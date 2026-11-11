@@ -303,6 +303,16 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         # Share the cover object with the button platform of this entry.
         self._config_entry.runtime_data.cover = self
 
+    @callback
+    def async_entity_id_changed(self, old_entity_id: str) -> None:
+        """Change the entity_id in place, without settling the movement.
+
+        Restated here on purpose: Home Assistant only treats a class's add and
+        remove hooks as covered when that class (or a subclass) defines this
+        method, and DooyaCover has its own. See DooyaBaseEntity.
+        """
+        super().async_entity_id_changed(old_entity_id)
+
     async def async_will_remove_from_hass(self) -> None:
         """Cancel the pending callbacks when the entity is removed.
 
