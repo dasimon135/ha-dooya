@@ -1,4 +1,4 @@
-"""The card on a Home Assistant cover group, the tile's words, and the name.
+"""The card on a Home Assistant cover group, and the tile's words.
 
 A cover group (`cover.volets_salon` standing for two shutters) used to show
 only the group: no way to move one shutter without leaving the card. The full
@@ -171,28 +171,6 @@ def test_a_moving_tile_says_it_moves() -> None:
 # --- the name ---------------------------------------------------------------
 
 
-def test_the_name_comes_from_home_assistant_s_formatter() -> None:
-    html = _node(
-        {
-            "config": {"entity": LEFT, "layout": "tile"},
-            "state": _member("Salon gauche", "open", 60),
-            "formatName": "Salon",
-        }
-    )["html"]
-    assert '<span class="tname">Salon Salon gauche</span>' in html
-
-
-def test_a_configured_name_still_wins() -> None:
-    html = _node(
-        {
-            "config": {"entity": LEFT, "layout": "tile", "name": "Baie"},
-            "state": _member("Salon gauche", "open", 60),
-            "formatName": "Salon",
-        }
-    )["html"]
-    assert '<span class="tname">Baie</span>' in html
-
-
-def test_without_the_formatter_the_friendly_name_is_used() -> None:
+def test_the_name_is_the_friendly_name() -> None:
     html = _tile("open", 60)
     assert '<span class="tname">Salon gauche</span>' in html

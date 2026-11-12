@@ -89,15 +89,6 @@ card.hass = {
   entities: { [entity]: { platform: "dooya_rf", device_id: "dev1" }, ...(scenario.entities || {}) },
   callService: (domain, service, data) => calls.push({ domain, service, data }),
 };
-// `formatName` stands in for Home Assistant's own name formatter
-// (frontend 2025.10+): it answers "<prefix> <friendly_name>".
-if (scenario.formatName) {
-  card._sig = null; // the name is not part of the signature: force the render
-  card.hass = {
-    ...card._hass,
-    formatEntityName: (st) => `${scenario.formatName} ${st.attributes.friendly_name}`,
-  };
-}
 
 if (scenario.click) {
   // A click on an element carrying the given data attribute, e.g. data-act="open"

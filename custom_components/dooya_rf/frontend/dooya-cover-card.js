@@ -210,18 +210,11 @@ class DooyaCoverCard extends HTMLElement {
       </svg>`;
   }
 
-  // The name the card shows. A configured `name` wins; otherwise Home
-  // Assistant's own formatter (frontend 2025.10+), which composes the name the
-  // way the native cards do since names include the device and the area. The
-  // `friendly_name` attribute is the fallback for anything older.
+  // The name the card shows: the configured `name`, else `friendly_name`.
+  // Not `hass.formatEntityName`: called without a name it composes device +
+  // entity ("Volet parents Parents"), longer than the tile cards around it.
   _name(st, name) {
-    if (name) return name;
-    const h = this._hass;
-    if (h && typeof h.formatEntityName === "function") {
-      const n = h.formatEntityName(st);
-      if (n) return n;
-    }
-    return (st && st.attributes.friendly_name) || "Cover";
+    return name || (st && st.attributes.friendly_name) || "Cover";
   }
 
   // The covers a Home Assistant cover group stands for. A group carries them
