@@ -17,7 +17,7 @@
 // Console banner only. Cache-busting uses a digest of this file (see
 // __init__.py::_async_register_card), so this does not need to be kept in sync
 // with any Python constant.
-const VERSION = "1.5.0";
+const VERSION = "1.6.0";
 // eslint-disable-next-line no-console
 console.info(`%c DOOYA-COVER-CARD %c v${VERSION} `, "background:#e8833a;color:#fff;border-radius:3px 0 0 3px", "background:#c95d2e;color:#fff;border-radius:0 3px 3px 0");
 
@@ -28,6 +28,8 @@ const STRINGS = {
     opening: "Opening…",
     closing: "Closing…",
     position: (p) => `Open ${p}%`,
+    percent: (p) => `${p}%`,
+    members: "Covers in this group",
     estimated: "Position is estimated from travel time",
     up: "Open",
     stop: "Stop",
@@ -58,6 +60,8 @@ const STRINGS = {
     opening: "Ouverture…",
     closing: "Fermeture…",
     position: (p) => `Ouvert à ${p}%`,
+    percent: (p) => `${p} %`,
+    members: "Volets du groupe",
     estimated: "Position estimée d'après le temps de trajet",
     up: "Ouvrir",
     stop: "Stop",
@@ -206,6 +210,30 @@ class DooyaCoverCard extends HTMLElement {
       </svg>`;
   }
 
+  // The name the card shows. A configured `name` wins; otherwise Home
+  // Assistant's own formatter (frontend 2025.10+), which composes the name the
+  // way the native cards do since names include the device and the area. The
+  // `friendly_name` attribute is the fallback for anything older.
+  _name(st, name) {
+    if (name) return name;
+    const h = this._hass;
+    if (h && typeof h.formatEntityName === "function") {
+      const n = h.formatEntityName(st);
+      if (n) return n;
+    }
+    return (st && st.attributes.friendly_name) || "Cover";
+  }
+
+  // The covers a Home Assistant cover group stands for. A group carries them
+  // in its `entity_id` attribute; a single cover has none. Members Home
+  // Assistant does not know about (a removed shutter) are left out.
+  _members(st) {
+    const ids = st && st.attributes && st.attributes.entity_id;
+    if (!Array.isArray(ids)) return [];
+    const states = (this._hass && this._hass.states) || {};
+    return ids.filter((e) => typeof e === "string" && e.startsWith("cover.") && states[e]);
+  }
+
   _isDooya() {
     const reg = (this._hass && this._hass.entities) || {};
     const e = reg[this._config.entity];
@@ -270,7 +298,15 @@ class DooyaCoverCard extends HTMLElement {
     const s = this._hass.states[this._config.entity];
     if (!s) return `${this._config.entity}:none:${lang}`;
     const a = s.attributes;
-    return `${this._config.entity}:${s.state}:${a.current_position}:${a.supported_features}:${this._favoriteButton() || ""}:${this._scene()}:${lang}`;
+    // A group's rows show each member's own state: a member that moves alone
+    // has to re-render the card even when the group's average has not changed.
+    const members = this._members(s)
+      .map((e) => {
+        const m = this._hass.states[e];
+        return `${e}=${m.state}/${m.attributes.current_position}`;
+      })
+      .join(",");
+    return `${this._config.entity}:${s.state}:${a.current_position}:${a.supported_features}:${this._favoriteButton() || ""}:${this._scene()}:${lang}:${members}`;
   }
 
   // Whether the cover takes a live command at all: since v0.12.0 a cover
@@ -323,9 +359,7 @@ class DooyaCoverCard extends HTMLElement {
       usable && pos == null && !["open", "opening", "closed", "closing"].includes(st.state);
     // Where the drawing sits when there is nothing to show: half-way.
     const neutral = !usable || vague;
-    const name = this._esc(
-      this._config.name || st.attributes.friendly_name || "Cover"
-    );
+    const name = this._esc(this._name(st, this._config.name));
     const awning = this._isAwning(st);
     // An awning keeps Home Assistant's open / closed state words, and says
     // deploying / retracting for everything that describes the fabric moving.
@@ -352,6 +386,13 @@ class DooyaCoverCard extends HTMLElement {
     // Tile: an ultra-compact row aligned with HA's native tile cards. Tapping
     // the icon/name opens the full card in a popup (see _openCardDialog).
     if (this._layout() === "tile") {
+      // Same words as the tile cards it sits among: "Open · 60 %", the
+      // position given whenever the cover is not closed. Moving, unavailable
+      // and closed keep their single word.
+      const tileLabel =
+        usable && !vague && !moving && pos != null && pos > 0
+          ? `${t.open} · ${t.percent(pos)}`
+          : stateLabel;
       const icon = closed || neutral ? "mdi:window-shutter" : "mdi:window-shutter-open";
       const dot = awning
         ? AWNING_GLYPH[closed || neutral ? "retracted" : "deployed"]
@@ -362,7 +403,7 @@ class DooyaCoverCard extends HTMLElement {
             <div class="tdot">${dot}</div>
             <div class="ttext">
               <span class="tname">${name}</span>
-              <span class="tsub">${stateLabel}</span>
+              <span class="tsub">${tileLabel}</span>
             </div>
           </div>
           <div class="tctl">
@@ -429,6 +470,37 @@ class DooyaCoverCard extends HTMLElement {
         </div>`;
     }
 
+    // A Home Assistant cover group: one row per shutter, so a single one can
+    // be moved without leaving the group's card. Each row commands its own
+    // entity, never the group.
+    let membersHtml = "";
+    const members = this._members(st);
+    if (members.length) {
+      membersHtml =
+        `<div class="members"><div class="mtitle">${t.members}</div>` +
+        members
+          .map((e) => {
+            const m = this._hass.states[e];
+            const mok = this._usable(m);
+            const mdis = mok ? "" : " disabled";
+            const id = this._esc(e);
+            return `
+          <div class="mrow ${mok ? "" : "off"}">
+            <div class="mtext">
+              <span class="mname">${this._esc(this._name(m))}</span>
+              <span class="msub">${this._esc(this._shortLabel(m))}</span>
+            </div>
+            <div class="mctl">
+              <button class="tbtn ${m.state === "opening" ? "active" : ""}" data-member="${id}" data-mact="open" aria-label="${ta.up}"${mdis}><ha-icon icon="${openIcon}"></ha-icon></button>
+              <button class="tbtn" data-member="${id}" data-mact="stop" aria-label="${t.stop}"${mdis}><ha-icon icon="mdi:stop"></ha-icon></button>
+              <button class="tbtn ${m.state === "closing" ? "active" : ""}" data-member="${id}" data-mact="close" aria-label="${ta.down}"${mdis}><ha-icon icon="${closeIcon}"></ha-icon></button>
+            </div>
+          </div>`;
+          })
+          .join("") +
+        `</div>`;
+    }
+
     this._body.innerHTML = `
       <div class="head">
         <div class="title">${name}</div>
@@ -462,7 +534,21 @@ class DooyaCoverCard extends HTMLElement {
       </div>` : ""}
       ${presetHtml}
       ${calibHtml}
+      ${membersHtml}
     `;
+  }
+
+  // One line for a cover in a group's list: what the tile would say.
+  _shortLabel(st) {
+    const t = this._t();
+    const ta = this._isAwning(st) ? { ...t, ...t.awning } : t;
+    if (!this._usable(st)) return t.unavailable;
+    if (st.state === "opening") return ta.opening;
+    if (st.state === "closing") return ta.closing;
+    const pos = st.attributes.current_position;
+    // Open / closed stay Home Assistant's words, awning or not (see _render).
+    if (pos == null) return st.state === "closed" ? t.closed : st.state === "open" ? t.open : "";
+    return pos > 0 ? `${t.open} · ${t.percent(pos)}` : t.closed;
   }
 
   _ensureRoot() {
@@ -571,6 +657,17 @@ class DooyaCoverCard extends HTMLElement {
     // the bar are plain elements, so the state decides here as well.
     const usable = this._usable(st);
     const canPos = usable && this._hasPosition(st);
+    // A row of a group's list commands that member alone, and only while that
+    // member is reachable: the group's own availability says nothing about it.
+    const mb = e.target.closest("[data-member]");
+    if (mb) {
+      const member = mb.dataset.member;
+      const service = { open: "open_cover", stop: "stop_cover", close: "close_cover" }[mb.dataset.mact];
+      if (service && this._members(st).includes(member) && this._usable(this._hass.states[member])) {
+        this._call("cover", service, { entity_id: member });
+      }
+      return;
+    }
     const w = e.target.closest("[data-window]");
     if (w && !e.target.closest("[data-slider]")) {
       if (!canPos) return;
@@ -632,12 +729,28 @@ class DooyaCoverCard extends HTMLElement {
       .tname { font-weight:600; font-size:14px; line-height:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
       .tsub { font-size:12px; line-height:16px; color: var(--secondary-text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
       .tctl { flex:0 0 auto; display:flex; gap:6px; }
-      .tbtn { width:36px; height:34px; border-radius:9px; border:1px solid var(--divider-color);
-              background: var(--card-background-color); color: var(--primary-text-color); cursor:pointer;
-              display:grid; place-items:center; transition: transform .12s, border-color .2s, background .2s; }
+      /* Filled, borderless controls like the tile and Mushroom cards a tile sits
+         among. A theme's Mushroom sizes and radius apply when it sets them. */
+      .tbtn { width: var(--mush-control-height, 36px); height: var(--mush-control-height, 36px);
+              border-radius: var(--mush-control-border-radius, 12px); border:none; padding:0;
+              background: rgba(var(--rgb-primary-text-color, 128, 128, 128), 0.08);
+              color: var(--primary-text-color); cursor:pointer;
+              display:grid; place-items:center; transition: transform .12s, background .2s; }
       .tbtn ha-icon { --mdc-icon-size:20px; }
-      .tbtn.active { background: var(--dooya-accent, var(--primary-color)); color: var(--text-primary-color,#fff); border-color: var(--dooya-accent, var(--primary-color)); }
-      .tbtn:hover { border-color: var(--dooya-accent, var(--primary-color)); }
+      .tbtn.active { background: var(--dooya-accent, var(--primary-color)); color: var(--text-primary-color,#fff); }
+      .tbtn:hover:not([disabled]) { background: rgba(var(--rgb-primary-text-color, 128, 128, 128), 0.16); }
+      .tbtn.active:hover { background: var(--dooya-accent, var(--primary-color)); }
+      .tbtn:focus-visible { outline:2px solid var(--dooya-accent, var(--primary-color)); outline-offset:2px; }
+      /* A group's members, one row each, below the group's own controls. */
+      .members { margin-top:14px; padding-top:10px; border-top:1px solid var(--divider-color);
+                 display:flex; flex-direction:column; gap:8px; }
+      .mtitle { font-size:.8rem; color: var(--secondary-text-color); }
+      .mrow { display:flex; align-items:center; gap:12px; }
+      .mrow.off { opacity:.55; }
+      .mtext { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; }
+      .mname { font-weight:600; font-size:14px; line-height:20px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .msub { font-size:12px; line-height:16px; color: var(--secondary-text-color); }
+      .mctl { flex:0 0 auto; display:flex; gap:6px; }
       .tbtn:active { transform: scale(.9); }
       .head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
       .title { font-size:1.15rem; font-weight:600; }

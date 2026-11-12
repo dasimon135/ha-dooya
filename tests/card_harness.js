@@ -83,18 +83,33 @@ const entity = scenario.config.entity;
 card.setConfig(scenario.config);
 card.hass = {
   language: scenario.language || "en",
-  states: { [entity]: { entity_id: entity, ...scenario.state } },
+  // `states` adds other entities, e.g. the members of a cover group.
+  states: { ...(scenario.states || {}), [entity]: { entity_id: entity, ...scenario.state } },
   // `entities` adds registry rows, e.g. a sibling favorite button on "dev1".
   entities: { [entity]: { platform: "dooya_rf", device_id: "dev1" }, ...(scenario.entities || {}) },
   callService: (domain, service, data) => calls.push({ domain, service, data }),
 };
+// `formatName` stands in for Home Assistant's own name formatter
+// (frontend 2025.10+): it answers "<prefix> <friendly_name>".
+if (scenario.formatName) {
+  card._sig = null; // the name is not part of the signature: force the render
+  card.hass = {
+    ...card._hass,
+    formatEntityName: (st) => `${scenario.formatName} ${st.attributes.friendly_name}`,
+  };
+}
 
 if (scenario.click) {
   // A click on an element carrying the given data attribute, e.g. data-act="open"
   // or data-window. `closest` answers for that selector family only.
   const { selector, value, clientX = 0, clientY = 0 } = scenario.click;
   const target = {
-    dataset: selector === "data-act" ? { act: value } : selector === "data-pos" ? { pos: String(value) } : {},
+    dataset:
+      selector === "data-act" ? { act: value }
+      : selector === "data-pos" ? { pos: String(value) }
+      // A row of a group's list: { entity, act }.
+      : selector === "data-member" ? { member: value.entity, mact: value.act }
+      : {},
     getBoundingClientRect: () => ({ top: 0, left: 0, width: 100, height: 100 }),
   };
   target.closest = (sel) => {
