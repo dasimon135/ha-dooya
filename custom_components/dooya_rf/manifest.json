@@ -11,5 +11,5 @@
   "iot_class": "assumed_state",
   "issue_tracker": "https://github.com/dasimon135/ha-dooya/issues",
   "loggers": ["custom_components.dooya_rf"],
-  "version": "1.0.0"
+  "version": "1.0.1"
 }
