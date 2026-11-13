@@ -83,7 +83,8 @@ const entity = scenario.config.entity;
 card.setConfig(scenario.config);
 card.hass = {
   language: scenario.language || "en",
-  states: { [entity]: { entity_id: entity, ...scenario.state } },
+  // `states` adds other entities, e.g. the members of a cover group.
+  states: { ...(scenario.states || {}), [entity]: { entity_id: entity, ...scenario.state } },
   // `entities` adds registry rows, e.g. a sibling favorite button on "dev1".
   entities: { [entity]: { platform: "dooya_rf", device_id: "dev1" }, ...(scenario.entities || {}) },
   callService: (domain, service, data) => calls.push({ domain, service, data }),
@@ -94,7 +95,12 @@ if (scenario.click) {
   // or data-window. `closest` answers for that selector family only.
   const { selector, value, clientX = 0, clientY = 0 } = scenario.click;
   const target = {
-    dataset: selector === "data-act" ? { act: value } : selector === "data-pos" ? { pos: String(value) } : {},
+    dataset:
+      selector === "data-act" ? { act: value }
+      : selector === "data-pos" ? { pos: String(value) }
+      // A row of a group's list: { entity, act }.
+      : selector === "data-member" ? { member: value.entity, mact: value.act }
+      : {},
     getBoundingClientRect: () => ({ top: 0, left: 0, width: 100, height: 100 }),
   };
   target.closest = (sel) => {
