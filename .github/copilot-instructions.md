@@ -10,7 +10,7 @@ estimated from travel time (`assumed_state`, no feedback from the motor).
 ## Stack
 
 - Python 3.13+ (Home Assistant 2026.5+)
-- HA custom component (`custom_components/dooya/`)
+- HA custom component (`custom_components/dooya_rf/`)
 - Transmitter: ESPHome node(s) with CC1101; each node exposes
   `esphome.<node_slug>_transmit_dooya` and publishes the
   `esphome.dooya_received` event when a frame is sniffed
@@ -47,7 +47,7 @@ estimated from travel time (`assumed_state`, no feedback from the motor).
 ## Structure
 
 ```
-custom_components/dooya/
+custom_components/dooya_rf/
 ├── __init__.py          # setup/unload, DooyaRuntimeData, bundled card registration
 ├── manifest.json        # dependencies: ["http"], after_dependencies: ["frontend"]
 ├── const.py             # DOMAIN, CONF_*, defaults, repair issue ids

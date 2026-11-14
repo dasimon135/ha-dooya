@@ -167,7 +167,7 @@ Comme il n'y a pas de capteur physique, l'etat reste une estimation. Chaque vole
 - **Marquer ouvert** / **Marquer ferme** : recale la position a 100 % ou 0 % sans faire bouger le volet
 - **Calibrer le temps d'ouverture** / **de fermeture** : l'assistant de calibration (voir ci-dessous)
 
-Les services d'entite `dooya.mark_open`, `dooya.mark_closed` et `dooya.set_known_position` restent disponibles pour les automatisations.
+Les services d'entite `dooya_rf.mark_open`, `dooya_rf.mark_closed` et `dooya_rf.set_known_position` restent disponibles pour les automatisations.
 
 ### Assistant de calibration
 
@@ -256,7 +256,7 @@ Verifier :
 
 - que les temps d'ouverture et de fermeture sont realistes
 - qu'un stop manuel ou telecommande n'a pas interrompu un mouvement sans recalage
-- que l'entite a bien ete recalee avec `dooya.mark_open`, `dooya.mark_closed` ou `dooya.set_known_position` si necessaire
+- que l'entite a bien ete recalee avec `dooya_rf.mark_open`, `dooya_rf.mark_closed` ou `dooya_rf.set_known_position` si necessaire
 
 ## 14. Liens utiles
 
