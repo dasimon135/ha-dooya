@@ -344,7 +344,8 @@ Set a **favorite position** (for example 30 %) in the integration options. A *Fa
 
 ### The remote as a trigger
 
-Each blind has a **Remote** event entity (`event.<blind>_remote`). It fires
+Each blind has a **Remote** event entity on its device page (*Télécommande* in
+French; Home Assistant derives its entity id from your names). It fires
 once per press of the physical remote on that blind, with the button pressed:
 `up`, `stop` or `down`. A press of the common button fires on the group cover
 and on every blind it moves. Commands sent by Home Assistant never fire it.
