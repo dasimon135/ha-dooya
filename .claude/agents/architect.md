@@ -10,12 +10,12 @@ component (HACS, Python 3.13) that controls Dooya RF433 motorized covers.
 The integration has no physical position feedback: it sends open/close/stop
 commands through a native ESPHome service (`esphome/dooya-node.yaml`,
 `transmit_dooya`) and estimates cover position purely from travel time,
-implemented in `custom_components/dooya/travel_calc.py` and consumed by
-`custom_components/dooya/cover.py`. The ESPHome node also emits
+implemented in `custom_components/dooya_rf/travel_calc.py` and consumed by
+`custom_components/dooya_rf/cover.py`. The ESPHome node also emits
 `esphome.dooya_received` events when it decodes RF frames from a physical
 remote, which the integration uses to resync state. Recalibration is exposed
 as HA services (`mark_open`, `mark_closed`, `set_known_position`) defined in
-`custom_components/dooya/services.yaml`.
+`custom_components/dooya_rf/services.yaml`.
 
 Use when: redesigning or extending the travel-time-based position-estimation
 algorithm; changing the `transmit_dooya` service signature, its
@@ -28,9 +28,9 @@ contractually consistent.
 
 Approach: read both sides of the contract before changing either —
 `esphome/dooya-node.yaml`'s `api.services` and `on_esphome.dooya_received`
-handling, and the corresponding calls/listeners in `custom_components/dooya/`
+handling, and the corresponding calls/listeners in `custom_components/dooya_rf/`
 (`cover.py`, `dooya_protocol.py`, `echo_filter.py`). Check
-`custom_components/dooya/const.py` and `manifest.json` for version/contract
+`custom_components/dooya_rf/const.py` and `manifest.json` for version/contract
 constants that may need bumping. Cross-reference `docs/` for documented
 behavior that must stay accurate. After changing logic, run the test suite
 (`pytest`, or targeted files like `tests/test_travel_calc.py`,

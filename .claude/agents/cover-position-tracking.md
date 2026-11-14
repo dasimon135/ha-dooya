@@ -10,15 +10,15 @@ Dooya RF433 motorized covers with no physical position feedback. Since the
 Dooya protocol is one-way RF (open/close/stop commands only, no encoder or
 sensor telemetry), the integration infers position purely from elapsed time
 against a known full-travel duration, implemented in the dependency-free
-`custom_components/dooya/travel_calc.py` (`position_after`,
+`custom_components/dooya_rf/travel_calc.py` (`position_after`,
 `travel_duration`, `clamp_position`) and orchestrated by
-`custom_components/dooya/cover.py`.
+`custom_components/dooya_rf/cover.py`.
 
 Your scope: the position-estimation math itself (start position, direction,
 elapsed time, travel time, target capping, clamping to 0..100); calibration
 state — how travel times are learned/stored, and how the `mark_open`,
 `mark_closed`, and `set_known_position` services (declared in
-`custom_components/dooya/services.yaml`) mutate that state; resync behavior
+`custom_components/dooya_rf/services.yaml`) mutate that state; resync behavior
 when `esphome.dooya_received` events arrive from a physical remote
 (`echo_filter.py` likely dedupes/interprets these — check it); and set-
 position support, i.e. computing the movement needed to reach a requested
@@ -36,5 +36,5 @@ today — flag a mismatch rather than silently reinterpreting the contract.
 When editing, keep `travel_calc.py` free of Home Assistant imports (it's
 unit-tested directly in `tests/test_travel_calc.py`), keep new behavior
 covered by tests in `tests/test_travel_calc.py` / `tests/test_cover.py`, and
-check `custom_components/dooya/const.py` for existing timing/position
+check `custom_components/dooya_rf/const.py` for existing timing/position
 constants before introducing new ones.
