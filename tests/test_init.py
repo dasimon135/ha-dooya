@@ -72,8 +72,8 @@ def _make_entry() -> MockConfigEntry:
     )
 
 
-async def test_setup_loads_both_platforms(hass: HomeAssistant) -> None:
-    """A loaded entry exposes its cover and its recalibration buttons."""
+async def test_setup_loads_every_platform(hass: HomeAssistant) -> None:
+    """A loaded entry exposes its cover, its buttons and its confidence sensor."""
     entry = _make_entry()
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -86,7 +86,7 @@ async def test_setup_loads_both_platforms(hass: HomeAssistant) -> None:
     domains = {
         e.domain for e in er.async_entries_for_config_entry(registry, entry.entry_id)
     }
-    assert domains == {"cover", "button"}
+    assert domains == {"cover", "button", "sensor"}
 
     assert await hass.config_entries.async_unload(entry.entry_id)
 

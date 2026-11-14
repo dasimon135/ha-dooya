@@ -324,6 +324,31 @@ If needed, you can recalibrate a cover manually with the entity services exposed
 
 The same actions are also available as **button entities** on the shutter's device page (*Set as open*, *Set as closed*), usable directly from the UI and in automations.
 
+### How far to trust the position
+
+Each move that stops between the end stops lets the estimate drift a little; a
+full run to an end stop (or one of the actions above) brings it back. A
+diagnostic sensor, **Position confidence** (`sensor.<blind>_position_confidence`),
+says where a blind stands: `high` under 5 such moves, `medium` from 5, `low`
+from 10. The cover keeps its `position_confidence` and `moves_since_sync`
+attributes as before.
+
+To resync a blind that has drifted, at night when nobody minds:
+
+```yaml
+triggers:
+  - trigger: time
+    at: "03:00:00"
+conditions:
+  - condition: state
+    entity_id: sensor.salon_position_confidence
+    state: low
+actions:
+  - action: cover.close_cover
+    target:
+      entity_id: cover.salon
+```
+
 ### Calibration assistant
 
 Instead of measuring travel times with a stopwatch, use the two calibration buttons on the device page:

@@ -18,6 +18,7 @@ from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_platform, issue_registry as ir
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.restore_state import (
@@ -45,6 +46,7 @@ from .const import (
     EVENT_DOOYA_RECEIVED,
     ISSUE_GATEWAY_SERVICE_MISSING,
     TRANSMIT_SERVICE_SUFFIX,
+    cover_state_signal,
     entry_value,
     gateway_issue_id,
     is_group_entry,
@@ -203,20 +205,37 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         return self._current_position
 
     @property
+    def position_confidence(self) -> str:
+        """Return how much the estimated position can be trusted.
+
+        Every move that stops between the end stops adds drift; a full run
+        to an end stop resets the count. Read by the diagnostic sensor.
+        """
+        if self._moves_since_sync >= 10:
+            return "low"
+        if self._moves_since_sync >= 5:
+            return "medium"
+        return "high"
+
+    @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
         """Expose how much the estimated position can be trusted."""
         if self._is_broadcast:
             return None
-        if self._moves_since_sync >= 10:
-            confidence = "low"
-        elif self._moves_since_sync >= 5:
-            confidence = "medium"
-        else:
-            confidence = "high"
+        # Kept next to the diagnostic sensor: automations written against
+        # these attributes must keep working.
         return {
-            "position_confidence": confidence,
+            "position_confidence": self.position_confidence,
             "moves_since_sync": self._moves_since_sync,
         }
+
+    @callback
+    def async_write_ha_state(self) -> None:
+        """Write the state, and tell the confidence sensor to follow."""
+        super().async_write_ha_state()
+        async_dispatcher_send(
+            self.hass, cover_state_signal(self._config_entry.entry_id)
+        )
 
     @property
     def extra_restore_state_data(self) -> ExtraStoredData | None:
