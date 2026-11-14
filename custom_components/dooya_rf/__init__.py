@@ -24,7 +24,7 @@ _LOGGER = logging.getLogger(__name__)
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
-PLATFORMS: list[Platform] = [Platform.COVER, Platform.BUTTON]
+PLATFORMS: list[Platform] = [Platform.COVER, Platform.BUTTON, Platform.EVENT]
 
 
 @dataclass

@@ -157,6 +157,20 @@
       "favorite": {
         "name": "Favorite position"
       }
+    },
+    "event": {
+      "remote": {
+        "name": "Remote",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "up": "Up",
+              "stop": "Stop",
+              "down": "Down"
+            }
+          }
+        }
+      }
     }
   },
   "services": {
