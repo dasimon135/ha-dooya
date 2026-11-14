@@ -171,6 +171,16 @@
           }
         }
       }
+    },
+    "sensor": {
+      "position_confidence": {
+        "name": "Position confidence",
+        "state": {
+          "high": "High",
+          "medium": "Medium",
+          "low": "Low"
+        }
+      }
     }
   },
   "services": {
