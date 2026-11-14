@@ -94,6 +94,13 @@ def remote_press_signal(entry_id: str) -> str:
     return f"{DOMAIN}_remote_press_{entry_id}"
 
 
+# Dispatcher signal the cover sends after each state write; the entry's
+# position confidence sensor listens to it.
+def cover_state_signal(entry_id: str) -> str:
+    """Return the signal sent when the cover of one entry writes its state."""
+    return f"{DOMAIN}_cover_state_{entry_id}"
+
+
 # Calibration assistant: longest gap allowed between the start (UP/DOWN) and
 # the user's STOP before the measurement is abandoned.
 CALIBRATION_TIMEOUT_SEC: Final = 240.0

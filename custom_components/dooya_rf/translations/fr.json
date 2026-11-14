@@ -171,6 +171,16 @@
           }
         }
       }
+    },
+    "sensor": {
+      "position_confidence": {
+        "name": "Confiance de position",
+        "state": {
+          "high": "Élevée",
+          "medium": "Moyenne",
+          "low": "Faible"
+        }
+      }
     }
   },
   "services": {
