@@ -18,6 +18,7 @@ from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_platform, issue_registry as ir
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.restore_state import (
@@ -48,6 +49,7 @@ from .const import (
     entry_value,
     gateway_issue_id,
     is_group_entry,
+    remote_press_signal,
     transmit_service_name,
 )
 from .dooya_protocol import (
@@ -60,6 +62,7 @@ from .dooya_protocol import (
 )
 from .echo_filter import TxEchoFilter
 from .entity import DooyaBaseEntity
+from .remote_press import PressTracker
 from .travel_calc import clamp_position, position_after, travel_duration
 
 if TYPE_CHECKING:
@@ -172,6 +175,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         self._progress_unsub: Callable[[], None] | None = None
         self._event_unsub: Callable[[], None] | None = None
         self._echo_filter = TxEchoFilter(ECHO_SUPPRESS_WINDOW_SEC)
+        self._press_tracker = PressTracker()
 
         # Calibration assistant state: 0 = idle, +1 measuring up travel,
         # -1 measuring down travel.
@@ -783,7 +787,11 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         ):
             return
 
-        if self._echo_filter.is_echo(button, monotonic()):
+        now = monotonic()
+        # Fed every frame, echoes included: the frames a repeat or another
+        # node adds to a held press must not open a second press.
+        new_press = self._press_tracker.is_new_press(button, now)
+        if self._echo_filter.is_echo(button, now):
             _LOGGER.debug(
                 "%s: ignoring echo of our own transmission (button=%d)",
                 self._cover_name,
@@ -797,12 +805,17 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         # left to _async_transmit, which records it only after resolving the
         # node: when the node is missing, the rest of the remote's burst, a few
         # ms later, would each be repeated too.
+        if new_press and button in (BUTTON_UP, BUTTON_DOWN, BUTTON_STOP):
+            async_dispatcher_send(
+                self.hass, remote_press_signal(self._config_entry.entry_id), button
+            )
+
         if (
             self._repeat_remote
             and event_channel == self._channel
             and button in (BUTTON_UP, BUTTON_DOWN, BUTTON_STOP)
         ):
-            self._echo_filter.record_tx(button, monotonic())
+            self._echo_filter.record_tx(button, now)
             self._config_entry.async_create_task(
                 self.hass, self._async_repeat(button), "dooya remote repeat"
             )

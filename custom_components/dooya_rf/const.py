@@ -86,6 +86,14 @@ CONF_FAVORITE_POSITION: Final = (
 # transmit call plus event latency.
 ECHO_SUPPRESS_WINDOW_SEC: Final = 2.0
 
+
+# Dispatcher signal the cover sends once per press of the physical remote,
+# with the button; the entry's event entity listens to it.
+def remote_press_signal(entry_id: str) -> str:
+    """Return the signal carrying the remote presses of one entry."""
+    return f"{DOMAIN}_remote_press_{entry_id}"
+
+
 # Calibration assistant: longest gap allowed between the start (UP/DOWN) and
 # the user's STOP before the measurement is abandoned.
 CALIBRATION_TIMEOUT_SEC: Final = 240.0

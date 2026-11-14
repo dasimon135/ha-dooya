@@ -65,6 +65,9 @@ Around that:
 - **A repeater for a weak remote.** Ticked on a shutter the remote does not
   reach, each press on the remote is sent again by the ESPHome node. Home
   Assistant's own commands are never repeated.
+- **The physical remote as a trigger.** Each blind has a *Remote* event entity
+  that fires `up`, `stop` or `down` once per press on the real remote, so the
+  remote can drive automations too.
 - **One control for all of them.** A single entity that opens or closes every
   blind paired with the remote, in one radio frame rather than one per blind.
 - **A card, already included.** An animated shutter with position, presets and
@@ -338,6 +341,34 @@ Persistent notifications guide each step; the measurement is cancelled automatic
 ### Favorite position
 
 Set a **favorite position** (for example 30 %) in the integration options. A *Favorite position* button then appears on the device page (and a star chip on the bundled card) that sends the shutter there in one press — like the favorite button of real Dooya remotes.
+
+### The remote as a trigger
+
+Each blind has a **Remote** event entity (`event.<blind>_remote`). It fires
+once per press of the physical remote on that blind, with the button pressed:
+`up`, `stop` or `down`. A press of the common button fires on the group cover
+and on every blind it moves. Commands sent by Home Assistant never fire it.
+
+```yaml
+triggers:
+  - trigger: state
+    entity_id: event.salon_remote
+    not_from: [unavailable, unknown]
+conditions:
+  - condition: state
+    entity_id: event.salon_remote
+    attribute: event_type
+    state: down
+```
+
+Trigger on the entity's state, which changes on every press, and test the
+button in a condition: a trigger on `event_type` alone would miss the second
+of two `down` presses in a row.
+
+A remote sends a press as a burst of frames and keeps sending while held, so
+two presses of the same button less than a second apart count as one. The
+event names the remote's button, not the direction: on an awning, `down`
+deploys it.
 
 ### Awnings
 
