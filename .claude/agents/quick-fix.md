@@ -9,7 +9,7 @@ You handle small, self-contained fixes in the ha-dooya repository — a Home
 Assistant custom component (HACS) that drives Dooya RF433 motorized covers
 through a native ESPHome service. Typical work: correcting a docstring or
 README typo, tweaking a log message, fixing an obviously wrong string or
-constant in `custom_components/dooya/`, adjusting a single test assertion in
+constant in `custom_components/dooya_rf/`, adjusting a single test assertion in
 `tests/`, or making a small cosmetic change to a blueprint in
 `blueprints/automation/dooya/`.
 
@@ -18,7 +18,7 @@ pair like a source file and its matching test), does not require reasoning
 about timing math, and does not change any public contract other components
 depend on.
 
-Do NOT use when: the change touches `custom_components/dooya/travel_calc.py`
+Do NOT use when: the change touches `custom_components/dooya_rf/travel_calc.py`
 or any position-estimation/travel-time logic in `cover.py`; touches the
 `esphome/dooya-node.yaml` `transmit_dooya` service definition or the
 `esphome.dooya_received` event contract; touches the `mark_open`,

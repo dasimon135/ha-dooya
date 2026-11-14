@@ -93,7 +93,7 @@ independent halves, and most reports are about the boundary between them:
 
 | Half | What it is | Where the code is |
 | --- | --- | --- |
-| **Home Assistant side** | Config flow, cover entities, position estimation, calibration | `custom_components/dooya/` |
+| **Home Assistant side** | Config flow, cover entities, position estimation, calibration | `custom_components/dooya_rf/` |
 | **ESPHome node** | CC1101 radio, the `transmit_dooya` action, the `esphome.dooya_received` event | `esphome/` |
 
 The contract between them is the `transmit_dooya` action signature and the
@@ -142,7 +142,7 @@ Then the rest:
 | Commands do nothing, node not found, action missing | `esphome/`, README § *ESPHome Prerequisite (CC1101)* |
 | Repeats, unreliable transmission | `const.py`, `cover.py`, README § *RF Reliability (Repeat Count)* |
 | Buttons, cleanup of old ESPHome buttons | `button.py`, README § *Cleaning Up Old ESPHome Buttons* |
-| Lovelace card | `custom_components/dooya/frontend/`, README § *Bundled Lovelace Card* |
+| Lovelace card | `custom_components/dooya_rf/frontend/`, README § *Bundled Lovelace Card* |
 | Blueprint | `blueprints/`, README § *Automation Blueprint* |
 | Download diagnostics content | `diagnostics.py` |
 | Version, dependency, release state | `manifest.json`, `hacs.json`, README § *Release Status* |
@@ -198,7 +198,7 @@ Drop every line you do not need; add none.
 > - **Home Assistant version** — Settings → About.
 > - **Dooya RF Covers version** — Settings → Devices & services → Dooya RF
 >   Covers, or the `version` field in
->   `custom_components/dooya/manifest.json` on your system.
+>   `custom_components/dooya_rf/manifest.json` on your system.
 > - **Your ESPHome node YAML** — the CC1101 wiring and the `transmit_dooya`
 >   action, redacting only Wi-Fi credentials and API keys. Confirm the node is
 >   adopted in Home Assistant through the ESPHome integration.
@@ -232,7 +232,7 @@ You traced the failure to specific lines and you are confident about the cause.
 Post, **as a comment only**:
 
 1. What is wrong, in one or two sentences.
-2. The trace: file and line references (`custom_components/dooya/cover.py:214`)
+2. The trace: file and line references (`custom_components/dooya_rf/cover.py:214`)
    and what the code does there versus what it should do.
 3. The proposed fix, as a diff or snippet **inside the comment**.
 4. A workaround, if one exists.
