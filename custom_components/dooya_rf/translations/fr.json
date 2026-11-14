@@ -157,6 +157,20 @@
       "favorite": {
         "name": "Position favorite"
       }
+    },
+    "event": {
+      "remote": {
+        "name": "Télécommande",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "up": "Monter",
+              "stop": "Stop",
+              "down": "Descendre"
+            }
+          }
+        }
+      }
     }
   },
   "services": {
