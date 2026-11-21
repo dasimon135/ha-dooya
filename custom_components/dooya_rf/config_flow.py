@@ -26,6 +26,7 @@ from .const import (
     CONF_DOOYA_ID,
     CONF_ESPHOME_DEVICE,
     CONF_FAVORITE_POSITION,
+    CONF_INVERT_DIRECTION,
     CONF_IS_AWNING,
     CONF_IS_GROUP,
     CONF_LEGACY_ENTRY_ID,
@@ -125,6 +126,7 @@ def _confirm_schema() -> vol.Schema:
                 default=DEFAULT_TRAVEL_TIME_DOWN,
             ): vol.All(vol.Coerce(float), vol.Range(min=1, max=240)),
             vol.Optional(CONF_IS_AWNING, default=False): bool,
+            vol.Optional(CONF_INVERT_DIRECTION, default=False): bool,
             vol.Optional(CONF_ADDITIONAL_REMOTES, default=""): str,
         }
     )
@@ -442,6 +444,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                     travel_time_up=user_input[CONF_TRAVEL_TIME_UP],
                     travel_time_down=user_input[CONF_TRAVEL_TIME_DOWN],
                     is_awning=user_input.get(CONF_IS_AWNING, False),
+                    invert_direction=user_input.get(CONF_INVERT_DIRECTION, False),
                     additional_remotes=additional,
                 )
 
@@ -483,6 +486,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                         travel_time_up=user_input[CONF_TRAVEL_TIME_UP],
                         travel_time_down=user_input[CONF_TRAVEL_TIME_DOWN],
                         is_awning=user_input.get(CONF_IS_AWNING, False),
+                        invert_direction=user_input.get(CONF_INVERT_DIRECTION, False),
                         additional_remotes=additional,
                     )
 
@@ -504,6 +508,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                         default=DEFAULT_TRAVEL_TIME_DOWN,
                     ): vol.All(vol.Coerce(float), vol.Range(min=1, max=240)),
                     vol.Optional(CONF_IS_AWNING, default=False): bool,
+                    vol.Optional(CONF_INVERT_DIRECTION, default=False): bool,
                     vol.Optional(CONF_ADDITIONAL_REMOTES, default=""): str,
                 }
             ),
@@ -594,6 +599,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
         travel_time_up: float,
         travel_time_down: float,
         is_awning: bool = False,
+        invert_direction: bool = False,
         additional_remotes: list[dict[str, int]] | None = None,
     ) -> ConfigFlowResult:
         """Create the config entry, refusing to drive the same shutter twice.
@@ -629,6 +635,8 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
             CONF_TRAVEL_TIME_DOWN: travel_time_down,
             CONF_IS_AWNING: is_awning,
         }
+        if invert_direction:
+            data[CONF_INVERT_DIRECTION] = True
         if additional_remotes:
             data[CONF_ADDITIONAL_REMOTES] = additional_remotes
 
@@ -666,6 +674,9 @@ class DooyaOptionsFlow(OptionsFlow):
             )
         )
         current_is_awning = bool(entry_value(entry, CONF_IS_AWNING, False))
+        current_invert_direction = bool(
+            entry_value(entry, CONF_INVERT_DIRECTION, False)
+        )
         current_repeat_remote = bool(entry_value(entry, CONF_REPEAT_REMOTE, False))
         current_secondaries = entry_remotes(entry)[1:]
         errors: dict[str, str] = {}
@@ -738,6 +749,10 @@ class DooyaOptionsFlow(OptionsFlow):
                 favorite_field: vol.All(vol.Coerce(int), vol.Range(min=0, max=100)),
                 vol.Required(CONF_IS_GROUP, default=current_is_group): bool,
                 vol.Required(CONF_IS_AWNING, default=current_is_awning): bool,
+                vol.Required(
+                    CONF_INVERT_DIRECTION,
+                    default=current_invert_direction,
+                ): bool,
                 vol.Required(CONF_REPEAT_REMOTE, default=current_repeat_remote): bool,
                 vol.Optional(
                     CONF_ADDITIONAL_REMOTES,

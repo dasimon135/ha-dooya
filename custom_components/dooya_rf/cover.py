@@ -31,6 +31,7 @@ import voluptuous as vol
 from .const import (
     BROADCAST_CHANNEL,
     CALIBRATION_TIMEOUT_SEC,
+    CONF_INVERT_DIRECTION,
     CONF_IS_AWNING,
     CONF_REPEAT_COUNT,
     CONF_REPEAT_REMOTE,
@@ -149,6 +150,10 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         # through _button_for / _direction_for: buttons stay physical,
         # directions and positions stay semantic (issue #50).
         self._is_awning = bool(entry_value(config_entry, CONF_IS_AWNING, False))
+        self._invert_direction = bool(
+            entry_value(config_entry, CONF_INVERT_DIRECTION, False)
+        )
+        self._reverse_direction = self._is_awning != self._invert_direction
         # A weak remote reaches some shutters and not others. Repeating its
         # presses from Home Assistant is only safe here, where our own frames
         # are known: an automation cannot tell them apart (issue #19).
@@ -855,7 +860,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     def _button_for(self, direction: int) -> int:
         """Return the button that moves this cover in `direction` (+1 opens)."""
         opens = direction > 0
-        if self._is_awning:
+        if self._reverse_direction:
             opens = not opens
         return BUTTON_UP if opens else BUTTON_DOWN
 
@@ -867,7 +872,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             direction = -1
         else:
             return 0
-        return -direction if self._is_awning else direction
+        return -direction if self._reverse_direction else direction
 
     @callback
     def _start_estimated_motion(self, direction: int, target_position: int) -> None:

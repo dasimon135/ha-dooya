@@ -417,6 +417,10 @@ A Dooya remote rolls an awning out with **DOWN**, while Home Assistant calls a d
 
 A remote whose common button drives both shutters and an awning moves each of them the way its motor does: one UP opens the shutters and retracts the awning. The group cover itself follows its own setting.
 
+### Reversed buttons
+
+If **UP lowers** a cover and **DOWN raises** it, tick **Invert UP and DOWN** when you name the cover or later in its options. Home Assistant keeps its usual meaning (*Open* = 100 %, *Close* = 0 %) and sends the opposite physical button. The setting can be combined with the awning setting: for an awning, it means UP deploys and DOWN retracts. The event entity still reports the physical button pressed, not the resulting direction.
+
 ## Broadcast Channel (All Shutters)
 
 Dooya multi-channel remotes have an "all" button that moves every shutter paired with the remote from a single RF frame. On most remotes it transmits on **channel 0**.
