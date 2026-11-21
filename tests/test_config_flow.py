@@ -23,6 +23,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.dooya_rf.config_flow import CONF_LEARN_ADDITIONAL
 from custom_components.dooya_rf.const import (
     CONF_ADDITIONAL_REMOTES,
     CONF_CHANNEL,
@@ -719,6 +720,7 @@ async def test_options_store_and_show_additional_remotes(
     assert entry.options[CONF_ADDITIONAL_REMOTES] == [
         {CONF_DOOYA_ID: 0x00400A7E, CONF_CHANNEL: 241}
     ]
+    assert CONF_LEARN_ADDITIONAL not in entry.options
     assert entry.data[CONF_DOOYA_ID] == 0xD1C917
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
@@ -892,3 +894,135 @@ async def test_learn_timeout_offers_a_retry(
     )
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "manual"
+
+
+async def _start_additional_learning(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> dict:
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {**OPTIONS_BASE, CONF_LEARN_ADDITIONAL: True}
+    )
+    assert result["type"] is FlowResultType.SHOW_PROGRESS
+    assert result["step_id"] == "learn_additional"
+    return result
+
+
+async def test_options_can_learn_an_additional_remote(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """A heard remote is offered for addition to the current shutter."""
+    entry = await _add_cover(hass, channel=5, name="Salon")
+    result = await _start_additional_learning(hass, entry)
+    await asyncio.sleep(0)
+
+    hass.bus.async_fire(
+        "esphome.dooya_received",
+        {"id": "00400A7E", "channel": 241, "button": 3, "check": 12},
+    )
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_configure(result["flow_id"])
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "learn_additional_confirm"
+    assert result["description_placeholders"]["dooya_id"] == "0x400A7E"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"add": True}
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_ADDITIONAL_REMOTES] == [
+        {CONF_DOOYA_ID: 0x00400A7E, CONF_CHANNEL: 241}
+    ]
+    assert CONF_LEARN_ADDITIONAL not in entry.options
+
+
+async def test_options_learning_refuses_the_main_remote(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """The main remote cannot be stored as its own secondary."""
+    entry = await _add_cover(hass, channel=5, name="Salon")
+    result = await _start_additional_learning(hass, entry)
+    await asyncio.sleep(0)
+
+    hass.bus.async_fire(
+        "esphome.dooya_received",
+        {"id": "00D1C917", "channel": 5, "button": 1, "check": 1},
+    )
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_configure(result["flow_id"])
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"add": True}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "duplicate_remote"}
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"add": False}
+    )
+    await hass.async_block_till_done()
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_ADDITIONAL_REMOTES] == []
+
+
+async def test_options_learning_refuses_a_remote_from_another_shutter(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """A detected remote already claimed elsewhere cannot be reused."""
+    other = await _add_cover(hass, channel=5, name="Other")
+    hass.config_entries.async_update_entry(
+        other,
+        data={
+            **other.data,
+            CONF_DOOYA_ID: 0x00400A7E,
+            CONF_CHANNEL: 241,
+        },
+    )
+    entry = await _add_cover(hass, channel=6, name="Salon")
+    result = await _start_additional_learning(hass, entry)
+    await asyncio.sleep(0)
+
+    hass.bus.async_fire(
+        "esphome.dooya_received",
+        {"id": "00400A7E", "channel": 241, "button": 1, "check": 1},
+    )
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_configure(result["flow_id"])
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"add": True}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "duplicate_shutter"}
+
+
+async def test_options_learning_timeout_can_save_other_settings(
+    hass: HomeAssistant,
+    gateway_service: list[dict],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Silence offers a retry, and skipping still saves the edited options."""
+    monkeypatch.setattr(
+        "custom_components.dooya_rf.config_flow.LEARN_TIMEOUT_SEC", 0.05
+    )
+    entry = await _add_cover(hass, channel=5, name="Salon")
+    result = await _start_additional_learning(hass, entry)
+
+    await asyncio.sleep(0.2)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_configure(result["flow_id"])
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "learn_additional_retry"
+    assert result["errors"] == {"base": "learn_timeout"}
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"skip": True}
+    )
+    await hass.async_block_till_done()
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_ADDITIONAL_REMOTES] == []
+    assert entry.options[CONF_TRAVEL_TIME_UP] == 20.0

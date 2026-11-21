@@ -114,7 +114,8 @@
           "is_group": "This cover is the remote's common button",
           "is_awning": "This cover is an awning (DOWN deploys it)",
           "repeat_remote": "Repeat presses from the remote",
-          "additional_remotes": "Additional remotes (optional)"
+          "additional_remotes": "Additional remotes (optional)",
+          "learn_additional": "Detect another remote"
         },
         "data_description": {
           "esphome_device": "ESPHome node used to transmit RF commands for this shutter. With several nodes in the house, pick the one closest to the shutter.",
@@ -123,15 +124,40 @@
           "is_group": "Tick this for the cover that stands for the remote's \"all\" button. Frames on its channel resync every other shutter of the same remote, and this cover exposes no position of its own. Defaults to the cover on channel 0, which is where most remotes put it.",
           "is_awning": "Tick this for an awning: DOWN rolls it out, and Home Assistant shows it open once deployed. The opening time is then the time to deploy it. Leave it unticked for shutters and blinds.",
           "repeat_remote": "Tick this only for a shutter the physical remote does not reach reliably. Each press on the remote for this shutter is sent again through this shutter's ESPHome node. Commands sent by Home Assistant are never repeated, so position commands keep working. The remote's common button is repeated only by the cover that holds that role, if it is ticked there too.",
-          "additional_remotes": "Other remotes that also control this shutter, separated by commas or new lines as HEX_ID:CHANNEL (for example: 00400A7E:241). Commands sent by Home Assistant still use the main remote; these only track physical remote presses. Leave the field empty to remove them."
+          "additional_remotes": "Other remotes that also control this shutter, separated by commas or new lines as HEX_ID:CHANNEL (for example: 00400A7E:241). Commands sent by Home Assistant still use the main remote; these only track physical remote presses. Leave the field empty to remove them.",
+          "learn_additional": "Press a button on the new remote after saving to detect it."
+        }
+      },
+      "learn_additional_confirm": {
+        "title": "Additional remote detected",
+        "description": "A remote with ID {dooya_id} on channel {channel} was heard. Add it to this shutter so its physical button presses are tracked?",
+        "data": {
+          "add": "Add this remote"
+        },
+        "data_description": {
+          "add": "Commands sent by Home Assistant still use the main remote. This remote is only used to follow physical button presses."
+        }
+      },
+      "learn_additional_retry": {
+        "title": "No remote detected",
+        "description": "No Dooya signal was received within {timeout} seconds. Press a button on the remote while Home Assistant is listening.",
+        "data": {
+          "skip": "Save the other settings without adding a remote"
+        },
+        "data_description": {
+          "skip": "Tick this to leave the additional remote list unchanged. Leave it unticked to listen again."
         }
       }
+    },
+    "progress": {
+      "listen_remote": "Waiting for a signal from the additional Dooya remote"
     },
     "error": {
       "duplicate_group": "Another cover of this remote is already marked as its common button. Untick it there first: only one cover per remote can hold the role.",
       "invalid_additional_remotes": "Invalid remote list. Use HEX_ID:CHANNEL, separated by commas or new lines.",
       "duplicate_remote": "A remote is listed twice, or one of them is the main remote.",
-      "duplicate_shutter": "This identifier and channel are already configured on another shutter. Two entries for one shutter would fight over the estimated position."
+      "duplicate_shutter": "This identifier and channel are already configured on another shutter. Two entries for one shutter would fight over the estimated position.",
+      "learn_timeout": "No signal was received in time. Try again, or save the other settings without adding a remote."
     }
   },
   "issues": {

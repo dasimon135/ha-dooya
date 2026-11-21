@@ -256,7 +256,10 @@ A shutter can be driven by more than one physical remote: a handheld one and a w
 00400A7E:241, 0x00ABCDEF:6
 ```
 
-The first remote is the main one: every command sent by Home Assistant still uses its id, channel and checksum. The additional remotes only track presses from the physical remote, so moving the cover from any of them keeps the estimated position in sync. Each `(id, channel)` pair can belong to only one shutter, and the main remote cannot be repeated as an additional one.
+You can also tick **Detect another remote** in the options dialog, save, then press a button on the new remote. Home Assistant listens for its next frame and offers to add the detected `(id, channel)` to the list.
+
+The first remote is the main one: every command sent by Home Assistant still uses its id, channel and checksum.
+ The additional remotes only track presses from the physical remote, so moving the cover from any of them keeps the estimated position in sync. Each `(id, channel)` pair can belong to only one shutter, and the main remote cannot be repeated as an additional one.
 
 Leave the field empty to remove additional remotes from a shutter. This works even when they were stored in an older config entry, as long as the entry's options are saved once.
 

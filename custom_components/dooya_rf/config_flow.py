@@ -14,7 +14,7 @@ from homeassistant.config_entries import (
     ConfigFlowResult,
     OptionsFlow,
 )
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 import voluptuous as vol
 
 from .const import (
@@ -68,6 +68,7 @@ from .remotes import (
 # Maximum time spent listening for a remote in learn mode (seconds)
 _LOGGER = logging.getLogger(__name__)
 LEARN_TIMEOUT_SEC = 30
+CONF_LEARN_ADDITIONAL = "learn_additional"
 
 
 def _parse_dooya_id(raw: str) -> int:
@@ -155,6 +156,56 @@ def _list_transmit_devices(hass) -> list[str]:
                 service_name[: -len(TRANSMIT_SERVICE_SUFFIX)].replace("_", "-")
             )
     return sorted(devices)
+
+
+async def _async_wait_for_dooya_signal(
+    hass: HomeAssistant, *, require_consistent_check: bool = True
+) -> DooyaData | None:
+    """Listen for the HA event ESPHome fires when it receives a Dooya frame."""
+    result: DooyaData | None = None
+    event_received = asyncio.Event()
+
+    @callback
+    def _handle_event(event: Any) -> None:
+        nonlocal result
+        data = event.data
+        try:
+            learned = DooyaData(
+                id=int(data["id"], 16)
+                if isinstance(data["id"], str)
+                else int(data["id"]),
+                channel=int(data["channel"]),
+                button=int(data["button"]),
+                check=int(data["check"]),
+            )
+        except (KeyError, ValueError, TypeError):
+            return
+
+        if require_consistent_check and not is_frame_consistent(
+            learned.button, learned.check
+        ):
+            _LOGGER.debug(
+                "Ignoring a mis-decoded frame while learning "
+                "(id=%06X, button=%d, check=%d)",
+                learned.id,
+                learned.button,
+                learned.check,
+            )
+            return
+
+        result = learned
+        event_received.set()
+
+    unsubscribe = hass.bus.async_listen(EVENT_DOOYA_RECEIVED, _handle_event)
+
+    try:
+        await asyncio.wait_for(event_received.wait(), timeout=LEARN_TIMEOUT_SEC)
+    except TimeoutError:
+        return None
+    finally:
+        unsubscribe()
+
+    return result
 
 
 class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -325,7 +376,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
         """Step 3a: start listening for a remote straight away."""
         if self._learn_task is None:
             self._learn_task = self.hass.async_create_task(
-                self._async_wait_for_dooya_signal()
+                _async_wait_for_dooya_signal(self.hass)
             )
 
         if not self._learn_task.done():
@@ -367,58 +418,6 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
             description_placeholders={"timeout": str(LEARN_TIMEOUT_SEC)},
             errors={"base": "learn_timeout"},
         )
-
-    async def _async_wait_for_dooya_signal(self) -> DooyaData | None:
-        """Listen for the HA event ESPHome fires when it receives a Dooya frame."""
-        result: DooyaData | None = None
-        event_received = asyncio.Event()
-
-        @callback
-        def _handle_event(event: Any) -> None:
-            nonlocal result
-            data = event.data
-            try:
-                learned = DooyaData(
-                    id=int(data["id"], 16)
-                    if isinstance(data["id"], str)
-                    else int(data["id"]),
-                    channel=int(data["channel"]),
-                    button=int(data["button"]),
-                    check=int(data["check"]),
-                )
-            except (KeyError, ValueError, TypeError):
-                return
-
-            # Keep listening rather than learn a mis-decoded frame: a weak
-            # remote gets a bit read wrong now and then (issue #19), and an id
-            # off by one bit configures a shutter that never answers.
-            if not is_frame_consistent(learned.button, learned.check):
-                _LOGGER.debug(
-                    "Ignoring a mis-decoded frame while learning "
-                    "(id=%06X, button=%d, check=%d)",
-                    learned.id,
-                    learned.button,
-                    learned.check,
-                )
-                return
-
-            result = learned
-
-            # Completing the task is enough: the flow manager watches the
-            # progress_task passed to async_show_progress and advances the
-            # flow itself when it finishes.
-            event_received.set()
-
-        unsubscribe = self.hass.bus.async_listen(EVENT_DOOYA_RECEIVED, _handle_event)
-
-        try:
-            await asyncio.wait_for(event_received.wait(), timeout=LEARN_TIMEOUT_SEC)
-        except TimeoutError:
-            return None
-        finally:
-            unsubscribe()
-
-        return result
 
     async def async_step_confirm(
         self, user_input: dict[str, Any] | None = None
@@ -642,6 +641,9 @@ class DooyaOptionsFlow(OptionsFlow):
     def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize the options flow."""
         self._config_entry = config_entry
+        self._pending_options: dict[str, Any] | None = None
+        self._learn_task: asyncio.Task[DooyaData | None] | None = None
+        self._learned_data: DooyaData | None = None
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -684,8 +686,13 @@ class DooyaOptionsFlow(OptionsFlow):
             ):
                 errors[CONF_IS_GROUP] = "duplicate_group"
             if not errors:
+                learn_additional = bool(user_input.get(CONF_LEARN_ADDITIONAL, False))
                 data = dict(user_input)
+                data.pop(CONF_LEARN_ADDITIONAL, None)
                 data[CONF_ADDITIONAL_REMOTES] = additional
+                if learn_additional:
+                    self._pending_options = data
+                    return await self.async_step_learn_additional()
                 return self.async_create_entry(data=data)
 
         # With several TX+RX nodes in the house, a cover can be reassigned to
@@ -736,12 +743,102 @@ class DooyaOptionsFlow(OptionsFlow):
                     CONF_ADDITIONAL_REMOTES,
                     default=format_remote_list(current_secondaries),
                 ): str,
+                vol.Optional(CONF_LEARN_ADDITIONAL, default=False): bool,
             }
         )
 
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(schema),
+            errors=errors,
+        )
+
+    async def async_step_learn_additional(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Listen for a new remote and offer to add it to this shutter."""
+        assert self._pending_options is not None
+        if self._learn_task is None:
+            self._learn_task = self.hass.async_create_task(
+                _async_wait_for_dooya_signal(
+                    self.hass, require_consistent_check=False
+                )
+            )
+
+        if not self._learn_task.done():
+            return self.async_show_progress(
+                step_id="learn_additional",
+                progress_action="listen_remote",
+                progress_task=self._learn_task,
+                description_placeholders={"timeout": str(LEARN_TIMEOUT_SEC)},
+            )
+
+        learned = self._learn_task.result()
+        self._learn_task = None
+        if learned is None:
+            return self.async_show_progress_done(
+                next_step_id="learn_additional_retry"
+            )
+
+        self._learned_data = learned
+        return self.async_show_progress_done(
+            next_step_id="learn_additional_confirm"
+        )
+
+    async def async_step_learn_additional_retry(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Offer another attempt or save the other options after a timeout."""
+        assert self._pending_options is not None
+        if user_input is not None:
+            if user_input.get("skip"):
+                return self.async_create_entry(data=self._pending_options)
+            return await self.async_step_learn_additional()
+
+        return self.async_show_form(
+            step_id="learn_additional_retry",
+            data_schema=vol.Schema({vol.Optional("skip", default=False): bool}),
+            description_placeholders={"timeout": str(LEARN_TIMEOUT_SEC)},
+            errors={"base": "learn_timeout"},
+        )
+
+    async def async_step_learn_additional_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Confirm the remote that was heard, validating it against the others."""
+        assert self._pending_options is not None
+        assert self._learned_data is not None
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            if not user_input.get("add", True):
+                return self.async_create_entry(data=self._pending_options)
+
+            remotes = [
+                DooyaRemote(int(remote[CONF_DOOYA_ID]), int(remote[CONF_CHANNEL]))
+                for remote in self._pending_options.get(CONF_ADDITIONAL_REMOTES, [])
+            ]
+            remotes.append(
+                DooyaRemote(self._learned_data.id, self._learned_data.channel)
+            )
+            additional, errors = _validate_additional_remotes(
+                format_remote_list(remotes),
+                int(self._config_entry.data[CONF_DOOYA_ID]),
+                int(self._config_entry.data[CONF_CHANNEL]),
+                self.hass.config_entries.async_entries(DOMAIN),
+                ignore_entry_id=self._config_entry.entry_id,
+            )
+            if not errors:
+                self._pending_options[CONF_ADDITIONAL_REMOTES] = additional
+                return self.async_create_entry(data=self._pending_options)
+
+        return self.async_show_form(
+            step_id="learn_additional_confirm",
+            data_schema=vol.Schema({vol.Optional("add", default=True): bool}),
+            description_placeholders={
+                "dooya_id": f"0x{self._learned_data.id:06X}",
+                "channel": str(self._learned_data.channel),
+            },
             errors=errors,
         )
 
