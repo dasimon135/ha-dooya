@@ -36,10 +36,12 @@
           "cover_name": "Shutter name",
           "travel_time_up": "Full opening time (seconds)",
           "travel_time_down": "Full closing time (seconds)",
-          "is_awning": "This cover is an awning (DOWN deploys it)"
+          "is_awning": "This cover is an awning (DOWN deploys it)",
+          "additional_remotes": "Additional remotes (optional)"
         },
         "data_description": {
-          "is_awning": "Tick this for an awning: DOWN rolls it out, and Home Assistant shows it open once deployed. The opening time is then the time to deploy it. Leave it unticked for shutters and blinds."
+          "is_awning": "Tick this for an awning: DOWN rolls it out, and Home Assistant shows it open once deployed. The opening time is then the time to deploy it. Leave it unticked for shutters and blinds.",
+          "additional_remotes": "Other remotes that also control this shutter, separated by commas or new lines as HEX_ID:CHANNEL (for example: 00400A7E:241). Commands sent by Home Assistant still use the main remote; these only track physical remote presses."
         }
       },
       "manual": {
@@ -51,10 +53,12 @@
           "channel": "Channel (1-255, or 0 = all shutters)",
           "travel_time_up": "Full opening time (seconds)",
           "travel_time_down": "Full closing time (seconds)",
-          "is_awning": "This cover is an awning (DOWN deploys it)"
+          "is_awning": "This cover is an awning (DOWN deploys it)",
+          "additional_remotes": "Additional remotes (optional)"
         },
         "data_description": {
-          "is_awning": "Tick this for an awning: DOWN rolls it out, and Home Assistant shows it open once deployed. The opening time is then the time to deploy it. Leave it unticked for shutters and blinds."
+          "is_awning": "Tick this for an awning: DOWN rolls it out, and Home Assistant shows it open once deployed. The opening time is then the time to deploy it. Leave it unticked for shutters and blinds.",
+          "additional_remotes": "Other remotes that also control this shutter, separated by commas or new lines as HEX_ID:CHANNEL (for example: 00400A7E:241). Commands sent by Home Assistant still use the main remote; these only track physical remote presses."
         }
       },
       "reconfigure": {
@@ -91,7 +95,9 @@
       "learn_timeout": "No signal was received in time. You can try again, or choose manual entry.",
       "required_esphome_device": "Several compatible ESPHome devices were found. Choose the one that should send the shutter commands.",
       "unknown_esphome_device": "No compatible ESPHome device was found with this name. Check the name and try again.",
-      "duplicate_shutter": "This shutter (same identifier and channel) is already configured. Two entries for one shutter would fight over the estimated position."
+      "duplicate_shutter": "This identifier and channel are already configured on another shutter. Two entries for one shutter would fight over the estimated position.",
+      "invalid_additional_remotes": "Invalid remote list. Use HEX_ID:CHANNEL, separated by commas or new lines.",
+      "duplicate_remote": "A remote is listed twice, or one of them is the main remote."
     }
   },
   "options": {
@@ -107,7 +113,8 @@
           "favorite_position": "Favorite position (%, optional)",
           "is_group": "This cover is the remote's common button",
           "is_awning": "This cover is an awning (DOWN deploys it)",
-          "repeat_remote": "Repeat presses from the remote"
+          "repeat_remote": "Repeat presses from the remote",
+          "additional_remotes": "Additional remotes (optional)"
         },
         "data_description": {
           "esphome_device": "ESPHome node used to transmit RF commands for this shutter. With several nodes in the house, pick the one closest to the shutter.",
@@ -115,12 +122,16 @@
           "favorite_position": "Position used by the 'Favorite position' button on the device page and on the card. Leave empty to hide the button.",
           "is_group": "Tick this for the cover that stands for the remote's \"all\" button. Frames on its channel resync every other shutter of the same remote, and this cover exposes no position of its own. Defaults to the cover on channel 0, which is where most remotes put it.",
           "is_awning": "Tick this for an awning: DOWN rolls it out, and Home Assistant shows it open once deployed. The opening time is then the time to deploy it. Leave it unticked for shutters and blinds.",
-          "repeat_remote": "Tick this only for a shutter the physical remote does not reach reliably. Each press on the remote for this shutter is sent again through this shutter's ESPHome node. Commands sent by Home Assistant are never repeated, so position commands keep working. The remote's common button is repeated only by the cover that holds that role, if it is ticked there too."
+          "repeat_remote": "Tick this only for a shutter the physical remote does not reach reliably. Each press on the remote for this shutter is sent again through this shutter's ESPHome node. Commands sent by Home Assistant are never repeated, so position commands keep working. The remote's common button is repeated only by the cover that holds that role, if it is ticked there too.",
+          "additional_remotes": "Other remotes that also control this shutter, separated by commas or new lines as HEX_ID:CHANNEL (for example: 00400A7E:241). Commands sent by Home Assistant still use the main remote; these only track physical remote presses. Leave the field empty to remove them."
         }
       }
     },
     "error": {
-      "duplicate_group": "Another cover of this remote is already marked as its common button. Untick it there first: only one cover per remote can hold the role."
+      "duplicate_group": "Another cover of this remote is already marked as its common button. Untick it there first: only one cover per remote can hold the role.",
+      "invalid_additional_remotes": "Invalid remote list. Use HEX_ID:CHANNEL, separated by commas or new lines.",
+      "duplicate_remote": "A remote is listed twice, or one of them is the main remote.",
+      "duplicate_shutter": "This identifier and channel are already configured on another shutter. Two entries for one shutter would fight over the estimated position."
     }
   },
   "issues": {

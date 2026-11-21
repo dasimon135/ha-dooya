@@ -7,13 +7,12 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_DOOYA_ID
+from .const import CONF_ADDITIONAL_REMOTES, CONF_DOOYA_ID
 
 if TYPE_CHECKING:
     from . import DooyaConfigEntry
 
-# The remote id would let anyone replay frames to the shutters — redact it.
-TO_REDACT = {CONF_DOOYA_ID}
+TO_REDACT = {CONF_DOOYA_ID, CONF_ADDITIONAL_REMOTES}
 
 
 async def async_get_config_entry_diagnostics(
@@ -34,7 +33,7 @@ async def async_get_config_entry_diagnostics(
         "entry": {
             "title": entry.title,
             "data": async_redact_data(dict(entry.data), TO_REDACT),
-            "options": dict(entry.options),
+            "options": async_redact_data(dict(entry.options), TO_REDACT),
         },
         "cover": cover_state,
     }

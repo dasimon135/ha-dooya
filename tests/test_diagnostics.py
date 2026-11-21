@@ -21,6 +21,7 @@ from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.dooya_rf.const import (
+    CONF_ADDITIONAL_REMOTES,
     CONF_CHANNEL,
     CONF_CHECK,
     CONF_COVER_NAME,
@@ -37,6 +38,7 @@ from custom_components.dooya_rf.diagnostics import (
 
 GATEWAY_SLUG = "volets-dooya-rf433"
 DOOYA_ID = 0x00D1C917
+SECONDARY_ID = 0x00400A7E
 
 
 @pytest.fixture(autouse=True)
@@ -57,8 +59,16 @@ def _make_entry() -> MockConfigEntry:
             CONF_COVER_NAME: "Salon",
             CONF_TRAVEL_TIME_UP: 20.0,
             CONF_TRAVEL_TIME_DOWN: 18.0,
+            CONF_ADDITIONAL_REMOTES: [
+                {CONF_DOOYA_ID: SECONDARY_ID, CONF_CHANNEL: 241}
+            ],
         },
-        options={CONF_REPEAT_COUNT: 2},
+        options={
+            CONF_REPEAT_COUNT: 2,
+            CONF_ADDITIONAL_REMOTES: [
+                {CONF_DOOYA_ID: SECONDARY_ID, CONF_CHANNEL: 241}
+            ],
+        },
     )
 
 
@@ -80,12 +90,16 @@ async def test_remote_id_is_redacted(hass: HomeAssistant) -> None:
     diagnostics = await async_get_config_entry_diagnostics(hass, entry)
 
     assert diagnostics["entry"]["data"][CONF_DOOYA_ID] != DOOYA_ID
+    redacted = [{CONF_DOOYA_ID: "**redacted**", CONF_CHANNEL: 241}]
+    assert diagnostics["entry"]["data"][CONF_ADDITIONAL_REMOTES] == redacted
+    assert diagnostics["entry"]["options"][CONF_ADDITIONAL_REMOTES] == redacted
     # Belt and braces: the raw value must not survive anywhere in the payload,
     # in any spelling a future field might use.
     dumped = repr(diagnostics)
-    assert str(DOOYA_ID) not in dumped
-    assert f"{DOOYA_ID:06X}" not in dumped
-    assert f"{DOOYA_ID:06x}" not in dumped
+    for remote_id in (DOOYA_ID, SECONDARY_ID):
+        assert str(remote_id) not in dumped
+        assert f"{remote_id:06X}" not in dumped
+        assert f"{remote_id:06x}" not in dumped
 
     assert await hass.config_entries.async_unload(entry.entry_id)
 
@@ -102,8 +116,11 @@ async def test_non_secret_fields_are_kept(hass: HomeAssistant) -> None:
     assert data[CONF_CHANNEL] == 5
     assert data[CONF_ESPHOME_DEVICE] == GATEWAY_SLUG
     assert data[CONF_TRAVEL_TIME_UP] == 20.0
-    # Options are reported separately from data, unredacted.
-    assert diagnostics["entry"]["options"] == {CONF_REPEAT_COUNT: 2}
+    # Options are reported separately from data, with remote ids redacted too.
+    assert diagnostics["entry"]["options"][CONF_REPEAT_COUNT] == 2
+    assert diagnostics["entry"]["options"][CONF_ADDITIONAL_REMOTES] == [
+        {CONF_DOOYA_ID: "**redacted**", CONF_CHANNEL: 241}
+    ]
 
     assert await hass.config_entries.async_unload(entry.entry_id)
 

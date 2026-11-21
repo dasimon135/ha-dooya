@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterable
 import logging
 from typing import Any
 
@@ -18,6 +19,7 @@ import voluptuous as vol
 
 from .const import (
     BROADCAST_CHANNEL,
+    CONF_ADDITIONAL_REMOTES,
     CONF_CHANNEL,
     CONF_CHECK,
     CONF_COVER_NAME,
@@ -54,6 +56,14 @@ from .legacy import (
     async_remove_legacy_installed,
     legacy_entries,
 )
+from .remotes import (
+    DooyaRemote,
+    RemoteListError,
+    conflicting_entry_for_remotes,
+    entry_remotes,
+    format_remote_list,
+    parse_remote_text,
+)
 
 # Maximum time spent listening for a remote in learn mode (seconds)
 _LOGGER = logging.getLogger(__name__)
@@ -71,6 +81,52 @@ def _parse_dooya_id(raw: str) -> int:
     if not 0 <= value <= MAX_DOOYA_ID:
         raise ValueError(f"dooya id {value:X} does not fit in 24 bits")
     return value
+
+
+def _validate_additional_remotes(
+    raw: Any,
+    primary_id: int,
+    primary_channel: int,
+    entries: Iterable[ConfigEntry],
+    *,
+    ignore_entry_id: str | None = None,
+) -> tuple[list[dict[str, int]], dict[str, str]]:
+    try:
+        remotes = parse_remote_text(raw)
+    except RemoteListError as err:
+        return [], {CONF_ADDITIONAL_REMOTES: err.reason}
+
+    primary = DooyaRemote(primary_id, primary_channel)
+    if primary in remotes:
+        return [], {CONF_ADDITIONAL_REMOTES: "duplicate_remote"}
+
+    if conflicting_entry_for_remotes(
+        entries, remotes, ignore_entry_id=ignore_entry_id
+    ):
+        return [], {CONF_ADDITIONAL_REMOTES: "duplicate_shutter"}
+
+    return [
+        {CONF_DOOYA_ID: remote.id, CONF_CHANNEL: remote.channel}
+        for remote in remotes
+    ], {}
+
+
+def _confirm_schema() -> vol.Schema:
+    return vol.Schema(
+        {
+            vol.Required(CONF_COVER_NAME): str,
+            vol.Required(
+                CONF_TRAVEL_TIME_UP,
+                default=DEFAULT_TRAVEL_TIME_UP,
+            ): vol.All(vol.Coerce(float), vol.Range(min=1, max=240)),
+            vol.Required(
+                CONF_TRAVEL_TIME_DOWN,
+                default=DEFAULT_TRAVEL_TIME_DOWN,
+            ): vol.All(vol.Coerce(float), vol.Range(min=1, max=240)),
+            vol.Optional(CONF_IS_AWNING, default=False): bool,
+            vol.Optional(CONF_ADDITIONAL_REMOTES, default=""): str,
+        }
+    )
 
 
 def _legacy_unique_id(old: ConfigEntry) -> str:
@@ -370,37 +426,34 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
         """Step 3: confirm the learned fields and name the shutter."""
         assert self._learned_data is not None
 
+        errors: dict[str, str] = {}
         if user_input is not None:
-            return await self._async_create_entry(
-                name=user_input[CONF_COVER_NAME],
-                dooya_id=self._learned_data.id,
-                channel=self._learned_data.channel,
-                check=self._learned_data.check,
-                travel_time_up=user_input[CONF_TRAVEL_TIME_UP],
-                travel_time_down=user_input[CONF_TRAVEL_TIME_DOWN],
-                is_awning=user_input.get(CONF_IS_AWNING, False),
+            additional, errors = _validate_additional_remotes(
+                user_input.get(CONF_ADDITIONAL_REMOTES, ""),
+                self._learned_data.id,
+                self._learned_data.channel,
+                self._async_current_entries(),
             )
+            if not errors:
+                return await self._async_create_entry(
+                    name=user_input[CONF_COVER_NAME],
+                    dooya_id=self._learned_data.id,
+                    channel=self._learned_data.channel,
+                    check=self._learned_data.check,
+                    travel_time_up=user_input[CONF_TRAVEL_TIME_UP],
+                    travel_time_down=user_input[CONF_TRAVEL_TIME_DOWN],
+                    is_awning=user_input.get(CONF_IS_AWNING, False),
+                    additional_remotes=additional,
+                )
 
         return self.async_show_form(
             step_id="confirm",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_COVER_NAME): str,
-                    vol.Required(
-                        CONF_TRAVEL_TIME_UP,
-                        default=DEFAULT_TRAVEL_TIME_UP,
-                    ): vol.All(vol.Coerce(float), vol.Range(min=1, max=240)),
-                    vol.Required(
-                        CONF_TRAVEL_TIME_DOWN,
-                        default=DEFAULT_TRAVEL_TIME_DOWN,
-                    ): vol.All(vol.Coerce(float), vol.Range(min=1, max=240)),
-                    vol.Optional(CONF_IS_AWNING, default=False): bool,
-                }
-            ),
+            data_schema=_confirm_schema(),
             description_placeholders={
                 "dooya_id": f"0x{self._learned_data.id:06X}",
                 "channel": str(self._learned_data.channel),
             },
+            errors=errors,
         )
 
     async def async_step_manual(
@@ -415,17 +468,24 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
             except ValueError:
                 errors[CONF_DOOYA_ID] = "invalid_dooya_id"
             else:
-                return await self._async_create_entry(
-                    name=user_input[CONF_COVER_NAME],
-                    dooya_id=dooya_id,
-                    channel=user_input[CONF_CHANNEL],
-                    # The check nibble is derived from the button at transmit
-                    # time; record the UP value for reference only.
-                    check=check_for_button(BUTTON_UP),
-                    travel_time_up=user_input[CONF_TRAVEL_TIME_UP],
-                    travel_time_down=user_input[CONF_TRAVEL_TIME_DOWN],
-                    is_awning=user_input.get(CONF_IS_AWNING, False),
+                additional, remote_errors = _validate_additional_remotes(
+                    user_input.get(CONF_ADDITIONAL_REMOTES, ""),
+                    dooya_id,
+                    user_input[CONF_CHANNEL],
+                    self._async_current_entries(),
                 )
+                errors.update(remote_errors)
+                if not errors:
+                    return await self._async_create_entry(
+                        name=user_input[CONF_COVER_NAME],
+                        dooya_id=dooya_id,
+                        channel=user_input[CONF_CHANNEL],
+                        check=check_for_button(BUTTON_UP),
+                        travel_time_up=user_input[CONF_TRAVEL_TIME_UP],
+                        travel_time_down=user_input[CONF_TRAVEL_TIME_DOWN],
+                        is_awning=user_input.get(CONF_IS_AWNING, False),
+                        additional_remotes=additional,
+                    )
 
         return self.async_show_form(
             step_id="manual",
@@ -445,6 +505,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                         default=DEFAULT_TRAVEL_TIME_DOWN,
                     ): vol.All(vol.Coerce(float), vol.Range(min=1, max=240)),
                     vol.Optional(CONF_IS_AWNING, default=False): bool,
+                    vol.Optional(CONF_ADDITIONAL_REMOTES, default=""): str,
                 }
             ),
             errors=errors,
@@ -468,10 +529,14 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors[CONF_DOOYA_ID] = "invalid_dooya_id"
             else:
                 channel = user_input[CONF_CHANNEL]
-                # Editing an entry into an identity another entry already owns
-                # would create the same duplicate the user step guards against.
-                if self._conflicting_entry(
-                    dooya_id, channel, ignore_entry_id=entry.entry_id
+                primary = DooyaRemote(dooya_id, channel)
+                own_secondaries = entry_remotes(entry)[1:]
+                if primary in own_secondaries:
+                    errors[CONF_DOOYA_ID] = "duplicate_remote"
+                elif conflicting_entry_for_remotes(
+                    self._async_current_entries(),
+                    [primary, *own_secondaries],
+                    ignore_entry_id=entry.entry_id,
                 ):
                     errors[CONF_DOOYA_ID] = "duplicate_shutter"
                 else:
@@ -514,20 +579,12 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
     def _conflicting_entry(
         self, dooya_id: int, channel: int, *, ignore_entry_id: str | None = None
     ) -> ConfigEntry | None:
-        """Return an existing entry already driving this shutter, if any.
-
-        Matches on the entry data rather than on the unique id so that entries
-        created before unique ids were introduced are caught too.
-        """
-        for entry in self._async_current_entries():
-            if entry.entry_id == ignore_entry_id:
-                continue
-            if (
-                entry.data.get(CONF_DOOYA_ID) == dooya_id
-                and entry.data.get(CONF_CHANNEL) == channel
-            ):
-                return entry
-        return None
+        """Return an existing entry already driving this shutter, if any."""
+        return conflicting_entry_for_remotes(
+            self._async_current_entries(),
+            [DooyaRemote(dooya_id, channel)],
+            ignore_entry_id=ignore_entry_id,
+        )
 
     async def _async_create_entry(
         self,
@@ -538,6 +595,7 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
         travel_time_up: float,
         travel_time_down: float,
         is_awning: bool = False,
+        additional_remotes: list[dict[str, int]] | None = None,
     ) -> ConfigFlowResult:
         """Create the config entry, refusing to drive the same shutter twice.
 
@@ -545,25 +603,37 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
         and would each see the other's transmissions as a physical remote
         press, so the two estimates would drift apart permanently.
         """
-        if self._conflicting_entry(dooya_id, channel) is not None:
+        additional_remotes = additional_remotes or []
+        primary = DooyaRemote(dooya_id, channel)
+        identities = [
+            primary,
+            *[
+                DooyaRemote(
+                    int(remote[CONF_DOOYA_ID]), int(remote[CONF_CHANNEL])
+                )
+                for remote in additional_remotes
+            ],
+        ]
+        if conflicting_entry_for_remotes(self._async_current_entries(), identities):
             return self.async_abort(reason="already_configured")
 
         await self.async_set_unique_id(shutter_unique_id(dooya_id, channel))
         self._abort_if_unique_id_configured()
 
-        return self.async_create_entry(
-            title=name,
-            data={
-                CONF_ESPHOME_DEVICE: self._esphome_device,
-                CONF_DOOYA_ID: dooya_id,
-                CONF_CHANNEL: channel,
-                CONF_CHECK: check,
-                CONF_COVER_NAME: name,
-                CONF_TRAVEL_TIME_UP: travel_time_up,
-                CONF_TRAVEL_TIME_DOWN: travel_time_down,
-                CONF_IS_AWNING: is_awning,
-            },
-        )
+        data: dict[str, Any] = {
+            CONF_ESPHOME_DEVICE: self._esphome_device,
+            CONF_DOOYA_ID: dooya_id,
+            CONF_CHANNEL: channel,
+            CONF_CHECK: check,
+            CONF_COVER_NAME: name,
+            CONF_TRAVEL_TIME_UP: travel_time_up,
+            CONF_TRAVEL_TIME_DOWN: travel_time_down,
+            CONF_IS_AWNING: is_awning,
+        }
+        if additional_remotes:
+            data[CONF_ADDITIONAL_REMOTES] = additional_remotes
+
+        return self.async_create_entry(title=name, data=data)
 
 
 class DooyaOptionsFlow(OptionsFlow):
@@ -595,17 +665,28 @@ class DooyaOptionsFlow(OptionsFlow):
         )
         current_is_awning = bool(entry_value(entry, CONF_IS_AWNING, False))
         current_repeat_remote = bool(entry_value(entry, CONF_REPEAT_REMOTE, False))
+        current_secondaries = entry_remotes(entry)[1:]
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            # Two covers claiming the group role on one remote would make the
-            # lookup in cover.group_channel_for depend on entry order, which is
-            # exactly the silent divergence a per-cover channel number would
-            # have caused. Refuse it instead.
-            if user_input.get(CONF_IS_GROUP) and self._other_group_entry(entry):
+            additional, remote_errors = _validate_additional_remotes(
+                user_input.get(CONF_ADDITIONAL_REMOTES, ""),
+                int(entry.data[CONF_DOOYA_ID]),
+                int(entry.data[CONF_CHANNEL]),
+                self.hass.config_entries.async_entries(DOMAIN),
+                ignore_entry_id=entry.entry_id,
+            )
+            errors.update(remote_errors)
+            if (
+                not errors
+                and user_input.get(CONF_IS_GROUP)
+                and self._other_group_entry(entry)
+            ):
                 errors[CONF_IS_GROUP] = "duplicate_group"
-            else:
-                return self.async_create_entry(data=user_input)
+            if not errors:
+                data = dict(user_input)
+                data[CONF_ADDITIONAL_REMOTES] = additional
+                return self.async_create_entry(data=data)
 
         # With several TX+RX nodes in the house, a cover can be reassigned to
         # the nearest node here without re-creating the entry. Keep the
@@ -651,6 +732,10 @@ class DooyaOptionsFlow(OptionsFlow):
                 vol.Required(CONF_IS_GROUP, default=current_is_group): bool,
                 vol.Required(CONF_IS_AWNING, default=current_is_awning): bool,
                 vol.Required(CONF_REPEAT_REMOTE, default=current_repeat_remote): bool,
+                vol.Optional(
+                    CONF_ADDITIONAL_REMOTES,
+                    default=format_remote_list(current_secondaries),
+                ): str,
             }
         )
 
@@ -663,11 +748,11 @@ class DooyaOptionsFlow(OptionsFlow):
     @callback
     def _other_group_entry(self, entry: ConfigEntry) -> ConfigEntry | None:
         """Return another cover of this remote already flagged as the group."""
-        dooya_id = entry.data.get(CONF_DOOYA_ID)
+        ids = {remote.id for remote in entry_remotes(entry)}
         for other in self.hass.config_entries.async_entries(DOMAIN):
             if other.entry_id == entry.entry_id:
                 continue
-            if other.data.get(CONF_DOOYA_ID) != dooya_id:
+            if not ids & {remote.id for remote in entry_remotes(other)}:
                 continue
             channel = other.data.get(CONF_CHANNEL)
             if entry_value(other, CONF_IS_GROUP, channel == BROADCAST_CHANNEL):

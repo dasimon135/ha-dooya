@@ -68,6 +68,7 @@ EVENT_DOOYA_RECEIVED: Final = "esphome.dooya_received"
 CONF_ESPHOME_DEVICE: Final = "esphome_device"  # ESPHome device name (slug)
 CONF_DOOYA_ID: Final = "dooya_id"  # 24-bit remote identifier
 CONF_CHANNEL: Final = "channel"  # Shutter channel (8 bits)
+CONF_ADDITIONAL_REMOTES: Final = "additional_remotes"  # RX-only remote identities
 CONF_CHECK: Final = "check"  # Check nibble (4 bits)
 CONF_COVER_NAME: Final = "cover_name"  # Shutter name
 CONF_IS_GROUP: Final = "is_group"  # This cover is the remote's common button

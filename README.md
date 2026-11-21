@@ -248,6 +248,18 @@ Note: *Allow the device to perform Home Assistant actions* has no bearing on thi
 4. Enter the full opening and closing travel times for that cover
 5. Create one config entry per shutter
 
+### Several remotes for one shutter
+
+A shutter can be driven by more than one physical remote: a handheld one and a wall one, for example. Enter the other remotes in **Additional remotes**, in the setup or options dialog, as `HEX_ID:CHANNEL` separated by commas or new lines, for example:
+
+```text
+00400A7E:241, 0x00ABCDEF:6
+```
+
+The first remote is the main one: every command sent by Home Assistant still uses its id, channel and checksum. The additional remotes only track presses from the physical remote, so moving the cover from any of them keeps the estimated position in sync. Each `(id, channel)` pair can belong to only one shutter, and the main remote cannot be repeated as an additional one.
+
+Leave the field empty to remove additional remotes from a shutter. This works even when they were stored in an older config entry, as long as the entry's options are saved once.
+
 ### What automatic detection does
 
 Automatic detection does **not** pair the shutter and does **not** change its configuration.

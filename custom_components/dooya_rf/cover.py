@@ -31,8 +31,6 @@ import voluptuous as vol
 from .const import (
     BROADCAST_CHANNEL,
     CALIBRATION_TIMEOUT_SEC,
-    CONF_CHANNEL,
-    CONF_DOOYA_ID,
     CONF_IS_AWNING,
     CONF_REPEAT_COUNT,
     CONF_REPEAT_REMOTE,
@@ -64,6 +62,7 @@ from .dooya_protocol import (
 from .echo_filter import TxEchoFilter
 from .entity import DooyaBaseEntity
 from .remote_press import PressTracker
+from .remotes import entry_remotes
 from .travel_calc import clamp_position, position_after, travel_duration
 
 if TYPE_CHECKING:
@@ -89,11 +88,11 @@ def group_channel_for(hass: HomeAssistant, dooya_id: int) -> int:
     staleness would be.
     """
     for entry in hass.config_entries.async_entries(DOMAIN):
-        channel = entry.data.get(CONF_CHANNEL)
-        if entry.data.get(CONF_DOOYA_ID) != dooya_id or channel is None:
+        if not is_group_entry(entry):
             continue
-        if is_group_entry(entry):
-            return int(channel)
+        for remote in entry_remotes(entry):
+            if remote.id == dooya_id:
+                return remote.channel
     return BROADCAST_CHANNEL
 
 
@@ -383,10 +382,11 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         group cover carries no position estimate to drive.
         """
         siblings: list[DooyaCover] = []
+        ids = {remote.id for remote in self._remotes}
         for entry in self.hass.config_entries.async_entries(DOMAIN):
             if entry.entry_id == self._config_entry.entry_id:
                 continue
-            if entry.data.get(CONF_DOOYA_ID) != self._dooya_id:
+            if not ids & {remote.id for remote in entry_remotes(entry)}:
                 continue
             runtime_data = getattr(entry, "runtime_data", None)
             cover = getattr(runtime_data, "cover", None)
@@ -784,9 +784,23 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         except (KeyError, TypeError, ValueError):
             return
 
-        if check is not None and not is_frame_consistent(button, check):
-            # A mis-decoded frame, not a press: acting on it would move an
-            # estimate, or cancel the STOP a partial move is waiting for.
+        matched_remote = None
+        for remote in self._remotes:
+            if event_id != remote.id:
+                continue
+            if event_channel == remote.channel or event_channel == group_channel_for(
+                self.hass, remote.id
+            ):
+                matched_remote = remote
+                break
+        if matched_remote is None:
+            return
+
+        if (
+            check is not None
+            and matched_remote == self._remotes[0]
+            and not is_frame_consistent(button, check)
+        ):
             _LOGGER.debug(
                 "%s: ignoring a frame whose check does not match its button "
                 "(button=%d, check=%d)",
@@ -794,15 +808,6 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
                 button,
                 check,
             )
-            return
-
-        if event_id != self._dooya_id:
-            return
-        # A group frame — the remote's common button, or the Home Assistant
-        # entity standing for it — moves every shutter paired with this remote.
-        if event_channel != self._channel and event_channel != group_channel_for(
-            self.hass, self._dooya_id
-        ):
             return
 
         now = monotonic()
@@ -830,7 +835,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
         if (
             self._repeat_remote
-            and event_channel == self._channel
+            and event_channel == matched_remote.channel
             and button in (BUTTON_UP, BUTTON_DOWN, BUTTON_STOP)
         ):
             self._echo_filter.record_tx(button, now)

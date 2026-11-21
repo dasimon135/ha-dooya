@@ -22,6 +22,7 @@ from homeassistant.core import HomeAssistant, callback
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.dooya_rf.const import (
+    CONF_ADDITIONAL_REMOTES,
     CONF_CHANNEL,
     CONF_CHECK,
     CONF_COVER_NAME,
@@ -66,24 +67,28 @@ async def _setup(
     *,
     awning: bool = False,
     group: bool = False,
+    additional_remotes: list[dict] | None = None,
 ) -> MockConfigEntry:
     options: dict = {}
     if awning:
         options[CONF_IS_AWNING] = True
     if group:
         options[CONF_IS_GROUP] = True
+    data = {
+        CONF_ESPHOME_DEVICE: "volets-dooya-rf433",
+        CONF_DOOYA_ID: DOOYA_ID,
+        CONF_CHANNEL: channel,
+        CONF_CHECK: 1,
+        CONF_COVER_NAME: name,
+        CONF_TRAVEL_TIME_UP: 3.0,
+        CONF_TRAVEL_TIME_DOWN: 3.0,
+    }
+    if additional_remotes:
+        data[CONF_ADDITIONAL_REMOTES] = additional_remotes
     entry = MockConfigEntry(
         domain=DOMAIN,
         title=name,
-        data={
-            CONF_ESPHOME_DEVICE: "volets-dooya-rf433",
-            CONF_DOOYA_ID: DOOYA_ID,
-            CONF_CHANNEL: channel,
-            CONF_CHECK: 1,
-            CONF_COVER_NAME: name,
-            CONF_TRAVEL_TIME_UP: 3.0,
-            CONF_TRAVEL_TIME_DOWN: 3.0,
-        },
+        data=data,
         options=options,
     )
     entry.add_to_hass(hass)
@@ -93,12 +98,16 @@ async def _setup(
 
 
 async def _frame(
-    hass: HomeAssistant, button: int, channel: int = 5, check: int | None = None
+    hass: HomeAssistant,
+    button: int,
+    channel: int = 5,
+    check: int | None = None,
+    remote_id: int = DOOYA_ID,
 ) -> None:
     hass.bus.async_fire(
         EVENT_DOOYA_RECEIVED,
         {
-            "id": f"{DOOYA_ID:06X}",
+            "id": f"{remote_id:06X}",
             "channel": str(channel),
             "button": str(button),
             "check": str(button if check is None else check),
@@ -195,6 +204,18 @@ async def test_a_misdecoded_frame_fires_nothing(
     await _setup(hass)
     await _frame(hass, UP, check=9)
     assert EVENT_ID not in fired
+
+
+async def test_a_secondary_remote_fires_with_its_own_check(
+    hass: HomeAssistant, fired: dict
+) -> None:
+    """Secondary remotes may use a check nibble different from the button."""
+    await _setup(
+        hass,
+        additional_remotes=[{CONF_DOOYA_ID: 0x00400A7E, CONF_CHANNEL: 241}],
+    )
+    await _frame(hass, DOWN, channel=241, check=12, remote_id=0x00400A7E)
+    assert fired[EVENT_ID] == ["down"]
 
 
 async def test_the_led_button_fires_nothing(hass: HomeAssistant, fired: dict) -> None:
