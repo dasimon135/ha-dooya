@@ -35,6 +35,7 @@ from custom_components.dooya_rf.const import (
     CONF_COVER_NAME,
     CONF_DOOYA_ID,
     CONF_ESPHOME_DEVICE,
+    CONF_GROUP_COVERS,
     CONF_INVERT_DIRECTION,
     CONF_IS_AWNING,
     CONF_IS_GROUP,
@@ -87,6 +88,7 @@ def _entry(
     awning: bool = False,
     invert: bool = False,
     group: bool = False,
+    group_covers: list[str] | None = None,
 ) -> MockConfigEntry:
     options: dict = {}
     if awning:
@@ -95,6 +97,8 @@ def _entry(
         options[CONF_INVERT_DIRECTION] = True
     if group:
         options[CONF_IS_GROUP] = True
+    if group_covers is not None:
+        options[CONF_GROUP_COVERS] = group_covers
     return MockConfigEntry(
         domain=DOMAIN,
         title=name,
@@ -393,6 +397,55 @@ async def test_a_group_frame_from_the_remote_moves_each_sibling_by_its_own_mappi
     await hass.async_block_till_done()
 
     assert hass.states.get(SHUTTER_ID).state == "closing"
+    assert hass.states.get(AWNING_ID).state == "opening"
+
+
+async def test_group_open_only_moves_the_selected_sibling(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    shutter = await _setup(hass, _entry("Salon", 5))
+    await _setup(hass, _entry("Terrasse", 6, awning=True))
+    await _setup(
+        hass,
+        _entry(
+            "All shutters",
+            GROUP_CHANNEL,
+            group=True,
+            group_covers=[shutter.entry_id],
+        ),
+    )
+    shutter.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover", "open_cover", {"entity_id": GROUP_ID}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    assert [f["btn"] for f in frames] == [UP]
+    assert hass.states.get(SHUTTER_ID).state == "opening"
+    assert hass.states.get(AWNING_ID).state != "closing"
+
+
+async def test_group_frame_only_moves_the_selected_sibling(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    await _setup(hass, _entry("Salon", 5))
+    awning = await _setup(hass, _entry("Terrasse", 6, awning=True))
+    await _setup(
+        hass,
+        _entry(
+            "All shutters",
+            GROUP_CHANNEL,
+            group=True,
+            group_covers=[awning.entry_id],
+        ),
+    )
+    awning.runtime_data.cover._current_position = 0
+
+    _fire_frame(hass, DOWN, channel=GROUP_CHANNEL)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(SHUTTER_ID).state != "closing"
     assert hass.states.get(AWNING_ID).state == "opening"
 
 

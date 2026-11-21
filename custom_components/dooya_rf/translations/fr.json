@@ -38,11 +38,15 @@
           "travel_time_down": "Temps de fermeture complet (secondes)",
           "is_awning": "Cette couverture est un store banne (DOWN la déploie)",
           "invert_direction": "Inverser HAUT et BAS",
+          "is_group": "Ce volet est le bouton commun de la télécommande",
+          "group_covers": "Volets pilotés par le bouton commun",
           "additional_remotes": "Télécommandes supplémentaires (optionnel)"
         },
         "data_description": {
           "is_awning": "À cocher pour un store banne : DOWN le déploie, et Home Assistant l'affiche ouvert une fois déployé. Le temps d'ouverture devient alors le temps de déploiement. À laisser décoché pour les volets et les stores.",
           "invert_direction": "À cocher quand HAUT descend le volet et BAS le remonte. Home Assistant affiche toujours les positions habituelles (ouvert/déployé = 100 %) et envoie le bouton physique opposé.",
+          "is_group": "À cocher pour le volet qui représente le bouton « tout » de la télécommande. Les trames reçues sur son canal resynchronisent les volets sélectionnés, et ce volet n'expose pas de position propre. Un seul volet par télécommande peut porter ce rôle.",
+          "group_covers": "Choisissez les volets pilotés par le bouton commun. Laissez-les tous sélectionnés pour piloter tous les volets de la télécommande, ou décochez-en un pour l'exclure.",
           "additional_remotes": "Autres télécommandes qui pilotent aussi ce volet, séparées par des virgules ou des retours à la ligne sous la forme ID_HEX:CANAL (par exemple : 00400A7E:241). Les commandes envoyées par Home Assistant utilisent toujours la télécommande principale ; celles-ci servent seulement à suivre les appuis physiques."
         }
       },
@@ -57,11 +61,15 @@
           "travel_time_down": "Temps de fermeture complet (secondes)",
           "is_awning": "Cette couverture est un store banne (DOWN la déploie)",
           "invert_direction": "Inverser HAUT et BAS",
+          "is_group": "Ce volet est le bouton commun de la télécommande",
+          "group_covers": "Volets pilotés par le bouton commun",
           "additional_remotes": "Télécommandes supplémentaires (optionnel)"
         },
         "data_description": {
           "is_awning": "À cocher pour un store banne : DOWN le déploie, et Home Assistant l'affiche ouvert une fois déployé. Le temps d'ouverture devient alors le temps de déploiement. À laisser décoché pour les volets et les stores.",
           "invert_direction": "À cocher quand HAUT descend le volet et BAS le remonte. Home Assistant affiche toujours les positions habituelles (ouvert/déployé = 100 %) et envoie le bouton physique opposé.",
+          "is_group": "À cocher pour le volet qui représente le bouton « tout » de la télécommande. Les trames reçues sur son canal resynchronisent les volets sélectionnés, et ce volet n'expose pas de position propre. Un seul volet par télécommande peut porter ce rôle.",
+          "group_covers": "Choisissez les volets pilotés par le bouton commun. Laissez-les tous sélectionnés pour piloter tous les volets de la télécommande, ou décochez-en un pour l'exclure.",
           "additional_remotes": "Autres télécommandes qui pilotent aussi ce volet, séparées par des virgules ou des retours à la ligne sous la forme ID_HEX:CANAL (par exemple : 00400A7E:241). Les commandes envoyées par Home Assistant utilisent toujours la télécommande principale ; celles-ci servent seulement à suivre les appuis physiques."
         }
       },
@@ -100,6 +108,8 @@
       "required_esphome_device": "Plusieurs boîtiers ESPHome compatibles ont été trouvés. Choisissez celui qui doit envoyer les commandes du volet.",
       "unknown_esphome_device": "Aucun boîtier ESPHome compatible n'a été trouvé avec ce nom. Vérifiez le nom et réessayez.",
       "duplicate_shutter": "Cet identifiant et ce canal sont déjà configurés sur un autre volet. Deux entrées pour un seul volet se disputeraient l'estimation de position.",
+      "duplicate_group": "Un autre volet de cette télécommande est déjà marqué comme bouton commun. Décochez-le d'abord : un seul volet par télécommande peut porter ce rôle.",
+      "invalid_group_covers": "Choisissez uniquement des volets pilotés par la même télécommande.",
       "invalid_additional_remotes": "Liste de télécommandes invalide. Utilisez ID_HEX:CANAL, séparés par des virgules ou des retours à la ligne.",
       "duplicate_remote": "Une télécommande figure deux fois, ou l'une d'elles est la télécommande principale."
     }
@@ -116,6 +126,7 @@
           "repeat_count": "Nombre de répétitions de l'émission RF (1–3)",
           "favorite_position": "Position favorite (%, optionnelle)",
           "is_group": "Ce volet est le bouton commun de la télécommande",
+          "group_covers": "Volets pilotés par le bouton commun",
           "is_awning": "Cette couverture est un store banne (DOWN la déploie)",
           "invert_direction": "Inverser HAUT et BAS",
           "repeat_remote": "Répéter les appuis de la télécommande",
@@ -126,7 +137,8 @@
           "esphome_device": "Nœud ESPHome utilisé pour émettre les commandes RF de ce volet. Avec plusieurs nœuds dans la maison, choisissez le plus proche du volet.",
           "repeat_count": "Nombre de fois où la commande RF est envoyée à chaque action. Augmenter à 2 ou 3 si le volet rate parfois une commande (interférences RF). Défaut : 1.",
           "favorite_position": "Position utilisée par le bouton « Position favorite » sur la page de l'appareil et sur la carte. Laisser vide pour masquer le bouton.",
-          "is_group": "À cocher pour le volet qui représente le bouton « tout » de la télécommande. Les trames reçues sur son canal resynchronisent tous les autres volets de la même télécommande, et ce volet n'expose pas de position propre. Par défaut, le volet sur le canal 0, là où la plupart des télécommandes le placent.",
+          "is_group": "À cocher pour le volet qui représente le bouton « tout » de la télécommande. Les trames reçues sur son canal resynchronisent les volets sélectionnés, et ce volet n'expose pas de position propre. Un seul volet par télécommande peut porter ce rôle.",
+          "group_covers": "Choisissez les volets pilotés par le bouton commun. Laissez-les tous sélectionnés pour piloter tous les volets de la télécommande, ou décochez-en un pour l'exclure.",
           "is_awning": "À cocher pour un store banne : DOWN le déploie, et Home Assistant l'affiche ouvert une fois déployé. Le temps d'ouverture devient alors le temps de déploiement. À laisser décoché pour les volets et les stores.",
           "invert_direction": "À cocher quand HAUT descend le volet et BAS le remonte. Home Assistant affiche toujours les positions habituelles (ouvert/déployé = 100 %) et envoie le bouton physique opposé.",
           "repeat_remote": "À cocher seulement pour un volet que la télécommande physique n'atteint pas bien. Chaque appui de la télécommande destiné à ce volet est renvoyé par le nœud ESPHome de ce volet. Les commandes envoyées par Home Assistant ne sont jamais répétées, donc les commandes de position continuent de fonctionner. Le bouton commun de la télécommande n'est répété que par le volet qui porte ce rôle, si la case y est cochée aussi.",
@@ -160,6 +172,7 @@
     },
     "error": {
       "duplicate_group": "Un autre volet de cette télécommande est déjà marqué comme bouton commun. Décochez-le d'abord : un seul volet par télécommande peut porter ce rôle.",
+      "invalid_group_covers": "Choisissez uniquement des volets pilotés par la même télécommande.",
       "invalid_additional_remotes": "Liste de télécommandes invalide. Utilisez ID_HEX:CANAL, séparés par des virgules ou des retours à la ligne.",
       "duplicate_remote": "Une télécommande figure deux fois, ou l'une d'elles est la télécommande principale.",
       "duplicate_shutter": "Cet identifiant et ce canal sont déjà configurés sur un autre volet. Deux entrées pour un seul volet se disputeraient l'estimation de position.",

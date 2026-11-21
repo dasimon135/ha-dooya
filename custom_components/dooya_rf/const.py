@@ -72,6 +72,7 @@ CONF_ADDITIONAL_REMOTES: Final = "additional_remotes"  # RX-only remote identiti
 CONF_CHECK: Final = "check"  # Check nibble (4 bits)
 CONF_COVER_NAME: Final = "cover_name"  # Shutter name
 CONF_IS_GROUP: Final = "is_group"  # This cover is the remote's common button
+CONF_GROUP_COVERS: Final = "group_covers"  # Covers driven by the common button
 CONF_IS_AWNING: Final = "is_awning"  # DOWN deploys it, and deployed is open
 CONF_INVERT_DIRECTION: Final = "invert_direction"
 CONF_TRAVEL_TIME_UP: Final = "travel_time_up"  # Full opening time (s)

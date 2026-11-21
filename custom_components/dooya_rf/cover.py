@@ -14,6 +14,7 @@ from homeassistant.components.cover import (
     CoverEntity,
     CoverEntityFeature,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
@@ -31,6 +32,7 @@ import voluptuous as vol
 from .const import (
     BROADCAST_CHANNEL,
     CALIBRATION_TIMEOUT_SEC,
+    CONF_GROUP_COVERS,
     CONF_INVERT_DIRECTION,
     CONF_IS_AWNING,
     CONF_REPEAT_COUNT,
@@ -75,7 +77,9 @@ ATTR_POSITION = "position"
 
 
 @callback
-def group_channel_for(hass: HomeAssistant, dooya_id: int) -> int:
+def group_channel_for(
+    hass: HomeAssistant, dooya_id: int, entry: ConfigEntry | None = None
+) -> int | None:
     """Return the channel that addresses every shutter of one remote.
 
     The group role is declared by CONF_IS_GROUP on one cover rather than fixed
@@ -88,12 +92,17 @@ def group_channel_for(hass: HomeAssistant, dooya_id: int) -> int:
     Config entries are a short in-memory list, so the scan is cheaper than the
     staleness would be.
     """
-    for entry in hass.config_entries.async_entries(DOMAIN):
-        if not is_group_entry(entry):
+    for group_entry in hass.config_entries.async_entries(DOMAIN):
+        if not is_group_entry(group_entry):
             continue
-        for remote in entry_remotes(entry):
-            if remote.id == dooya_id:
-                return remote.channel
+        for remote in entry_remotes(group_entry):
+            if remote.id != dooya_id:
+                continue
+            if entry is not None and entry.entry_id != group_entry.entry_id:
+                selected = entry_value(entry, CONF_GROUP_COVERS, None)
+                if isinstance(selected, list) and entry.entry_id not in selected:
+                    return None
+            return remote.channel
     return BROADCAST_CHANNEL
 
 
@@ -388,8 +397,12 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         """
         siblings: list[DooyaCover] = []
         ids = {remote.id for remote in self._remotes}
+        selected = entry_value(self._config_entry, CONF_GROUP_COVERS, None)
+        allowed = set(selected) if isinstance(selected, list) else None
         for entry in self.hass.config_entries.async_entries(DOMAIN):
             if entry.entry_id == self._config_entry.entry_id:
+                continue
+            if allowed is not None and entry.entry_id not in allowed:
                 continue
             if not ids & {remote.id for remote in entry_remotes(entry)}:
                 continue
@@ -794,7 +807,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             if event_id != remote.id:
                 continue
             if event_channel == remote.channel or event_channel == group_channel_for(
-                self.hass, remote.id
+                self.hass, remote.id, self._config_entry
             ):
                 matched_remote = remote
                 break
