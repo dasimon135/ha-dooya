@@ -178,13 +178,14 @@ def _flatten(data: dict, prefix: str = "") -> dict[str, str]:
 
 @pytest.fixture(scope="module")
 def locales() -> dict[str, dict[str, str]]:
-    """The three translation files, flattened to dotted keys."""
+    """The translation files, flattened to dotted keys."""
     return {
         name: _flatten(json.loads(path.read_text(encoding="utf-8")))
         for name, path in (
             ("strings", COMPONENT / "strings.json"),
             ("en", COMPONENT / "translations" / "en.json"),
             ("fr", COMPONENT / "translations" / "fr.json"),
+            ("es", COMPONENT / "translations" / "es.json"),
         )
     }
 
@@ -221,23 +222,26 @@ def test_english_translation_never_drifts_from_strings(
 def test_every_locale_covers_the_same_keys(
     locales: dict[str, dict[str, str]],
 ) -> None:
-    """The French locale must cover exactly the keys English does.
+    """Every locale must cover exactly the keys English does.
 
     A missing key makes Home Assistant fall back to English mid-sentence; an
     extra one is dead weight that outlives the string it translated.
     """
-    english, french = locales["en"], locales["fr"]
+    english = locales["en"]
 
-    assert english.keys() == french.keys(), (
-        f"missing from fr.json: {sorted(english.keys() - french.keys())}; "
-        f"stale in fr.json: {sorted(french.keys() - english.keys())}"
-    )
+    for name, translation in locales.items():
+        if name == "en":
+            continue
+        assert english.keys() == translation.keys(), (
+            f"missing from {name}.json: {sorted(english.keys() - translation.keys())}; "
+            f"stale in {name}.json: {sorted(translation.keys() - english.keys())}"
+        )
 
 
 def test_placeholders_match_across_locales(
     locales: dict[str, dict[str, str]],
 ) -> None:
-    """Both locales must use the same `{placeholder}` set for every key.
+    """Every locale must use the same `{placeholder}` set for every key.
 
     A placeholder present in one locale and absent in the other either drops a
     value the user needs or raises at render time, depending which way round it
@@ -247,11 +251,15 @@ def test_placeholders_match_across_locales(
     def placeholders(value: str) -> set[str]:
         return set(re.findall(r"\{(\w+)\}", value))
 
-    mismatched = {
-        key: (placeholders(locales["en"][key]), placeholders(locales["fr"][key]))
-        for key in locales["en"].keys() & locales["fr"].keys()
-        if placeholders(locales["en"][key]) != placeholders(locales["fr"][key])
-    }
-    assert not mismatched, (
-        f"placeholder mismatch between en.json and fr.json (en, fr): {mismatched}"
-    )
+    for name, translation in locales.items():
+        if name == "en":
+            continue
+        mismatched = {
+            key: (placeholders(locales["en"][key]), placeholders(translation[key]))
+            for key in locales["en"].keys() & translation.keys()
+            if placeholders(locales["en"][key]) != placeholders(translation[key])
+        }
+        assert not mismatched, (
+            f"placeholder mismatch between en.json and {name}.json "
+            f"(en, {name}): {mismatched}"
+        )

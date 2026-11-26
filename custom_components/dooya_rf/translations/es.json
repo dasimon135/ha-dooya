@@ -1,0 +1,262 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Dooya RF Cover — Dispositivo ESPHome",
+        "description": "Ingrese el nombre del dispositivo ESPHome transmisor de comandos a la persiana (por ejemplo: `volets-dooya-rf433`). Dispositivos compatibles detectados: {detected}.",
+        "data": {
+          "esphome_device": "Nombre del dispositivo ESPHome"
+        }
+      },
+      "method": {
+        "title": "Dooya RF Cover — Método de configuración",
+        "description": "Elija cómo desea configurar esta persiana. Con el identificador conocido, use la entrada manual. De lo contrario, la detección automática puede leerlo desde el mando.",
+        "data": {
+          "method": "Método de configuración"
+        },
+        "data_description": {
+          "method": "Se recomienda la entrada manual con el identificador conocido. La detección automática lo lee al pulsar ARRIBA en el mando."
+        }
+      },
+      "learn": {
+        "title": "Detección automática desde el mando",
+        "description": "Escucha iniciada. En los próximos {timeout} segundos, pulse el botón **ARRIBA** del mando físico Dooya de esta persiana.\n\nHome Assistant avanzará automáticamente al siguiente paso en cuanto reciba una señal válida.\n\nEste paso no modifica la persiana ni empareja nada. Solo lee la señal enviada por el mando."
+      },
+      "learn_retry": {
+        "title": "Detección automática desde el mando",
+        "description": "No se recibió ninguna señal en {timeout} segundos. Puede volver a intentarlo o cambiar a entrada manual.",
+        "data": {
+          "skip": "Quiero ingresar los datos manualmente"
+        }
+      },
+      "confirm": {
+        "title": "Confirmar datos aprendidos",
+        "description": "Señal recibida.\n- Identificador: **{dooya_id}**\n- Canal: **{channel}**\n\nElija un nombre para esta persiana.",
+        "data": {
+          "cover_name": "Nombre de la persiana",
+          "travel_time_up": "Tiempo de apertura completa (segundos)",
+          "travel_time_down": "Tiempo de cierre completo (segundos)",
+          "is_awning": "Esta persiana es un toldo (ABAJO lo despliega)",
+          "invert_direction": "Invertir ARRIBA y ABAJO",
+          "is_group": "Esta persiana es el botón común del mando",
+          "group_covers": "Persianas controladas por el botón común",
+          "additional_remotes": "Mandos adicionales (opcional)"
+        },
+        "data_description": {
+          "is_awning": "Marque esta opción para un toldo: ABAJO lo despliega y Home Assistant lo muestra abierto una vez desplegado. El tiempo de apertura pasa a ser el tiempo de despliegue. Déjelo sin marcar para persianas y cortinas.",
+          "invert_direction": "Marque esta opción cuando ARRIBA baja la persiana y ABAJO la sube. Home Assistant sigue mostrando las posiciones habituales (abierta/desplegada = 100 %) y envía el botón físico contrario.",
+          "is_group": "Marque esta opción en el equipo representante del botón «todo» del mando. Las señales recibidas en su canal resincronizan las persianas seleccionadas y ese equipo no expone posición propia. Solo una persiana por mando puede tener este rol.",
+          "group_covers": "Elija las persianas controladas por el botón común. Déjelas todas seleccionadas para controlar todas las persianas del mando, o desmarque una para excluirla.",
+          "additional_remotes": "Otros mandos para esta persiana, separados por comas o saltos de línea con el formato ID_HEX:CANAL (por ejemplo: 00400A7E:241). Los comandos enviados por Home Assistant siguen usando el mando principal; estos solo registran pulsaciones físicas."
+        }
+      },
+      "manual": {
+        "title": "Entrada manual",
+        "description": "Ingrese los datos de la persiana manualmente. Use este modo con el identificador conocido o sin detección automática.",
+        "data": {
+          "cover_name": "Nombre de la persiana",
+          "dooya_id": "Identificador de la persiana (por ejemplo: D1C917)",
+          "channel": "Canal (1-255, o 0 = todas las persianas)",
+          "travel_time_up": "Tiempo de apertura completa (segundos)",
+          "travel_time_down": "Tiempo de cierre completo (segundos)",
+          "is_awning": "Esta persiana es un toldo (ABAJO lo despliega)",
+          "invert_direction": "Invertir ARRIBA y ABAJO",
+          "is_group": "Esta persiana es el botón común del mando",
+          "group_covers": "Persianas controladas por el botón común",
+          "additional_remotes": "Mandos adicionales (opcional)"
+        },
+        "data_description": {
+          "is_awning": "Marque esta opción para un toldo: ABAJO lo despliega y Home Assistant lo muestra abierto una vez desplegado. El tiempo de apertura pasa a ser el tiempo de despliegue. Déjelo sin marcar para persianas y cortinas.",
+          "invert_direction": "Marque esta opción cuando ARRIBA baja la persiana y ABAJO la sube. Home Assistant sigue mostrando las posiciones habituales (abierta/desplegada = 100 %) y envía el botón físico contrario.",
+          "is_group": "Marque esta opción en el equipo representante del botón «todo» del mando. Las señales recibidas en su canal resincronizan las persianas seleccionadas y ese equipo no expone posición propia. Solo una persiana por mando puede tener este rol.",
+          "group_covers": "Elija las persianas controladas por el botón común. Déjelas todas seleccionadas para controlar todas las persianas del mando, o desmarque una para excluirla.",
+          "additional_remotes": "Otros mandos para esta persiana, separados por comas o saltos de línea con el formato ID_HEX:CANAL (por ejemplo: 00400A7E:241). Los comandos enviados por Home Assistant siguen usando el mando principal; estos solo registran pulsaciones físicas."
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigurar persiana",
+        "description": "Corrija la identidad de esta persiana. La entrada se recarga con los valores actualizados.",
+        "data": {
+          "cover_name": "Nombre de la persiana",
+          "dooya_id": "Identificador de la persiana (por ejemplo: D1C917)",
+          "channel": "Canal (1-255, o 0 = todas las persianas)"
+        }
+      },
+      "legacy_installed": {
+        "title": "Elimine primero la versión anterior",
+        "description": "La versión anterior de Dooya RF Covers sigue instalada en `{path}` y actualmente controla sus {count} persiana(s). Importarlas mientras esté activa daría dos dueños a cada persiana.\n\nConfirme para eliminar esa carpeta. Luego reinicie Home Assistant y vuelva a agregar Dooya RF Covers: sus persianas se importan con sus identificadores de mando, tiempos de recorrido, opciones e identificadores de entidad, sin necesidad de volver a aprender ni calibrar nada."
+      },
+      "import_legacy": {
+        "title": "Importe sus persianas",
+        "description": "Estas persianas se configuraron con una versión anterior de Dooya RF Covers: {covers}.\n\nConfirme para importarlas. Se conservan identificadores de mando, tiempos de recorrido, opciones, dispositivos e identificadores de entidad, así que los paneles y las automatizaciones que nombran las persianas siguen funcionando. Las automatizaciones que llaman a `dooya.mark_open`, `dooya.mark_closed` o `dooya.set_known_position` deben llamar ahora a `dooya_rf.*`."
+      }
+    },
+    "progress": {
+      "listen_remote": "Esperando una señal del mando Dooya"
+    },
+    "abort": {
+      "reconfigure_successful": "La persiana se reconfiguró correctamente.",
+      "already_configured": "Esta persiana ya está configurada.",
+      "restart_to_finish": "La versión anterior se eliminó. Reinicie Home Assistant y vuelva a agregar Dooya RF Covers para importar sus persianas.",
+      "legacy_not_removed": "La carpeta `custom_components/dooya` no corresponde a la versión anterior de esta integración, por lo cual no se tocó. Elimínela usted mismo en caso de ser esa versión y luego reinicie Home Assistant.",
+      "legacy_gone": "Esa persiana de la versión anterior ya no existe.",
+      "legacy_too_new": "Esa persiana fue configurada por una versión más reciente que esta y no se puede importar."
+    },
+    "error": {
+      "invalid_dooya_id": "Identificador inválido. Se espera un valor hexadecimal de 24 bits, de hasta 6 dígitos (p. ej. D1C917).",
+      "learn_timeout": "No se recibió una señal a tiempo. Puede volver a intentarlo o elegir entrada manual.",
+      "required_esphome_device": "Se encontraron varios dispositivos ESPHome compatibles. Elija el transmisor de los comandos de la persiana.",
+      "unknown_esphome_device": "No se encontró ningún dispositivo ESPHome compatible con ese nombre. Revise el nombre y vuelva a intentarlo.",
+      "duplicate_shutter": "Este identificador y canal ya están configurados en otra persiana. Dos entradas para una misma persiana competirían por su posición estimada.",
+      "duplicate_group": "Otra persiana de este mando ya está marcada como botón común. Desmárquela allí primero: solo una persiana por mando puede tener ese rol.",
+      "invalid_group_covers": "Elija solo persianas controladas por el mismo mando.",
+      "invalid_additional_remotes": "Relación de mandos inválida. Use ID_HEX:CANAL, separados por comas o saltos de línea.",
+      "duplicate_remote": "Un mando figura dos veces, o uno de ellos es el mando principal."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Ajustes de la persiana",
+        "description": "Elija el nodo transmisor y ajuste los tiempos de recorrido completos usados para estimar la posición de la persiana.",
+        "data": {
+          "esphome_device": "Dispositivo ESPHome transmisor",
+          "travel_time_up": "Tiempo de apertura completa (segundos)",
+          "travel_time_down": "Tiempo de cierre completo (segundos)",
+          "repeat_count": "Repeticiones de la transmisión RF (1–3)",
+          "favorite_position": "Posición favorita (%, opcional)",
+          "is_group": "Esta persiana es el botón común del mando",
+          "group_covers": "Persianas controladas por el botón común",
+          "is_awning": "Esta persiana es un toldo (ABAJO lo despliega)",
+          "invert_direction": "Invertir ARRIBA y ABAJO",
+          "repeat_remote": "Repetir pulsaciones del mando",
+          "additional_remotes": "Mandos adicionales (opcional)",
+          "learn_additional": "Detectar otro mando"
+        },
+        "data_description": {
+          "esphome_device": "Nodo ESPHome usado para transmitir los comandos RF de esta persiana. Con varios nodos en la casa, elija el más cercano a la persiana.",
+          "repeat_count": "Repeticiones del comando RF por acción. Aumente a 2 o 3 cuando la persiana pierde algunos comandos (interferencias RF). Predeterminado: 1.",
+          "favorite_position": "Posición usada por el botón «Posición favorita» en la página del dispositivo y en la tarjeta. Déjelo vacío para ocultar el botón.",
+          "is_group": "Marque esta opción en el equipo representante del botón «todo» del mando. Las señales recibidas en su canal resincronizan las persianas seleccionadas y ese equipo no expone posición propia. Solo una persiana por mando puede tener este rol.",
+          "group_covers": "Elija las persianas controladas por el botón común. Déjelas todas seleccionadas para controlar todas las persianas del mando, o desmarque una para excluirla.",
+          "is_awning": "Marque esta opción para un toldo: ABAJO lo despliega y Home Assistant lo muestra abierto una vez desplegado. El tiempo de apertura pasa a ser el tiempo de despliegue. Déjelo sin marcar para persianas y cortinas.",
+          "invert_direction": "Marque esta opción cuando ARRIBA baja la persiana y ABAJO la sube. Home Assistant sigue mostrando las posiciones habituales (abierta/desplegada = 100 %) y envía el botón físico contrario.",
+          "repeat_remote": "Marque esta opción solo para una persiana con alcance deficiente del mando físico. Cada pulsación del mando destinada a esa persiana se reenvía por su nodo ESPHome. Los comandos enviados por Home Assistant nunca se repiten, y las órdenes de posición siguen funcionando. El botón común del mando se repite solo en la persiana con ese rol, cuando también está marcado allí.",
+          "additional_remotes": "Otros mandos para esta persiana, separados por comas o saltos de línea con el formato ID_HEX:CANAL (por ejemplo: 00400A7E:241). Los comandos enviados por Home Assistant siguen usando el mando principal; estos solo registran pulsaciones físicas. Deje el campo vacío para eliminarlos.",
+          "learn_additional": "Pulse un botón del nuevo mando después de guardar para detectarlo."
+        }
+      },
+      "learn_additional_confirm": {
+        "title": "Mando adicional detectado",
+        "description": "Se detectó un mando con ID {dooya_id} en el canal {channel}. ¿Agregarlo a esta persiana para registrar sus pulsaciones físicas?",
+        "data": {
+          "add": "Agregar este mando"
+        },
+        "data_description": {
+          "add": "Los comandos enviados por Home Assistant siguen usando el mando principal. Este mando solo sirve para seguir pulsaciones físicas."
+        }
+      },
+      "learn_additional_retry": {
+        "title": "No se detectó ningún mando",
+        "description": "No se recibió ninguna señal Dooya en {timeout} segundos. Pulse un botón del mando mientras Home Assistant escucha.",
+        "data": {
+          "skip": "Guardar los demás ajustes sin agregar un mando"
+        },
+        "data_description": {
+          "skip": "Marque esta opción para dejar sin cambios los mandos adicionales. Déjela sin marcar para escuchar de nuevo."
+        }
+      }
+    },
+    "progress": {
+      "listen_remote": "Esperando una señal del mando Dooya adicional"
+    },
+    "error": {
+      "duplicate_group": "Otra persiana de este mando ya está marcada como botón común. Desmárquela allí primero: solo una persiana por mando puede tener ese rol.",
+      "invalid_group_covers": "Elija solo persianas controladas por el mismo mando.",
+      "invalid_additional_remotes": "Relación de mandos inválida. Use ID_HEX:CANAL, separados por comas o saltos de línea.",
+      "duplicate_remote": "Un mando figura dos veces, o uno de ellos es el mando principal.",
+      "duplicate_shutter": "Este identificador y canal ya están configurados en otra persiana. Dos entradas para una misma persiana competirían por su posición estimada.",
+      "learn_timeout": "No se recibió una señal a tiempo. Vuelva a intentarlo o guarde los demás ajustes sin agregar un mando."
+    }
+  },
+  "issues": {
+    "esphome_service_missing": {
+      "title": "Servicio de puerta de enlace Dooya no disponible",
+      "description": "El servicio ESPHome {service} usado por la persiana {name} para transmitir comandos RF no está disponible. Los comandos hacia esa persiana fallarán hasta su restablecimiento.\n\nCompruebe el estado en línea del nodo ESPHome {device} y la disponibilidad de transmit_dooya en su firmware. También puede seleccionar otro nodo de puerta de enlace en las opciones de la entrada Dooya."
+    }
+  },
+  "exceptions": {
+    "no_esphome_device": {
+      "message": "No hay ninguna puerta de enlace ESPHome configurada para {name}. Reconfigure la entrada Dooya y seleccione el dispositivo ESPHome transmisor de los comandos RF."
+    },
+    "esphome_service_missing": {
+      "message": "El servicio ESPHome {service} requerido por {name} no está disponible. Compruebe que el nodo ESPHome esté en línea y siga exponiendo transmit_dooya."
+    }
+  },
+  "entity": {
+    "button": {
+      "mark_open": {
+        "name": "Marcar como abierta"
+      },
+      "mark_closed": {
+        "name": "Marcar como cerrada"
+      },
+      "calibrate_up": {
+        "name": "Calibrar tiempo de apertura"
+      },
+      "calibrate_down": {
+        "name": "Calibrar tiempo de cierre"
+      },
+      "toggle_led": {
+        "name": "Alternar LED"
+      },
+      "favorite": {
+        "name": "Posición favorita"
+      }
+    },
+    "event": {
+      "remote": {
+        "name": "Mando",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "up": "Subir",
+              "stop": "Detener",
+              "down": "Bajar"
+            }
+          }
+        }
+      }
+    },
+    "sensor": {
+      "position_confidence": {
+        "name": "Confianza de posición",
+        "state": {
+          "high": "Alta",
+          "medium": "Media",
+          "low": "Baja"
+        }
+      }
+    }
+  },
+  "services": {
+    "mark_open": {
+      "name": "Marcar como abierta",
+      "description": "Recalibra la posición estimada de la persiana al 100 % sin enviar ningún comando RF."
+    },
+    "mark_closed": {
+      "name": "Marcar como cerrada",
+      "description": "Recalibra la posición estimada de la persiana al 0 % sin enviar ningún comando RF."
+    },
+    "set_known_position": {
+      "name": "Definir posición conocida",
+      "description": "Fuerza una posición estimada conocida sin enviar ningún comando RF.",
+      "fields": {
+        "position": {
+          "name": "Posición",
+          "description": "Posición conocida de la persiana, de 0 a 100."
+        }
+      }
+    }
+  }
+}
