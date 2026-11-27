@@ -17,8 +17,11 @@ Two facts shape how this is triggered:
   From then on `async_setup` brings over whatever is left.
 - HACS installs a renamed integration into the NEW folder and leaves the old one
   in place, still loaded and still driving the covers. Importing then would give
-  every cover two masters, so the flow first removes the old folder and asks
-  for a restart.
+  every cover two masters, so the flow stops and asks the user to delete the old
+  folder and restart. It never deletes it itself (hacs/default#9186): that folder
+  belongs to whatever installed it, and the manifest check is detection only.
+  HACS cannot remove it either: its Remove action deletes the folder of the
+  repository's current domain, `custom_components/dooya_rf`.
 """
 
 from __future__ import annotations
@@ -26,7 +29,6 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-import shutil
 
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -87,34 +89,11 @@ def is_legacy_package(path: Path) -> bool:
     )
 
 
-def remove_legacy_package(path: Path) -> bool:
-    """Delete the old package. Refuses anything that is not provably ours."""
-    if not is_legacy_package(path):
-        return False
-    shutil.rmtree(path)
-    return True
-
-
 async def async_legacy_installed(hass: HomeAssistant) -> bool:
     """True while the old package is on disk (and so loaded after a restart)."""
     return await hass.async_add_executor_job(
         is_legacy_package, legacy_package_path(hass)
     )
-
-
-async def async_remove_legacy_installed(hass: HomeAssistant) -> bool:
-    """Delete the old package from disk. True when it was ours and is gone."""
-    removed = await hass.async_add_executor_job(
-        remove_legacy_package, legacy_package_path(hass)
-    )
-    if removed:
-        _LOGGER.warning(
-            "Removed the previous version of Dooya RF Covers (custom_components/%s); "
-            "restart Home Assistant, then add Dooya RF Covers again to bring your "
-            "covers over",
-            LEGACY_DOMAIN,
-        )
-    return removed
 
 
 async def async_import_legacy_entries(hass: HomeAssistant) -> None:
@@ -126,7 +105,8 @@ async def async_import_legacy_entries(hass: HomeAssistant) -> None:
         _LOGGER.warning(
             "%d Dooya covers from the previous version are waiting to be brought "
             "over, but that version is still installed in custom_components/%s. "
-            "Add Dooya RF Covers from Settings → Devices & services to remove it",
+            "Delete that folder and restart Home Assistant: they come over on the "
+            "next start",
             len(pending),
             LEGACY_DOMAIN,
         )

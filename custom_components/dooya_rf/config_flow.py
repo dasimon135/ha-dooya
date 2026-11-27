@@ -51,7 +51,6 @@ from .dooya_protocol import (
 )
 from .legacy import (
     async_legacy_installed,
-    async_remove_legacy_installed,
     legacy_entries,
 )
 
@@ -145,22 +144,6 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
             options=dict(old.options),
         )
 
-    async def async_step_legacy_installed(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """The previous version is still installed and running: remove it first."""
-        if user_input is not None:
-            if not await async_remove_legacy_installed(self.hass):
-                return self.async_abort(reason="legacy_not_removed")
-            return self.async_abort(reason="restart_to_finish")
-        return self.async_show_form(
-            step_id="legacy_installed",
-            description_placeholders={
-                "count": str(len(legacy_entries(self.hass))),
-                "path": f"custom_components/{LEGACY_DOMAIN}",
-            },
-        )
-
     async def async_step_import_legacy(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -199,7 +182,15 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
         """Step 1: name the transmitting ESPHome device."""
         if user_input is None and legacy_entries(self.hass):
             if await async_legacy_installed(self.hass):
-                return await self.async_step_legacy_installed()
+                # Still loaded and driving the covers: the user removes it (never
+                # this integration, see legacy.py) and restarts first.
+                return self.async_abort(
+                    reason="legacy_installed",
+                    description_placeholders={
+                        "count": str(len(legacy_entries(self.hass))),
+                        "path": f"custom_components/{LEGACY_DOMAIN}",
+                    },
+                )
             return await self.async_step_import_legacy()
         errors: dict[str, str] = {}
         available_devices = self._available_esphome_devices()

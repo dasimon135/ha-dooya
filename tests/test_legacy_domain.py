@@ -13,6 +13,8 @@ nothing. The old entries are removed against that.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 import json
 from pathlib import Path
 import sys
@@ -52,7 +54,10 @@ from custom_components.dooya_rf.const import (
     LEGACY_DOMAIN,
     gateway_issue_id,
 )
-from custom_components.dooya_rf.legacy import is_legacy_package, remove_legacy_package
+from custom_components.dooya_rf.legacy import (
+    async_legacy_installed,
+    is_legacy_package,
+)
 
 GATEWAY_SLUG = "volets-dooya-rf433"
 DOOYA_ID = 0x00D1C917
@@ -70,6 +75,29 @@ def _old_package_gone():
     with patch(
         "custom_components.dooya_rf.legacy.async_legacy_installed",
         return_value=False,
+    ):
+        yield
+
+
+@contextmanager
+def _old_package_at(path: Path) -> Iterator[None]:
+    """Look for the old package at `path`, with the real on-disk check.
+
+    Undoes `_old_package_gone` in both places it may have been bound: config_flow
+    imports the function by name, at whatever moment it is first imported.
+    """
+    with (
+        patch(
+            "custom_components.dooya_rf.legacy.legacy_package_path", return_value=path
+        ),
+        patch(
+            "custom_components.dooya_rf.legacy.async_legacy_installed",
+            async_legacy_installed,
+        ),
+        patch(
+            "custom_components.dooya_rf.config_flow.async_legacy_installed",
+            async_legacy_installed,
+        ),
     ):
         yield
 
@@ -252,32 +280,62 @@ async def test_adding_the_integration_offers_to_bring_the_covers_over(
     assert hass.states.get("cover.cuisine") is not None
 
 
-async def test_adding_the_integration_first_removes_a_running_old_version(
-    hass: HomeAssistant,
+async def test_a_running_old_version_is_reported_and_left_on_disk(
+    hass: HomeAssistant, tmp_path: Path
 ) -> None:
-    _legacy_entry(hass)
+    """The user removes the old folder, never this integration (hacs/default#9186).
 
-    with (
-        patch(
-            "custom_components.dooya_rf.config_flow.async_legacy_installed",
-            return_value=True,
-        ),
-        patch(
-            "custom_components.dooya_rf.config_flow.async_remove_legacy_installed",
-            return_value=True,
-        ) as remove,
-    ):
+    Then, and only once it is gone, adding the integration brings the covers over.
+    """
+    old = _legacy_entry(hass)
+    package = _package(tmp_path / "dooya", _OUR_OLD_MANIFEST)
+
+    with _old_package_at(package):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
-        assert result["type"] is FlowResultType.FORM
-        assert result["step_id"] == "legacy_installed"
-        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+        assert result["type"] is FlowResultType.ABORT
+        assert result["reason"] == "legacy_installed"
+        assert result["description_placeholders"] == {
+            "count": "1",
+            "path": "custom_components/dooya",
+        }
+        assert (package / "manifest.json").is_file()
+        assert (package / "__init__.py").is_file()
+        assert hass.config_entries.async_get_entry(old.entry_id) is not None
+        assert not hass.config_entries.async_entries(DOMAIN)
 
-    assert remove.called
-    assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "restart_to_finish"
-    assert len(hass.config_entries.async_entries(LEGACY_DOMAIN)) == 1
+        # What the user does by hand, followed by the restart.
+        for child in package.iterdir():
+            child.unlink()
+        package.rmdir()
+
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        assert result["step_id"] == "import_legacy"
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+        await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY, result
+    assert hass.config_entries.async_get_entry(old.entry_id) is None
+    assert len(hass.config_entries.async_entries(DOMAIN)) == 1
+
+
+async def test_somebody_elses_dooya_folder_does_not_block_the_import(
+    hass: HomeAssistant, tmp_path: Path
+) -> None:
+    """Detection only: a `dooya` folder that is not ours is not reported, nor touched."""
+    _legacy_entry(hass)
+    package = _package(tmp_path / "dooya", _SOMEBODY_ELSES_MANIFEST)
+
+    with _old_package_at(package):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+
+    assert result["step_id"] == "import_legacy"
+    assert (package / "manifest.json").is_file()
 
 
 async def test_without_old_covers_adding_the_integration_is_unchanged(
@@ -306,31 +364,29 @@ async def test_the_card_resource_left_at_the_old_path_is_adopted(
     assert len([url for url in urls if url.startswith(CARD_URL)]) == 1, urls
 
 
-def _package(path: Path, manifest: dict) -> Path:
+_OUR_OLD_MANIFEST = {
+    "domain": "dooya",
+    "documentation": "https://github.com/dasimon135/ha-dooya",
+}
+_SOMEBODY_ELSES_MANIFEST = {
+    "domain": "dooya",
+    "documentation": "https://example.com/another-dooya",
+}
+
+
+def _package(path: Path, manifest: dict[str, str]) -> Path:
     path.mkdir(parents=True)
     (path / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     (path / "__init__.py").write_text("", encoding="utf-8")
     return path
 
 
-def test_the_old_package_is_recognised_and_removed(tmp_path: Path) -> None:
-    path = _package(
-        tmp_path / "dooya",
-        {"domain": "dooya", "documentation": "https://github.com/dasimon135/ha-dooya"},
-    )
-    assert is_legacy_package(path)
-    assert remove_legacy_package(path)
-    assert not path.exists()
+def test_the_old_package_is_recognised(tmp_path: Path) -> None:
+    assert is_legacy_package(_package(tmp_path / "dooya", _OUR_OLD_MANIFEST))
 
 
-def test_somebody_elses_dooya_package_is_never_removed(tmp_path: Path) -> None:
-    path = _package(
-        tmp_path / "dooya",
-        {"domain": "dooya", "documentation": "https://example.com/another-dooya"},
-    )
-    assert not is_legacy_package(path)
-    assert not remove_legacy_package(path)
-    assert path.exists()
+def test_somebody_elses_dooya_package_is_not_ours(tmp_path: Path) -> None:
+    assert not is_legacy_package(_package(tmp_path / "dooya", _SOMEBODY_ELSES_MANIFEST))
 
 
 def test_a_missing_folder_is_not_the_old_package(tmp_path: Path) -> None:

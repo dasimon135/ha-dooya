@@ -107,10 +107,15 @@ takes two restarts:
    keep running on the old version for now: HACS installs the new one beside
    it, in `custom_components/dooya_rf/`, and leaves `custom_components/dooya/`
    in place.
-2. Go to **Settings → Devices & services → Add integration → Dooya RF Covers**.
-   It offers to remove the old version: accept, then restart Home Assistant.
-3. Add **Dooya RF Covers** again. It lists your covers and offers to bring them
-   over: accept.
+2. Delete the folder `custom_components/dooya/` yourself (with the File editor
+   add-on, a Samba share or SSH), then restart Home Assistant. Do not use
+   **Remove** in HACS for this: it deletes the new version,
+   `custom_components/dooya_rf/`, not the old one. If you skip this step,
+   adding **Dooya RF Covers** stops and tells you to do it: the integration
+   never deletes anything outside its own folder.
+3. Go to **Settings → Devices & services → Add integration → Dooya RF Covers**
+   (not the core *Dooya* entry, which leads to Motion Blinds). It lists your
+   covers and offers to bring them over: accept.
 
 Between steps 2 and 3 your covers show as unavailable, and Home Assistant
 reports once *Setup failed for 'dooya': No setup or config entry setup function
