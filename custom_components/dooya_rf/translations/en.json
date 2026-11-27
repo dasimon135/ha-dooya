@@ -66,10 +66,6 @@
           "channel": "Channel (1-255, or 0 = all shutters)"
         }
       },
-      "legacy_installed": {
-        "title": "Remove the previous version first",
-        "description": "The previous version of Dooya RF Covers is still installed, in `{path}`, and it is the one driving your {count} cover(s) right now. Bringing them over while it runs would give every cover two masters.\n\nSubmit to delete that folder. Then restart Home Assistant and add Dooya RF Covers again: your covers come over with their remote ids, travel times, options and entity IDs, so nothing has to be learned or calibrated again."
-      },
       "import_legacy": {
         "title": "Bring your covers over",
         "description": "These covers were set up with the previous version of Dooya RF Covers: {covers}.\n\nSubmit to bring them over. Remote ids, travel times, options, devices and entity IDs are kept, so dashboards and automations that name the covers keep working. Automations that call `dooya.mark_open`, `dooya.mark_closed` or `dooya.set_known_position` must now call `dooya_rf.*`."
@@ -81,8 +77,8 @@
     "abort": {
       "reconfigure_successful": "The shutter was reconfigured successfully.",
       "already_configured": "This shutter is already configured.",
-      "restart_to_finish": "The previous version is removed. Restart Home Assistant, then add Dooya RF Covers again to bring your covers over.",
-      "legacy_not_removed": "The folder `custom_components/dooya` is not the previous version of this integration, so it was left alone. Remove it yourself if it is, then restart Home Assistant.",
+      "legacy_installed": "The previous version of Dooya RF Covers is still installed, in `{path}`, and it is the one driving your {count} cover(s) right now. Bringing them over while it runs would give every cover two masters, so nothing was changed.\n\nDelete the `{path}` folder yourself (with the File editor add-on, a Samba share or SSH), restart Home Assistant, then add Dooya RF Covers again: your covers come over with their remote ids, travel times, options and entity IDs, so nothing has to be learned or calibrated again.\n\nDo not use Remove in HACS for this: it deletes the new version, `custom_components/dooya_rf`, not the old one.",
+      "restart_to_finish": "The previous version is no longer installed, but it keeps running until Home Assistant restarts. Restart, then add Dooya RF Covers again to bring your covers over.",
       "legacy_gone": "That cover from the previous version no longer exists.",
       "legacy_too_new": "That cover was set up by a newer version than this one and cannot be brought over."
     },
