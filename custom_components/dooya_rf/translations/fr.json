@@ -78,6 +78,7 @@
       "reconfigure_successful": "Le volet a été reconfiguré avec succès.",
       "already_configured": "Ce volet est déjà configuré.",
       "legacy_installed": "L'ancienne version de Dooya RF Covers est toujours installée, dans `{path}`, et c'est elle qui pilote vos {count} volet(s) en ce moment. Les reprendre pendant qu'elle tourne donnerait deux maîtres à chaque volet : rien n'a donc été modifié.\n\nSupprimez vous-même le dossier `{path}` (avec le module complémentaire File editor, un partage Samba ou SSH), redémarrez Home Assistant, puis ajoutez de nouveau Dooya RF Covers : vos volets sont repris avec leurs identifiants de télécommande, leurs temps de course, leurs options et leurs identifiants d'entité, sans rien réapprendre ni recalibrer.\n\nN'utilisez pas Supprimer dans HACS pour cela : cette action efface la nouvelle version, `custom_components/dooya_rf`, et non l'ancienne.",
+      "restart_to_finish": "L'ancienne version n'est plus installée, mais elle tourne jusqu'au redémarrage de Home Assistant. Redémarrez, puis ajoutez de nouveau Dooya RF Covers pour reprendre vos volets.",
       "legacy_gone": "Ce volet de l'ancienne version n'existe plus.",
       "legacy_too_new": "Ce volet a été configuré par une version plus récente que celle-ci et ne peut pas être repris."
     },

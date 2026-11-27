@@ -52,6 +52,7 @@ from .dooya_protocol import (
 from .legacy import (
     async_legacy_installed,
     legacy_entries,
+    legacy_running,
 )
 
 # Maximum time spent listening for a remote in learn mode (seconds)
@@ -132,6 +133,8 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
         )
         if old is None or old.domain != LEGACY_DOMAIN:
             return self.async_abort(reason="legacy_gone")
+        if legacy_running(old):
+            return self.async_abort(reason="restart_to_finish")
         # Created at the current version, an entry from a newer schema would be
         # read as this one: refuse rather than misread it.
         if old.version > self.VERSION:
@@ -191,6 +194,8 @@ class DooyaConfigFlow(ConfigFlow, domain=DOMAIN):
                         "path": f"custom_components/{LEGACY_DOMAIN}",
                     },
                 )
+            if any(legacy_running(old) for old in legacy_entries(self.hass)):
+                return self.async_abort(reason="restart_to_finish")
             return await self.async_step_import_legacy()
         errors: dict[str, str] = {}
         available_devices = self._available_esphome_devices()

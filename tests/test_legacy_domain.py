@@ -280,6 +280,43 @@ async def test_adding_the_integration_offers_to_bring_the_covers_over(
     assert hass.states.get("cover.cuisine") is not None
 
 
+@pytest.mark.parametrize(
+    "state",
+    [
+        config_entries.ConfigEntryState.LOADED,
+        config_entries.ConfigEntryState.SETUP_RETRY,
+        config_entries.ConfigEntryState.SETUP_IN_PROGRESS,
+    ],
+)
+async def test_no_import_while_the_old_code_still_runs(
+    hass: HomeAssistant, state: config_entries.ConfigEntryState
+) -> None:
+    """Folder deleted, no restart yet: the 0.13 code still drives the cover.
+
+    Importing then would give it two masters, so both ways in wait for the restart.
+    Seen on a real 2026.11 instance before this guard: Add integration offered the
+    import straight after the folder was deleted.
+    """
+    old = _legacy_entry(hass)
+    old.mock_state(hass, state)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "restart_to_finish"
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": config_entries.SOURCE_IMPORT},
+        data={"legacy_entry_id": old.entry_id},
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "restart_to_finish"
+    assert not hass.config_entries.async_entries(DOMAIN)
+    assert hass.config_entries.async_get_entry(old.entry_id) is not None
+
+
 async def test_a_running_old_version_is_reported_and_left_on_disk(
     hass: HomeAssistant, tmp_path: Path
 ) -> None:
