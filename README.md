@@ -253,6 +253,21 @@ Note: *Allow the device to perform Home Assistant actions* has no bearing on thi
 4. Enter the full opening and closing travel times for that cover
 5. Create one config entry per shutter
 
+### Several remotes for one shutter
+
+A shutter can be driven by more than one physical remote: a handheld one and a wall one, for example. Enter the other remotes in **Additional remotes**, in the setup or options dialog, as `HEX_ID:CHANNEL` separated by commas or new lines, for example:
+
+```text
+00400A7E:241, 0x00ABCDEF:6
+```
+
+You can also tick **Detect another remote** in the options dialog, save, then press a button on the new remote. Home Assistant listens for its next frame and offers to add the detected `(id, channel)` to the list.
+
+The first remote is the main one: every command sent by Home Assistant still uses its id, channel and checksum.
+ The additional remotes only track presses from the physical remote, so moving the cover from any of them keeps the estimated position in sync. Each `(id, channel)` pair can belong to only one shutter, and the main remote cannot be repeated as an additional one.
+
+Leave the field empty to remove additional remotes from a shutter. This works even when they were stored in an older config entry, as long as the entry's options are saved once.
+
 ### What automatic detection does
 
 Automatic detection does **not** pair the shutter and does **not** change its configuration.
@@ -407,9 +422,13 @@ A Dooya remote rolls an awning out with **DOWN**, while Home Assistant calls a d
 
 A remote whose common button drives both shutters and an awning moves each of them the way its motor does: one UP opens the shutters and retracts the awning. The group cover itself follows its own setting.
 
+### Reversed buttons
+
+If **UP lowers** a cover and **DOWN raises** it, tick **Invert UP and DOWN** when you name the cover or later in its options. Home Assistant keeps its usual meaning (*Open* = 100 %, *Close* = 0 %) and sends the opposite physical button. The setting can be combined with the awning setting: for an awning, it means UP deploys and DOWN retracts. The event entity still reports the physical button pressed, not the resulting direction.
+
 ## Broadcast Channel (All Shutters)
 
-Dooya multi-channel remotes have an "all" button that moves every shutter paired with the remote from a single RF frame. On most remotes it transmits on **channel 0**.
+Dooya multi-channel remotes have an "all" button that can move several shutters from a single RF frame. On most remotes it transmits on **channel 0**.
 
 You can create such an entity with manual entry by setting the channel to `0`. It exposes open/close/stop only (no position estimate, since each shutter moves independently) and no position or calibration buttons, and is ideal for "close everything" automations — one RF frame instead of one per shutter.
 
@@ -418,6 +437,12 @@ You can create such an entity with manual entry by setting the channel to `0`. I
 Some motors ignore channel 0 entirely and answer a common button of their own — channel 80, for instance ([#33](https://github.com/dasimon135/ha-dooya/issues/33)). Create that cover on the channel the remote actually sends, then tick **This cover is the remote's common button** in its *Configure* dialog. Its siblings resolve the group channel from it, and the flagged cover drops its position slider and calibration the way a channel-0 entity does.
 
 Only one cover per remote can hold the flag, and channel 0 keeps the role automatically when no cover is flagged — installations predating the checkbox need no change.
+
+### Which covers the common button drives
+
+The group cover also offers **Covers driven by the common button**, both when it is created and in its options. Only covers that share its remote id (including its additional remotes) can be selected; other group covers cannot.
+
+Leaving every eligible cover ticked keeps the usual behaviour: the common button drives all of them. Untick a cover to exclude it, or clear the selection to drive none. Existing entries with no selection keep driving every cover that shares the remote id, so the setting is backwards compatible.
 
 ### Channel numbers above 16
 
@@ -429,7 +454,7 @@ Automatic detection reads whatever the remote sends and was never affected.
 
 ### Position sync
 
-Group commands drive the position estimate of every per-channel cover that shares the remote id, whichever side the command came from:
+Group commands drive the position estimate of every selected per-channel cover that shares the remote id, whichever side the command came from:
 
 - **the physical common button** — the node hears the frame and republishes it, and each cover resyncs on the event;
 - **the group entity in Home Assistant** — the node is transmitting, so it cannot hear its own frame; the covers are driven directly instead.

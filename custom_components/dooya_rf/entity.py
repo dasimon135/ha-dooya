@@ -13,13 +13,12 @@ from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.util import slugify
 
 from .const import (
-    CONF_CHANNEL,
     CONF_COVER_NAME,
-    CONF_DOOYA_ID,
     CONF_ESPHOME_DEVICE,
     DOMAIN,
     entry_value,
 )
+from .remotes import entry_remotes
 
 if TYPE_CHECKING:
     from . import DooyaConfigEntry
@@ -53,8 +52,9 @@ class DooyaBaseEntity(Entity):
         self._attr_unique_id = config_entry.entry_id
 
         data = config_entry.data
-        self._dooya_id: int = data[CONF_DOOYA_ID]
-        self._channel: int = data[CONF_CHANNEL]
+        self._remotes = entry_remotes(config_entry)
+        self._dooya_id: int = self._remotes[0].id
+        self._channel: int = self._remotes[0].channel
         self._cover_name: str = data[CONF_COVER_NAME]
         # CONF_CHECK is deliberately not read here: the check nibble is derived
         # from the button at transmit time (dooya_protocol.check_for_button).

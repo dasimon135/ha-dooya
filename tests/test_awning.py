@@ -35,6 +35,8 @@ from custom_components.dooya_rf.const import (
     CONF_COVER_NAME,
     CONF_DOOYA_ID,
     CONF_ESPHOME_DEVICE,
+    CONF_GROUP_COVERS,
+    CONF_INVERT_DIRECTION,
     CONF_IS_AWNING,
     CONF_IS_GROUP,
     CONF_REPEAT_COUNT,
@@ -55,6 +57,7 @@ STOP = 5
 
 AWNING_ID = "cover.terrasse"
 SHUTTER_ID = "cover.salon"
+INVERTED_SHUTTER_ID = "cover.cocina"
 GROUP_ID = "cover.all_shutters"
 GROUP_CHANNEL = 80
 
@@ -79,13 +82,23 @@ def frames(hass: HomeAssistant) -> list[dict]:
 
 
 def _entry(
-    name: str, channel: int, *, awning: bool = False, group: bool = False
+    name: str,
+    channel: int,
+    *,
+    awning: bool = False,
+    invert: bool = False,
+    group: bool = False,
+    group_covers: list[str] | None = None,
 ) -> MockConfigEntry:
     options: dict = {}
     if awning:
         options[CONF_IS_AWNING] = True
+    if invert:
+        options[CONF_INVERT_DIRECTION] = True
     if group:
         options[CONF_IS_GROUP] = True
+    if group_covers is not None:
+        options[CONF_GROUP_COVERS] = group_covers
     return MockConfigEntry(
         domain=DOMAIN,
         title=name,
@@ -266,6 +279,87 @@ async def test_calibrating_an_awning_open_deploys_it(
     assert 1.0 <= entry.options[CONF_TRAVEL_TIME_UP] <= 3.0
 
 
+async def test_opening_an_inverted_shutter_sends_down(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """An inverted cover maps the semantic OPEN direction to physical DOWN."""
+    entry = await _setup(hass, _entry("Cocina", 5, invert=True))
+    entry.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover", "open_cover", {"entity_id": INVERTED_SHUTTER_ID}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    assert [f["btn"] for f in frames] == [DOWN]
+    assert hass.states.get(INVERTED_SHUTTER_ID).state == "opening"
+
+
+async def test_closing_an_inverted_shutter_sends_up(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """An inverted cover maps the semantic CLOSE direction to physical UP."""
+    entry = await _setup(hass, _entry("Cocina", 5, invert=True))
+    entry.runtime_data.cover._current_position = 100
+
+    await hass.services.async_call(
+        "cover", "close_cover", {"entity_id": INVERTED_SHUTTER_ID}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    assert [f["btn"] for f in frames] == [UP]
+    assert hass.states.get(INVERTED_SHUTTER_ID).state == "closing"
+
+
+async def test_inverted_awning_open_sends_up(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """Inverting an awning swaps the awning mapping once, not twice."""
+    entry = await _setup(hass, _entry("Terrasse", 5, awning=True, invert=True))
+    entry.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover", "open_cover", {"entity_id": AWNING_ID}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    assert [f["btn"] for f in frames] == [UP]
+    assert hass.states.get(AWNING_ID).state == "opening"
+
+
+async def test_down_on_an_inverted_shutter_closes_it(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """RX presses go through the same button-to-direction mapping."""
+    await _setup(hass, _entry("Cocina", 5, invert=True))
+
+    _fire_frame(hass, DOWN, channel=5)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(INVERTED_SHUTTER_ID).state == "closing"
+    assert frames == []
+
+
+async def test_a_group_open_moves_an_inverted_sibling_the_other_way(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """Each sibling applies its own inversion to the physical group button."""
+    await _setup(hass, _entry("All shutters", GROUP_CHANNEL, group=True))
+    shutter = await _setup(hass, _entry("Salon", 5))
+    inverted = await _setup(hass, _entry("Cocina", 6, invert=True))
+    shutter.runtime_data.cover._current_position = 0
+    inverted.runtime_data.cover._current_position = 100
+
+    await hass.services.async_call(
+        "cover", "open_cover", {"entity_id": GROUP_ID}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    assert [f["btn"] for f in frames] == [UP]
+    assert hass.states.get(SHUTTER_ID).state == "opening"
+    assert hass.states.get(INVERTED_SHUTTER_ID).state == "closing"
+
+
 # ---- one remote driving shutters and an awning (issue #33 fan-out) ---------
 
 
@@ -303,6 +397,55 @@ async def test_a_group_frame_from_the_remote_moves_each_sibling_by_its_own_mappi
     await hass.async_block_till_done()
 
     assert hass.states.get(SHUTTER_ID).state == "closing"
+    assert hass.states.get(AWNING_ID).state == "opening"
+
+
+async def test_group_open_only_moves_the_selected_sibling(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    shutter = await _setup(hass, _entry("Salon", 5))
+    await _setup(hass, _entry("Terrasse", 6, awning=True))
+    await _setup(
+        hass,
+        _entry(
+            "All shutters",
+            GROUP_CHANNEL,
+            group=True,
+            group_covers=[shutter.entry_id],
+        ),
+    )
+    shutter.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover", "open_cover", {"entity_id": GROUP_ID}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    assert [f["btn"] for f in frames] == [UP]
+    assert hass.states.get(SHUTTER_ID).state == "opening"
+    assert hass.states.get(AWNING_ID).state != "closing"
+
+
+async def test_group_frame_only_moves_the_selected_sibling(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    await _setup(hass, _entry("Salon", 5))
+    awning = await _setup(hass, _entry("Terrasse", 6, awning=True))
+    await _setup(
+        hass,
+        _entry(
+            "All shutters",
+            GROUP_CHANNEL,
+            group=True,
+            group_covers=[awning.entry_id],
+        ),
+    )
+    awning.runtime_data.cover._current_position = 0
+
+    _fire_frame(hass, DOWN, channel=GROUP_CHANNEL)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(SHUTTER_ID).state != "closing"
     assert hass.states.get(AWNING_ID).state == "opening"
 
 
@@ -429,3 +572,66 @@ async def test_options_can_turn_an_existing_cover_into_an_awning(
     assert entry.options[CONF_IS_AWNING] is True
     # The options update reloads the entry: the entity comes back as an awning.
     assert hass.states.get(AWNING_ID).attributes["device_class"] == "awning"
+
+
+async def test_manual_entry_can_invert_buttons(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """The inversion flag is offered in the manual setup form."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_ESPHOME_DEVICE: GATEWAY_SLUG}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"method": "manual"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_COVER_NAME: "Cocina",
+            CONF_DOOYA_ID: "00D1C918",
+            CONF_CHANNEL: 5,
+            CONF_TRAVEL_TIME_UP: 20.0,
+            CONF_TRAVEL_TIME_DOWN: 18.0,
+            CONF_INVERT_DIRECTION: True,
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_INVERT_DIRECTION] is True
+
+
+async def test_options_can_invert_an_existing_cover(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    """An existing cover can be corrected without recreating its entry."""
+    entry = await _setup(hass, _entry("Cocina", 5))
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_ESPHOME_DEVICE: GATEWAY_SLUG,
+            CONF_TRAVEL_TIME_UP: 20.0,
+            CONF_TRAVEL_TIME_DOWN: 20.0,
+            CONF_REPEAT_COUNT: 1,
+            CONF_IS_GROUP: False,
+            CONF_IS_AWNING: False,
+            CONF_INVERT_DIRECTION: True,
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_INVERT_DIRECTION] is True
+
+    entry.runtime_data.cover._current_position = 0
+    await hass.services.async_call(
+        "cover", "open_cover", {"entity_id": INVERTED_SHUTTER_ID}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    assert [f["btn"] for f in frames] == [DOWN]

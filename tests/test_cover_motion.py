@@ -38,6 +38,7 @@ from custom_components.dooya_rf.const import (
     CONF_COVER_NAME,
     CONF_DOOYA_ID,
     CONF_ESPHOME_DEVICE,
+    CONF_GROUP_COVERS,
     CONF_IS_GROUP,
     CONF_REPEAT_COUNT,
     CONF_REPEAT_REMOTE,
@@ -1051,6 +1052,74 @@ async def test_opening_the_group_entity_moves_the_siblings(
     assert hass.states.get(ENTITY_ID).state == "opening"
     # One frame, on the group channel: the siblings are driven in Home
     # Assistant, not by 19 extra transmissions.
+    assert [f["channel"] for f in frames] == [GROUP_CHANNEL]
+
+
+async def test_group_frame_only_updates_the_selected_sibling(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    selected = _make_entry()
+    excluded = _make_sibling_entry(6, "Cuisine")
+    await _setup(
+        hass,
+        _make_group_entry(
+            flagged=True, options={CONF_GROUP_COVERS: [selected.entry_id]}
+        ),
+    )
+    selected = await _setup(hass, selected)
+    excluded = await _setup(hass, excluded)
+    selected.runtime_data.cover._current_position = 0
+    excluded.runtime_data.cover._current_position = 0
+
+    _fire_frame(hass, 1, channel=GROUP_CHANNEL)
+    await hass.async_block_till_done()
+
+    assert hass.states.get(ENTITY_ID).state == "opening"
+    assert hass.states.get("cover.cuisine").state != "opening"
+
+
+async def test_group_entity_only_drives_the_selected_sibling(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    selected = _make_entry()
+    excluded = _make_sibling_entry(6, "Cuisine")
+    await _setup(
+        hass,
+        _make_group_entry(
+            flagged=True, options={CONF_GROUP_COVERS: [selected.entry_id]}
+        ),
+    )
+    selected = await _setup(hass, selected)
+    await _setup(hass, excluded)
+    selected.runtime_data.cover._current_position = 0
+    excluded.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover", "open_cover", {"entity_id": GROUP_ENTITY_ID}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    assert hass.states.get(ENTITY_ID).state == "opening"
+    assert hass.states.get("cover.cuisine").state != "opening"
+    assert [f["channel"] for f in frames] == [GROUP_CHANNEL]
+
+
+async def test_empty_group_selection_drives_no_sibling(
+    hass: HomeAssistant, frames: list[dict]
+) -> None:
+    sibling = _make_entry()
+    await _setup(
+        hass, _make_group_entry(flagged=True, options={CONF_GROUP_COVERS: []})
+    )
+    sibling = await _setup(hass, sibling)
+    sibling.runtime_data.cover._current_position = 0
+
+    await hass.services.async_call(
+        "cover", "open_cover", {"entity_id": GROUP_ENTITY_ID}, blocking=True
+    )
+    await hass.async_block_till_done()
+
+    assert hass.states.get(ENTITY_ID).state != "opening"
     assert [f["channel"] for f in frames] == [GROUP_CHANNEL]
 
 

@@ -23,12 +23,18 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResultType, InvalidData
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.dooya_rf.config_flow import (
+    CONF_LEARN_ADDITIONAL,
+    _validate_group_covers,
+)
 from custom_components.dooya_rf.const import (
+    CONF_ADDITIONAL_REMOTES,
     CONF_CHANNEL,
     CONF_CHECK,
     CONF_COVER_NAME,
     CONF_DOOYA_ID,
     CONF_ESPHOME_DEVICE,
+    CONF_GROUP_COVERS,
     CONF_IS_AWNING,
     CONF_IS_GROUP,
     CONF_REPEAT_COUNT,
@@ -107,6 +113,99 @@ async def test_user_flow_manual_happy_path(
         CONF_TRAVEL_TIME_DOWN: 18.0,
         CONF_IS_AWNING: False,
     }
+
+
+async def test_manual_entry_stores_additional_remotes(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """Secondary remotes are stored separately from the main identity."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_ESPHOME_DEVICE: GATEWAY_SLUG}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"method": "manual"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_COVER_NAME: "Salon",
+            CONF_DOOYA_ID: "00D1C917",
+            CONF_CHANNEL: 5,
+            CONF_TRAVEL_TIME_UP: 20.0,
+            CONF_TRAVEL_TIME_DOWN: 18.0,
+            CONF_ADDITIONAL_REMOTES: "00400A7E:241, 0x00ABCDEF:6",
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_ADDITIONAL_REMOTES] == [
+        {CONF_DOOYA_ID: 0x00400A7E, CONF_CHANNEL: 241},
+        {CONF_DOOYA_ID: 0x00ABCDEF, CONF_CHANNEL: 6},
+    ]
+
+
+async def test_manual_entry_rejects_an_invalid_remote_list(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """A malformed remote list is shown on the field, not silently dropped."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_ESPHOME_DEVICE: GATEWAY_SLUG}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"method": "manual"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_COVER_NAME: "Salon",
+            CONF_DOOYA_ID: "00D1C917",
+            CONF_CHANNEL: 5,
+            CONF_TRAVEL_TIME_UP: 20.0,
+            CONF_TRAVEL_TIME_DOWN: 18.0,
+            CONF_ADDITIONAL_REMOTES: "not-a-remote",
+        },
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {
+        CONF_ADDITIONAL_REMOTES: "invalid_additional_remotes"
+    }
+
+
+async def test_manual_entry_rejects_the_main_remote_as_secondary(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """Listing the main remote twice would double-count its presses."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_ESPHOME_DEVICE: GATEWAY_SLUG}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"method": "manual"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_COVER_NAME: "Salon",
+            CONF_DOOYA_ID: "00D1C917",
+            CONF_CHANNEL: 5,
+            CONF_TRAVEL_TIME_UP: 20.0,
+            CONF_TRAVEL_TIME_DOWN: 18.0,
+            CONF_ADDITIONAL_REMOTES: "0x00D1C917:5",
+        },
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {CONF_ADDITIONAL_REMOTES: "duplicate_remote"}
 
 
 async def test_user_step_lists_the_detected_devices(
@@ -531,6 +630,7 @@ async def _add_cover(
     channel: int,
     name: str,
     options: dict | None = None,
+    dooya_id: int = 0xD1C917,
 ) -> MockConfigEntry:
     """Add and set up one shutter of the D1C917 remote."""
     entry = MockConfigEntry(
@@ -538,7 +638,7 @@ async def _add_cover(
         title=name,
         data={
             CONF_ESPHOME_DEVICE: GATEWAY_SLUG,
-            CONF_DOOYA_ID: 0xD1C917,
+            CONF_DOOYA_ID: dooya_id,
             CONF_CHANNEL: channel,
             CONF_CHECK: 1,
             CONF_COVER_NAME: name,
@@ -551,6 +651,36 @@ async def _add_cover(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     return entry
+
+
+async def _manual_flow_result(
+    hass: HomeAssistant,
+    *,
+    name: str,
+    channel: int,
+    extra: dict | None = None,
+) -> dict:
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_ESPHOME_DEVICE: GATEWAY_SLUG}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"method": "manual"}
+    )
+    payload = {
+        CONF_COVER_NAME: name,
+        CONF_DOOYA_ID: "D1C917",
+        CONF_CHANNEL: channel,
+        CONF_TRAVEL_TIME_UP: 20.0,
+        CONF_TRAVEL_TIME_DOWN: 20.0,
+    }
+    if extra:
+        payload.update(extra)
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], payload)
+    await hass.async_block_till_done()
+    return result
 
 
 async def test_options_can_mark_a_cover_as_the_common_button(
@@ -606,6 +736,227 @@ async def test_options_refuse_a_second_common_button_on_one_remote(
 
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {CONF_IS_GROUP: "duplicate_group"}
+
+
+async def test_manual_entry_can_select_which_covers_a_group_drives(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    salon = await _add_cover(hass, channel=5, name="Salon")
+    await _add_cover(hass, channel=6, name="Cuisine")
+
+    result = await _manual_flow_result(
+        hass,
+        name="All shutters",
+        channel=80,
+        extra={CONF_IS_GROUP: True, CONF_GROUP_COVERS: [salon.entry_id]},
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_IS_GROUP] is True
+    assert result["data"][CONF_GROUP_COVERS] == [salon.entry_id]
+
+
+async def test_manual_entry_can_create_a_group_with_no_covers(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    await _add_cover(hass, channel=5, name="Salon")
+
+    result = await _manual_flow_result(
+        hass,
+        name="All shutters",
+        channel=80,
+        extra={CONF_IS_GROUP: True, CONF_GROUP_COVERS: []},
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_GROUP_COVERS] == []
+
+
+async def test_manual_entry_accepts_a_cover_reached_through_an_extra_remote(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    garage = await _add_cover(
+        hass, channel=7, name="Garage", dooya_id=0xABCDEF
+    )
+
+    result = await _manual_flow_result(
+        hass,
+        name="All shutters",
+        channel=80,
+        extra={
+            CONF_ADDITIONAL_REMOTES: "ABCDEF:6",
+            CONF_IS_GROUP: True,
+            CONF_GROUP_COVERS: [garage.entry_id],
+        },
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_GROUP_COVERS] == [garage.entry_id]
+
+
+async def test_manual_entry_refuses_a_second_common_button(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    await _add_cover(
+        hass, channel=80, name="All shutters", options={CONF_IS_GROUP: True}
+    )
+
+    result = await _manual_flow_result(
+        hass,
+        name="Another group",
+        channel=6,
+        extra={CONF_IS_GROUP: True},
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {CONF_IS_GROUP: "duplicate_group"}
+
+
+async def test_options_can_limit_the_common_button_to_selected_covers(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    salon = await _add_cover(hass, channel=5, name="Salon")
+    await _add_cover(hass, channel=6, name="Cuisine")
+    group = await _add_cover(hass, channel=80, name="All shutters")
+
+    result = await hass.config_entries.options.async_init(group.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            **OPTIONS_BASE,
+            CONF_IS_GROUP: True,
+            CONF_GROUP_COVERS: [salon.entry_id],
+        },
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert group.options[CONF_GROUP_COVERS] == [salon.entry_id]
+
+
+async def test_options_can_clear_the_common_button_selection(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    await _add_cover(hass, channel=5, name="Salon")
+    group = await _add_cover(hass, channel=80, name="All shutters")
+
+    result = await hass.config_entries.options.async_init(group.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {**OPTIONS_BASE, CONF_GROUP_COVERS: []}
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert group.options[CONF_GROUP_COVERS] == []
+
+
+def test_group_cover_validation_keeps_a_clean_selection() -> None:
+    selected, errors = _validate_group_covers(["a", "b", "a"], {"a": "A", "b": "B"})
+
+    assert selected == ["a", "b"]
+    assert errors == {}
+
+    selected, errors = _validate_group_covers(["a", "missing"], {"a": "A"})
+
+    assert selected == []
+    assert errors == {CONF_GROUP_COVERS: "invalid_group_covers"}
+
+    selected, errors = _validate_group_covers("a", {"a": "A"})
+
+    assert selected == []
+    assert errors == {CONF_GROUP_COVERS: "invalid_group_covers"}
+
+
+async def test_options_store_and_show_additional_remotes(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """The options field edits secondary remotes without touching the main one."""
+    entry = await _add_cover(hass, channel=5, name="Salon")
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {**OPTIONS_BASE, CONF_ADDITIONAL_REMOTES: "00400A7E:241"},
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_ADDITIONAL_REMOTES] == [
+        {CONF_DOOYA_ID: 0x00400A7E, CONF_CHANNEL: 241}
+    ]
+    assert CONF_LEARN_ADDITIONAL not in entry.options
+    assert entry.data[CONF_DOOYA_ID] == 0xD1C917
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    field = next(
+        key for key in result["data_schema"].schema if key == CONF_ADDITIONAL_REMOTES
+    )
+    assert field.default() == "00400A7E:241"
+
+
+async def test_options_can_clear_additional_remotes(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """An empty options field removes secondary remotes inherited from data."""
+    entry = await _add_cover(hass, channel=5, name="Salon")
+    hass.config_entries.async_update_entry(
+        entry,
+        data={
+            **entry.data,
+            CONF_ADDITIONAL_REMOTES: [
+                {CONF_DOOYA_ID: 0x00400A7E, CONF_CHANNEL: 241}
+            ],
+        },
+    )
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {**OPTIONS_BASE, CONF_ADDITIONAL_REMOTES: ""}
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_ADDITIONAL_REMOTES] == []
+
+
+async def test_a_secondary_remote_cannot_be_reused_by_another_shutter(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """Conflict detection covers every remote in an entry, not just the main one."""
+    existing = await _add_cover(hass, channel=5, name="Salon")
+    hass.config_entries.async_update_entry(
+        existing,
+        data={
+            **existing.data,
+            CONF_ADDITIONAL_REMOTES: [
+                {CONF_DOOYA_ID: 0x00400A7E, CONF_CHANNEL: 241}
+            ],
+        },
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_ESPHOME_DEVICE: GATEWAY_SLUG}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"method": "manual"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_COVER_NAME: "Cuisine",
+            CONF_DOOYA_ID: "00D1C918",
+            CONF_CHANNEL: 6,
+            CONF_TRAVEL_TIME_UP: 20.0,
+            CONF_TRAVEL_TIME_DOWN: 18.0,
+            CONF_ADDITIONAL_REMOTES: "00400A7E:241",
+        },
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {CONF_ADDITIONAL_REMOTES: "duplicate_shutter"}
 
 
 # ---- automatic detection from the remote ---------------------------------
@@ -707,3 +1058,135 @@ async def test_learn_timeout_offers_a_retry(
     )
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "manual"
+
+
+async def _start_additional_learning(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> dict:
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {**OPTIONS_BASE, CONF_LEARN_ADDITIONAL: True}
+    )
+    assert result["type"] is FlowResultType.SHOW_PROGRESS
+    assert result["step_id"] == "learn_additional"
+    return result
+
+
+async def test_options_can_learn_an_additional_remote(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """A heard remote is offered for addition to the current shutter."""
+    entry = await _add_cover(hass, channel=5, name="Salon")
+    result = await _start_additional_learning(hass, entry)
+    await asyncio.sleep(0)
+
+    hass.bus.async_fire(
+        "esphome.dooya_received",
+        {"id": "00400A7E", "channel": 241, "button": 3, "check": 12},
+    )
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_configure(result["flow_id"])
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "learn_additional_confirm"
+    assert result["description_placeholders"]["dooya_id"] == "0x400A7E"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"add": True}
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_ADDITIONAL_REMOTES] == [
+        {CONF_DOOYA_ID: 0x00400A7E, CONF_CHANNEL: 241}
+    ]
+    assert CONF_LEARN_ADDITIONAL not in entry.options
+
+
+async def test_options_learning_refuses_the_main_remote(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """The main remote cannot be stored as its own secondary."""
+    entry = await _add_cover(hass, channel=5, name="Salon")
+    result = await _start_additional_learning(hass, entry)
+    await asyncio.sleep(0)
+
+    hass.bus.async_fire(
+        "esphome.dooya_received",
+        {"id": "00D1C917", "channel": 5, "button": 1, "check": 1},
+    )
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_configure(result["flow_id"])
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"add": True}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "duplicate_remote"}
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"add": False}
+    )
+    await hass.async_block_till_done()
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_ADDITIONAL_REMOTES] == []
+
+
+async def test_options_learning_refuses_a_remote_from_another_shutter(
+    hass: HomeAssistant, gateway_service: list[dict]
+) -> None:
+    """A detected remote already claimed elsewhere cannot be reused."""
+    other = await _add_cover(hass, channel=5, name="Other")
+    hass.config_entries.async_update_entry(
+        other,
+        data={
+            **other.data,
+            CONF_DOOYA_ID: 0x00400A7E,
+            CONF_CHANNEL: 241,
+        },
+    )
+    entry = await _add_cover(hass, channel=6, name="Salon")
+    result = await _start_additional_learning(hass, entry)
+    await asyncio.sleep(0)
+
+    hass.bus.async_fire(
+        "esphome.dooya_received",
+        {"id": "00400A7E", "channel": 241, "button": 1, "check": 1},
+    )
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_configure(result["flow_id"])
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"add": True}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "duplicate_shutter"}
+
+
+async def test_options_learning_timeout_can_save_other_settings(
+    hass: HomeAssistant,
+    gateway_service: list[dict],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Silence offers a retry, and skipping still saves the edited options."""
+    monkeypatch.setattr(
+        "custom_components.dooya_rf.config_flow.LEARN_TIMEOUT_SEC", 0.05
+    )
+    entry = await _add_cover(hass, channel=5, name="Salon")
+    result = await _start_additional_learning(hass, entry)
+
+    await asyncio.sleep(0.2)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_configure(result["flow_id"])
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "learn_additional_retry"
+    assert result["errors"] == {"base": "learn_timeout"}
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"skip": True}
+    )
+    await hass.async_block_till_done()
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_ADDITIONAL_REMOTES] == []
+    assert entry.options[CONF_TRAVEL_TIME_UP] == 20.0

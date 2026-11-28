@@ -14,6 +14,7 @@ from homeassistant.components.cover import (
     CoverEntity,
     CoverEntityFeature,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
@@ -31,8 +32,8 @@ import voluptuous as vol
 from .const import (
     BROADCAST_CHANNEL,
     CALIBRATION_TIMEOUT_SEC,
-    CONF_CHANNEL,
-    CONF_DOOYA_ID,
+    CONF_GROUP_COVERS,
+    CONF_INVERT_DIRECTION,
     CONF_IS_AWNING,
     CONF_REPEAT_COUNT,
     CONF_REPEAT_REMOTE,
@@ -64,6 +65,7 @@ from .dooya_protocol import (
 from .echo_filter import TxEchoFilter
 from .entity import DooyaBaseEntity
 from .remote_press import PressTracker
+from .remotes import entry_remotes
 from .travel_calc import clamp_position, position_after, travel_duration
 
 if TYPE_CHECKING:
@@ -75,7 +77,9 @@ ATTR_POSITION = "position"
 
 
 @callback
-def group_channel_for(hass: HomeAssistant, dooya_id: int) -> int:
+def group_channel_for(
+    hass: HomeAssistant, dooya_id: int, entry: ConfigEntry | None = None
+) -> int | None:
     """Return the channel that addresses every shutter of one remote.
 
     The group role is declared by CONF_IS_GROUP on one cover rather than fixed
@@ -88,12 +92,17 @@ def group_channel_for(hass: HomeAssistant, dooya_id: int) -> int:
     Config entries are a short in-memory list, so the scan is cheaper than the
     staleness would be.
     """
-    for entry in hass.config_entries.async_entries(DOMAIN):
-        channel = entry.data.get(CONF_CHANNEL)
-        if entry.data.get(CONF_DOOYA_ID) != dooya_id or channel is None:
+    for group_entry in hass.config_entries.async_entries(DOMAIN):
+        if not is_group_entry(group_entry):
             continue
-        if is_group_entry(entry):
-            return int(channel)
+        for remote in entry_remotes(group_entry):
+            if remote.id != dooya_id:
+                continue
+            if entry is not None and entry.entry_id != group_entry.entry_id:
+                selected = entry_value(entry, CONF_GROUP_COVERS, None)
+                if isinstance(selected, list) and entry.entry_id not in selected:
+                    return None
+            return remote.channel
     return BROADCAST_CHANNEL
 
 
@@ -150,6 +159,10 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         # through _button_for / _direction_for: buttons stay physical,
         # directions and positions stay semantic (issue #50).
         self._is_awning = bool(entry_value(config_entry, CONF_IS_AWNING, False))
+        self._invert_direction = bool(
+            entry_value(config_entry, CONF_INVERT_DIRECTION, False)
+        )
+        self._reverse_direction = self._is_awning != self._invert_direction
         # A weak remote reaches some shutters and not others. Repeating its
         # presses from Home Assistant is only safe here, where our own frames
         # are known: an automation cannot tell them apart (issue #19).
@@ -383,10 +396,15 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         group cover carries no position estimate to drive.
         """
         siblings: list[DooyaCover] = []
+        ids = {remote.id for remote in self._remotes}
+        selected = entry_value(self._config_entry, CONF_GROUP_COVERS, None)
+        allowed = set(selected) if isinstance(selected, list) else None
         for entry in self.hass.config_entries.async_entries(DOMAIN):
             if entry.entry_id == self._config_entry.entry_id:
                 continue
-            if entry.data.get(CONF_DOOYA_ID) != self._dooya_id:
+            if allowed is not None and entry.entry_id not in allowed:
+                continue
+            if not ids & {remote.id for remote in entry_remotes(entry)}:
                 continue
             runtime_data = getattr(entry, "runtime_data", None)
             cover = getattr(runtime_data, "cover", None)
@@ -784,9 +802,23 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
         except (KeyError, TypeError, ValueError):
             return
 
-        if check is not None and not is_frame_consistent(button, check):
-            # A mis-decoded frame, not a press: acting on it would move an
-            # estimate, or cancel the STOP a partial move is waiting for.
+        matched_remote = None
+        for remote in self._remotes:
+            if event_id != remote.id:
+                continue
+            if event_channel == remote.channel or event_channel == group_channel_for(
+                self.hass, remote.id, self._config_entry
+            ):
+                matched_remote = remote
+                break
+        if matched_remote is None:
+            return
+
+        if (
+            check is not None
+            and matched_remote == self._remotes[0]
+            and not is_frame_consistent(button, check)
+        ):
             _LOGGER.debug(
                 "%s: ignoring a frame whose check does not match its button "
                 "(button=%d, check=%d)",
@@ -794,15 +826,6 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
                 button,
                 check,
             )
-            return
-
-        if event_id != self._dooya_id:
-            return
-        # A group frame — the remote's common button, or the Home Assistant
-        # entity standing for it — moves every shutter paired with this remote.
-        if event_channel != self._channel and event_channel != group_channel_for(
-            self.hass, self._dooya_id
-        ):
             return
 
         now = monotonic()
@@ -830,7 +853,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
 
         if (
             self._repeat_remote
-            and event_channel == self._channel
+            and event_channel == matched_remote.channel
             and button in (BUTTON_UP, BUTTON_DOWN, BUTTON_STOP)
         ):
             self._echo_filter.record_tx(button, now)
@@ -850,7 +873,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
     def _button_for(self, direction: int) -> int:
         """Return the button that moves this cover in `direction` (+1 opens)."""
         opens = direction > 0
-        if self._is_awning:
+        if self._reverse_direction:
             opens = not opens
         return BUTTON_UP if opens else BUTTON_DOWN
 
@@ -862,7 +885,7 @@ class DooyaCover(DooyaBaseEntity, CoverEntity, RestoreEntity):
             direction = -1
         else:
             return 0
-        return -direction if self._is_awning else direction
+        return -direction if self._reverse_direction else direction
 
     @callback
     def _start_estimated_motion(self, direction: int, target_position: int) -> None:
